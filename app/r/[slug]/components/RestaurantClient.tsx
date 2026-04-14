@@ -168,25 +168,36 @@ export default function RestaurantClient({
           <div className="relative h-[85vh] w-full flex items-center justify-center overflow-hidden">
             <div className="absolute inset-0 z-0">
               <img 
-                src={restaurant.coverImage || "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=1600&auto=format"} 
+                src={(restaurant.coverImage && !restaurant.coverImage.includes('placehold.co')) ? restaurant.coverImage : "https://images.unsplash.com/photo-1544025162-d76694265947?w=1600&auto=format"} 
                 alt={restaurant.name} 
                 className="w-full h-full object-cover" 
               />
-              <div className="absolute inset-0 bg-gradient-to-b from-gray-900/40 via-gray-900/60 to-gray-900"></div>
+              {/* Layered Cinematic Gradients */}
+              <div className="absolute inset-0 bg-gradient-to-b from-gray-900/60 via-gray-900/40 to-gray-900"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-900/40 via-transparent to-gray-900/40"></div>
+              <div className="absolute inset-0 bg-black/20"></div>
             </div>
             
-            <div className="relative z-10 max-w-6xl mx-auto px-6 text-center">
-              <h1 className="text-7xl md:text-9xl font-black mb-6 text-white italic tracking-tighter uppercase leading-[0.85]">
+            <div className="relative z-10 max-w-6xl mx-auto px-6 text-center pointer-events-auto">
+              <div className="mb-10 inline-flex items-center gap-2 bg-white/5 backdrop-blur-xl border border-white/10 px-6 py-2 rounded-full shadow-2xl animate-pulse">
+                <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/80">Direct Kitchen Sync Active</span>
+              </div>
+
+              <h1 className="text-7xl md:text-9xl font-black mb-8 text-white italic tracking-tighter uppercase leading-[0.8] drop-shadow-2xl">
                 {restaurant.name}
               </h1>
-              <p className="text-xl md:text-2xl text-gray-300 mb-12 max-w-2xl mx-auto font-medium leading-relaxed opacity-90">
+              
+              <p className="text-xl md:text-2xl text-gray-200 mb-14 max-w-2xl mx-auto font-medium leading-tight opacity-90 drop-shadow-lg uppercase tracking-tight italic">
                 {restaurant.description || "Experience the finest culinary delights crafted with passion and served with excellence."}
               </p>
+
               <button 
                 onClick={() => handleSetView("menu")}
-                className="bg-orange-600 hover:bg-orange-500 text-white font-black py-6 px-12 rounded-2xl transition-all transform hover:scale-105 active:scale-95 shadow-2xl text-xl uppercase tracking-widest"
+                className="group relative bg-orange-600 hover:bg-orange-500 text-white font-black py-7 px-16 rounded-3xl transition-all transform hover:scale-105 active:scale-95 shadow-[0_0_50px_rgba(234,88,12,0.3)] hover:shadow-[0_0_80px_rgba(234,88,12,0.5)] text-2xl uppercase tracking-[0.1em]"
               >
-                Start Your Order
+                <span className="relative z-10">Start Your Order</span>
+                <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-orange-400 to-orange-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
               </button>
             </div>
           </div>
