@@ -31,7 +31,7 @@ export default function GetStartedClient({ defaultPlanId }: { defaultPlanId: str
         body: JSON.stringify(data),
       });
 
-      const json = await res.json();
+      const json = await res.json().catch(() => ({ error: `Server error (${res.status})` }));
 
       if (!res.ok || !json.authorizationUrl) {
         setError(json.error ?? "Something went wrong. Please try again.");
@@ -40,8 +40,8 @@ export default function GetStartedClient({ defaultPlanId }: { defaultPlanId: str
       }
 
       window.location.href = json.authorizationUrl;
-    } catch {
-      setError("Network error. Please try again.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error. Please try again.");
       setLoading(false);
     }
   }
