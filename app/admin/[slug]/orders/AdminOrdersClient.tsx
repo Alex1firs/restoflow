@@ -1,24 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { db } from "@/lib/firebase";
-import { 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  onSnapshot, 
-  updateDoc, 
-  doc,
-  Timestamp 
-} from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, updateDoc, doc, Timestamp } from "firebase/firestore";
 
-type OrderItem = {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-};
+type OrderStatus = "pending" | "preparing" | "ready" | "completed" | "rejected";
+
+type OrderItem = { id: string; name: string; price: number; quantity: number };
 
 type Order = {
   id: string;
@@ -27,242 +15,361 @@ type Order = {
   address: string;
   note: string;
   items: OrderItem[];
+  itemsTotal?: number;
+  deliveryFee?: number;
   total: number;
-  status: "pending" | "preparing" | "completed";
+  status: OrderStatus;
   paymentMethod?: "online" | "cash";
   paymentStatus?: "paid" | "pending";
   paymentReference?: string;
+  rejectionReason?: string;
   createdAt: Timestamp;
 };
 
-type Props = {
-  restaurant: {
-    id: string;
-    name: string;
-    slug: string;
-  };
+type FilterTab = "active" | "completed" | "all";
+
+type Props = { restaurant: { id: string; name: string; slug: string } };
+
+function playBeep() {
+  try {
+    const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new AC();
+    [0, 0.18, 0.36].forEach((t) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.35, ctx.currentTime + t);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.15);
+      osc.start(ctx.currentTime + t);
+      osc.stop(ctx.currentTime + t + 0.15);
+    });
+  } catch { /* silently skip if AudioContext unavailable */ }
+}
+
+const STATUS_CONFIG: Record<OrderStatus, { label: string; badge: string; dot: string }> = {
+  pending:   { label: "New Order", badge: "bg-amber-100 text-amber-800 border-amber-200", dot: "bg-amber-500" },
+  preparing: { label: "Preparing", badge: "bg-blue-100 text-blue-800 border-blue-200",   dot: "bg-blue-500" },
+  ready:     { label: "Ready",     badge: "bg-purple-100 text-purple-800 border-purple-200", dot: "bg-purple-500" },
+  completed: { label: "Completed", badge: "bg-green-100 text-green-800 border-green-200", dot: "bg-green-500" },
+  rejected:  { label: "Rejected",  badge: "bg-red-100 text-red-800 border-red-200",      dot: "bg-red-400" },
 };
 
 export default function AdminOrdersClient({ restaurant }: Props) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  const [tab, setTab] = useState<FilterTab>("active");
+  const [updating, setUpdating] = useState<string | null>(null);
+  const [newOrderIds, setNewOrderIds] = useState<Set<string>>(new Set());
+  const [toast, setToast] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
 
-  const fetchOrders = () => {
-    setLoading(true);
+  const prevIds = useRef<Set<string>>(new Set());
+  const firstLoad = useRef(true);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 4000);
+  }, []);
+
+  useEffect(() => {
     const q = query(
       collection(db, "orders"),
       where("restaurantId", "==", restaurant.slug),
       orderBy("createdAt", "desc")
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const ordersData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Order[];
-      setOrders(ordersData);
+    const unsub = onSnapshot(q, (snap) => {
+      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Order[];
+      setOrders(data);
       setLoading(false);
-    }, (error) => {
-      console.error("Firestore real-time error:", error);
+
+      const currentIds = new Set(snap.docs.map((d) => d.id));
+      if (firstLoad.current) {
+        firstLoad.current = false;
+        prevIds.current = currentIds;
+        return;
+      }
+
+      const added = [...currentIds].filter((id) => !prevIds.current.has(id));
+      if (added.length > 0) {
+        playBeep();
+        setNewOrderIds((prev) => new Set([...prev, ...added]));
+        showToast(`${added.length} new order${added.length > 1 ? "s" : ""} received!`);
+        setTimeout(() => {
+          setNewOrderIds((prev) => {
+            const next = new Set(prev);
+            added.forEach((id) => next.delete(id));
+            return next;
+          });
+        }, 8000);
+      }
+      prevIds.current = currentIds;
+    }, (err) => {
+      console.error("Firestore error:", err);
       setLoading(false);
     });
 
-    return unsubscribe;
-  };
+    return () => unsub();
+  }, [restaurant.slug, showToast]);
 
-  useEffect(() => {
-    const unsubscribe = fetchOrders();
-    return () => unsubscribe();
-  }, [restaurant.slug]);
-
-  const updateStatus = async (orderId: string, currentStatus: string) => {
-    let nextStatus: Order["status"];
-    if (currentStatus === "pending") nextStatus = "preparing";
-    else if (currentStatus === "preparing") nextStatus = "completed";
-    else return;
-
-    setIsUpdating(orderId);
+  const advance = async (orderId: string, next: OrderStatus) => {
+    setUpdating(orderId);
     try {
-      const orderRef = doc(db, "orders", orderId);
-      await updateDoc(orderRef, { status: nextStatus });
-    } catch (error) {
-      console.error("Failed to update status:", error);
-      alert("Error updating status. Please try again.");
+      await updateDoc(doc(db, "orders", orderId), { status: next });
+    } catch {
+      alert("Failed to update status. Please try again.");
     } finally {
-      setIsUpdating(null);
+      setUpdating(null);
     }
   };
 
-  const formatDate = (timestamp: Timestamp) => {
-    if (!timestamp) return "Just now";
-    return timestamp.toDate().toLocaleString([], { 
-      month: 'short', 
-      day: 'numeric', 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "pending": return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "preparing": return "bg-blue-100 text-blue-800 border-blue-200";
-      case "completed": return "bg-green-100 text-green-800 border-green-200";
-      default: return "bg-gray-100 text-gray-800 border-gray-200";
+  const reject = async (orderId: string) => {
+    if (!window.confirm("Reject this order? The customer will not be automatically notified.")) return;
+    setUpdating(orderId);
+    try {
+      await updateDoc(doc(db, "orders", orderId), { status: "rejected" });
+      setRejectingId(null);
+    } catch {
+      alert("Failed to reject order.");
+    } finally {
+      setUpdating(null);
     }
   };
+
+  const fmt = (ts: Timestamp) => {
+    if (!ts) return "Just now";
+    return ts.toDate().toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const isToday = (ts: Timestamp) => {
+    if (!ts?.toDate) return false;
+    const d = ts.toDate();
+    const now = new Date();
+    return d.toDateString() === now.toDateString();
+  };
+
+  const activeStatuses: OrderStatus[] = ["pending", "preparing", "ready"];
+  const todayOrders = orders.filter((o) => isToday(o.createdAt));
+  const activeOrders = orders.filter((o) => activeStatuses.includes(o.status));
+
+  const filtered =
+    tab === "active" ? activeOrders :
+    tab === "completed" ? orders.filter((o) => o.status === "completed" || o.status === "rejected") :
+    orders;
+
+  // Dashboard stats
+  const todayRevenue = todayOrders.filter((o) => o.status !== "rejected").reduce((s, o) => s + o.total, 0);
+  const todayPaid = todayOrders.filter((o) => o.paymentStatus === "paid").length;
+  const todayCash = todayOrders.filter((o) => o.paymentMethod === "cash" && o.status !== "rejected").length;
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <header className="flex justify-between items-center mb-10">
-        <div>
-          <h1 className="text-3xl font-black text-gray-900">{restaurant.name} Admin</h1>
-          <p className="text-gray-500 font-medium">Order Management Dashboard</p>
+    <div className="max-w-5xl mx-auto px-4 py-6">
+      {/* Toast */}
+      {toast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 border border-orange-500/50 text-white px-6 py-3 rounded-2xl shadow-2xl font-bold text-sm flex items-center gap-3 animate-bounce">
+          <span className="w-2.5 h-2.5 bg-orange-500 rounded-full animate-ping" />
+          {toast}
         </div>
-        <button 
-          onClick={() => window.location.reload()}
-          className="bg-white border text-gray-600 hover:text-black hover:border-black px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-          Manual Refresh
-        </button>
-      </header>
+      )}
+
+      {/* Header */}
+      <div className="flex justify-between items-start mb-6">
+        <div>
+          <h1 className="text-2xl font-black text-gray-900">{restaurant.name}</h1>
+          <p className="text-gray-500 text-sm font-medium">Live order management</p>
+        </div>
+        {activeOrders.length > 0 && (
+          <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 px-4 py-2 rounded-xl">
+            <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+            <span className="text-sm font-black text-orange-700">{activeOrders.length} active</span>
+          </div>
+        )}
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <StatCard label="Today's Orders" value={todayOrders.length.toString()} color="orange" />
+        <StatCard label="Today's Revenue" value={`₦${todayRevenue.toLocaleString("en-NG")}`} color="green" />
+        <StatCard label="Online Paid" value={todayPaid.toString()} color="blue" />
+        <StatCard label="Cash Orders" value={todayCash.toString()} color="gray" />
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl mb-6 w-fit">
+        {(["active", "completed", "all"] as FilterTab[]).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${tab === t ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
+          >
+            {t === "active" ? `Active (${activeOrders.length})` : t === "completed" ? "Done" : "All"}
+          </button>
+        ))}
+      </div>
 
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border shadow-sm">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mb-4"></div>
-          <p className="text-gray-400 font-bold">Synchronizing orders...</p>
+        <div className="flex flex-col items-center py-20 bg-white rounded-3xl border shadow-sm">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-600 mb-4" />
+          <p className="text-gray-400 font-bold">Loading orders…</p>
         </div>
-      ) : orders.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-300">
-          <div className="bg-gray-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg className="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
-          </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">No orders found</h2>
-          <p className="text-gray-500">New orders will appear here automatically.</p>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
+          <p className="text-gray-400 font-bold">{tab === "active" ? "No active orders right now." : "No orders yet."}</p>
+          <p className="text-gray-300 text-sm mt-1">New orders appear here in real-time.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6">
-          {orders.map((order) => (
-            <div key={order.id} className="bg-white border rounded-3xl shadow-sm overflow-hidden transition-all hover:shadow-md">
-              <div className="flex flex-col md:flex-row">
-                {/* Left Side: Order Info */}
-                <div className="p-6 md:w-2/3 border-b md:border-b-0 md:border-r">
-                  <div className="flex justify-between items-start mb-6">
-                    <div>
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Order Ref</span>
-                      <h3 className="font-mono text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded inline-block">{order.id}</h3>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Time</span>
-                      <p className="text-sm font-bold text-gray-700">{formatDate(order.createdAt)}</p>
-                    </div>
+        <div className="space-y-4">
+          {filtered.map((order) => {
+            const cfg = STATUS_CONFIG[order.status];
+            const isNew = newOrderIds.has(order.id);
+            const busy = updating === order.id;
+
+            return (
+              <div key={order.id} className={`bg-white border rounded-3xl overflow-hidden shadow-sm transition-all ${isNew ? "border-orange-400 shadow-orange-100 shadow-lg ring-2 ring-orange-300/50" : "border-gray-100 hover:shadow-md"}`}>
+                {isNew && (
+                  <div className="bg-orange-500 text-white text-xs font-black uppercase tracking-widest px-4 py-1.5 text-center">
+                    New Order!
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                    <div>
-                      <h4 className="text-sm font-black text-gray-400 uppercase tracking-wider mb-3">Customer</h4>
-                      <p className="font-bold text-gray-900 text-lg">{order.customerName}</p>
-                      <p className="text-sm text-gray-600 mb-1">{order.phone}</p>
-                      <p className="text-sm text-gray-500 leading-relaxed italic">{order.address}</p>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-black text-gray-400 uppercase tracking-wider mb-3">Items</h4>
-                      <div className="space-y-2">
-                        {order.items.map((item, idx) => (
-                          <div key={idx} className="flex justify-between text-sm">
-                            <span className="font-medium text-gray-700"><span className="font-black text-orange-600">{item.quantity}x</span> {item.name}</span>
-                            <span className="text-gray-400">₦{item.price.toFixed(2)}</span>
-                          </div>
-                        ))}
+                )}
+                <div className="flex flex-col md:flex-row">
+                  {/* Left */}
+                  <div className="p-5 md:w-[60%] border-b md:border-b-0 md:border-r border-gray-100">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <span className="font-mono text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded font-bold">{order.id.slice(0, 8).toUpperCase()}</span>
+                        <p className="text-[10px] text-gray-400 mt-1 font-bold">{fmt(order.createdAt)}</p>
                       </div>
+                      <span className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase border ${cfg.badge}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                        {cfg.label}
+                      </span>
                     </div>
-                  </div>
 
-                  {order.note && (
-                    <div className="bg-yellow-50 border border-yellow-100 p-4 rounded-2xl mb-4">
-                      <span className="text-[10px] font-black text-yellow-700 uppercase tracking-wider block mb-1">Customer Note</span>
-                      <p className="text-sm text-yellow-800">{order.note}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Right Side: Status & Action */}
-                <div className="p-6 md:w-1/3 bg-gray-50 flex flex-col justify-between items-center text-center">
-                  <div className="w-full">
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Current Status</span>
-                    <span className={`inline-block px-4 py-1.5 rounded-full text-xs font-black uppercase border ${getStatusBadge(order.status)}`}>
-                      {order.status}
-                    </span>
-                  </div>
-
-                  <div className="w-full mt-6">
-                    {/* Payment info */}
-                    <div className="mb-4 space-y-2">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-gray-400 font-bold uppercase tracking-wide">Payment</span>
-                        <span className={`font-black uppercase px-2 py-0.5 rounded-full text-[10px] ${
-                          order.paymentMethod === "online"
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-gray-100 text-gray-600"
-                        }`}>
-                          {order.paymentMethod === "online" ? "Online" : "Cash"}
-                        </span>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Customer</p>
+                        <p className="font-bold text-gray-900">{order.customerName}</p>
+                        <p className="text-sm text-gray-500">{order.phone}</p>
+                        <p className="text-xs text-gray-400 italic mt-0.5 leading-relaxed">{order.address}</p>
                       </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-gray-400 font-bold uppercase tracking-wide">Status</span>
-                        <span className={`font-black uppercase px-2 py-0.5 rounded-full text-[10px] ${
-                          order.paymentStatus === "paid"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-yellow-100 text-yellow-700"
-                        }`}>
-                          {order.paymentStatus === "paid" ? "Paid" : "Pending"}
-                        </span>
-                      </div>
-                      {order.paymentReference && (
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="text-gray-400 font-bold uppercase tracking-wide">Ref</span>
-                          <span className="font-mono text-gray-500 text-[10px] truncate max-w-[120px]">{order.paymentReference}</span>
+                      <div>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Items</p>
+                        <div className="space-y-1">
+                          {order.items.map((item, i) => (
+                            <p key={i} className="text-sm text-gray-700">
+                              <span className="font-black text-orange-600">{item.quantity}×</span> {item.name}
+                            </p>
+                          ))}
                         </div>
-                      )}
+                      </div>
                     </div>
 
-                    <div className="flex justify-between items-center mb-6">
-                      <span className="text-sm font-bold text-gray-400">Total</span>
-                      <span className="text-2xl font-black text-gray-900">₦{order.total.toFixed(2)}</span>
-                    </div>
-
-                    {order.status !== "completed" ? (
-                      <button 
-                        onClick={() => updateStatus(order.id, order.status)}
-                        disabled={isUpdating === order.id}
-                        className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all transform active:scale-95 shadow-lg ${
-                          order.status === "pending" 
-                            ? "bg-blue-600 hover:bg-blue-700 text-white" 
-                            : "bg-green-600 hover:bg-green-700 text-white"
-                        } ${isUpdating === order.id ? "opacity-50 cursor-not-allowed" : ""}`}
-                      >
-                        {isUpdating === order.id 
-                          ? "Updating..." 
-                          : order.status === "pending" 
-                            ? "Mark as Preparing" 
-                            : "Mark as Completed"
-                        }
-                      </button>
-                    ) : (
-                      <div className="flex items-center justify-center gap-2 text-green-600 font-bold">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-                        Order Fulfilled
+                    {order.note && (
+                      <div className="bg-amber-50 border border-amber-100 px-3 py-2 rounded-xl">
+                        <p className="text-[10px] font-black text-amber-700 uppercase mb-0.5">Note</p>
+                        <p className="text-sm text-amber-800">{order.note}</p>
                       </div>
                     )}
                   </div>
+
+                  {/* Right */}
+                  <div className="p-5 md:w-[40%] bg-gray-50 flex flex-col gap-4">
+                    {/* Payment */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400 font-bold uppercase">Payment</span>
+                        <span className={`font-black uppercase px-2 py-0.5 rounded-full text-[10px] ${order.paymentMethod === "online" ? "bg-blue-100 text-blue-700" : "bg-gray-200 text-gray-600"}`}>
+                          {order.paymentMethod === "online" ? "Online" : "Cash"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400 font-bold uppercase">Status</span>
+                        <span className={`font-black uppercase px-2 py-0.5 rounded-full text-[10px] ${order.paymentStatus === "paid" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+                          {order.paymentStatus === "paid" ? "Paid" : "Pending"}
+                        </span>
+                      </div>
+                      {order.deliveryFee !== undefined && order.deliveryFee > 0 && (
+                        <div className="flex justify-between text-xs text-gray-400">
+                          <span>Items</span><span>₦{(order.itemsTotal ?? order.total - order.deliveryFee).toLocaleString("en-NG")}</span>
+                        </div>
+                      )}
+                      {order.deliveryFee !== undefined && order.deliveryFee > 0 && (
+                        <div className="flex justify-between text-xs text-gray-400">
+                          <span>Delivery</span><span>₦{order.deliveryFee.toLocaleString("en-NG")}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between font-black pt-1 border-t border-gray-200">
+                        <span className="text-sm text-gray-600">Total</span>
+                        <span className="text-xl text-gray-900">₦{order.total.toLocaleString("en-NG")}</span>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="space-y-2 mt-auto">
+                      {order.status === "pending" && (
+                        <>
+                          <button onClick={() => advance(order.id, "preparing")} disabled={busy} className="w-full py-3 rounded-2xl bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest transition-all active:scale-95">
+                            {busy ? "…" : "Accept Order"}
+                          </button>
+                          <button onClick={() => reject(order.id)} disabled={busy} className="w-full py-2.5 rounded-2xl bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-600 font-black text-xs uppercase tracking-widest transition-all border border-red-100">
+                            {busy ? "…" : "Reject"}
+                          </button>
+                        </>
+                      )}
+                      {order.status === "preparing" && (
+                        <button onClick={() => advance(order.id, "ready")} disabled={busy} className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest transition-all active:scale-95">
+                          {busy ? "…" : "Mark as Ready"}
+                        </button>
+                      )}
+                      {order.status === "ready" && (
+                        <button onClick={() => advance(order.id, "completed")} disabled={busy} className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest transition-all active:scale-95">
+                          {busy ? "…" : "Mark Completed"}
+                        </button>
+                      )}
+                      {order.status === "completed" && (
+                        <div className="flex items-center justify-center gap-2 text-green-600 font-bold text-sm py-2">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                          Fulfilled
+                        </div>
+                      )}
+                      {order.status === "rejected" && (
+                        <div className="flex items-center justify-center gap-2 text-red-500 font-bold text-sm py-2">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                          Rejected
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
+    </div>
+  );
+}
+
+function StatCard({ label, value, color }: { label: string; value: string; color: string }) {
+  const colors: Record<string, string> = {
+    orange: "border-orange-100 bg-orange-50",
+    green:  "border-green-100 bg-green-50",
+    blue:   "border-blue-100 bg-blue-50",
+    gray:   "border-gray-100 bg-white",
+  };
+  const textColors: Record<string, string> = {
+    orange: "text-orange-700",
+    green:  "text-green-700",
+    blue:   "text-blue-700",
+    gray:   "text-gray-700",
+  };
+  return (
+    <div className={`border rounded-2xl p-4 ${colors[color]}`}>
+      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{label}</p>
+      <p className={`text-xl font-black ${textColors[color]}`}>{value}</p>
     </div>
   );
 }

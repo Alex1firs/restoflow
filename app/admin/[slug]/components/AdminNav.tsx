@@ -14,6 +14,7 @@ export default function AdminNav({ slug }: Props) {
   const router = useRouter();
 
   const navItems = [
+    { name: "Dashboard", href: `/admin/${slug}/dashboard` },
     { name: "Orders", href: `/admin/${slug}/orders` },
     { name: "Menu", href: `/admin/${slug}/menu` },
     { name: "Payments", href: `/admin/${slug}/payment` },

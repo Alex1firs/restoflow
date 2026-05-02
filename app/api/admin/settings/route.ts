@@ -15,13 +15,28 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { name, description, logo, coverImage, phone, address } = body as {
+  const {
+    name,
+    description,
+    logo,
+    coverImage,
+    phone,
+    address,
+    notificationPhone,
+    deliveryFee,
+    minimumOrder,
+    openingHours,
+  } = body as {
     name?: string;
     description?: string;
     logo?: string;
     coverImage?: string;
     phone?: string;
     address?: string;
+    notificationPhone?: string;
+    deliveryFee?: number;
+    minimumOrder?: number;
+    openingHours?: Record<string, { open: boolean; from: string; to: string }>;
   };
 
   if (!name?.trim()) {
@@ -38,6 +53,10 @@ export async function PUT(req: NextRequest) {
       coverImage: (coverImage ?? "").trim(),
       phone: (phone ?? "").trim(),
       address: (address ?? "").trim(),
+      notificationPhone: (notificationPhone ?? "").trim(),
+      deliveryFee: typeof deliveryFee === "number" && deliveryFee >= 0 ? deliveryFee : 0,
+      minimumOrder: typeof minimumOrder === "number" && minimumOrder >= 0 ? minimumOrder : 0,
+      ...(openingHours && typeof openingHours === "object" ? { openingHours } : {}),
     });
 
   return NextResponse.json({ success: true });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { checkIsOpen } from "@/lib/restaurant-utils";
 
 export async function POST(req: NextRequest) {
   let body: unknown;
@@ -45,16 +46,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
     }
 
-    const restaurantData = restaurantDoc.data()!;
-    const subaccountCode = restaurantData.paystackSubaccountCode as string | undefined;
-    if (!subaccountCode) {
-      return NextResponse.json(
-        { error: "Online payments are not set up for this restaurant." },
-        { status: 422 }
-      );
+    const rData = restaurantDoc.data()!;
+
+    if (!checkIsOpen(rData.openingHours as Parameters<typeof checkIsOpen>[0])) {
+      return NextResponse.json({ error: "The restaurant is currently closed." }, { status: 422 });
     }
 
-    // Fetch menu items — prices come from DB, never from client
+    const subaccountCode = rData.paystackSubaccountCode as string | undefined;
+    if (!subaccountCode) {
+      return NextResponse.json({ error: "Online payments are not set up for this restaurant." }, { status: 422 });
+    }
+
+    const deliveryFee = (rData.deliveryFee as number) ?? 0;
+    const minimumOrder = (rData.minimumOrder as number) ?? 0;
+
     const menuSnap = await db
       .collection("menu_items")
       .where("restaurantId", "==", restaurantId.trim())
@@ -70,7 +75,7 @@ export async function POST(req: NextRequest) {
     }
 
     const validatedItems: { id: string; name: string; price: number; quantity: number }[] = [];
-    let total = 0;
+    let itemsTotal = 0;
 
     for (const item of items as { id: string; quantity: number }[]) {
       const menuItem = menuMap.get(item.id);
@@ -81,9 +86,17 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `"${menuItem.name}" is currently unavailable` }, { status: 400 });
       }
       validatedItems.push({ id: item.id, name: menuItem.name, price: menuItem.price, quantity: item.quantity });
-      total += menuItem.price * item.quantity;
+      itemsTotal += menuItem.price * item.quantity;
     }
 
+    if (minimumOrder > 0 && itemsTotal < minimumOrder) {
+      return NextResponse.json(
+        { error: `Minimum order is ₦${minimumOrder.toLocaleString("en-NG")}. Please add more items.` },
+        { status: 422 }
+      );
+    }
+
+    const total = itemsTotal + deliveryFee;
     const amountKobo = Math.round(total * 100);
     const callbackUrl = `${process.env.NEXT_PUBLIC_APP_URL}/r/${restaurantId.trim()}/payment/callback`;
 
@@ -100,10 +113,7 @@ export async function POST(req: NextRequest) {
         subaccount: subaccountCode,
         bearer: "subaccount",
         callback_url: callbackUrl,
-        metadata: {
-          paymentType: "order",
-          restaurantId: restaurantId.trim(),
-        },
+        metadata: { paymentType: "order", restaurantId: restaurantId.trim() },
       }),
     });
 
@@ -116,7 +126,6 @@ export async function POST(req: NextRequest) {
     const reference = paystackData.reference as string;
     const authorizationUrl = paystackData.authorization_url as string;
 
-    // Store pending payment so we can create the order after verification
     await db.collection("pending_payments").doc(reference).set({
       restaurantId: restaurantId.trim(),
       customerName: customerName.trim(),
@@ -124,6 +133,8 @@ export async function POST(req: NextRequest) {
       address: address.trim(),
       note: typeof note === "string" ? note.trim() : "",
       items: validatedItems,
+      itemsTotal,
+      deliveryFee,
       total,
       createdAt: FieldValue.serverTimestamp(),
     });

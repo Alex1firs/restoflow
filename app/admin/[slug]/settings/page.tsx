@@ -5,6 +5,7 @@ import { getSubscriptionInfo } from "@/lib/subscription";
 import AdminNav from "../components/AdminNav";
 import SubscriptionBanner from "../components/SubscriptionBanner";
 import SettingsClient from "./SettingsClient";
+import type { OpeningHours } from "@/lib/restaurant-utils";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -32,6 +33,10 @@ export default async function SettingsPage({ params }: Props) {
     coverImage: (data.coverImage as string) ?? "",
     phone: (data.phone as string) ?? "",
     address: (data.address as string) ?? "",
+    notificationPhone: (data.notificationPhone as string) ?? "",
+    deliveryFee: (data.deliveryFee as number) ?? 0,
+    minimumOrder: (data.minimumOrder as number) ?? 0,
+    openingHours: (data.openingHours as OpeningHours) ?? null,
   };
 
   return (

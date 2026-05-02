@@ -42,8 +42,8 @@ service cloud.firestore {
       allow create: if false;
       allow read:   if isOwnerOf(resource.data.restaurantId);
       allow update: if isOwnerOf(resource.data.restaurantId)
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
-                    && request.resource.data.status in ['pending', 'preparing', 'completed'];
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'rejectionReason'])
+                    && request.resource.data.status in ['pending', 'preparing', 'ready', 'completed', 'rejected'];
       allow delete: if false;
     }
 

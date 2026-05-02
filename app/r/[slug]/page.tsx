@@ -4,6 +4,7 @@ import { doc, getDoc, collection, query, where, getDocs, DocumentData } from 'fi
 import RestaurantClient from './components/RestaurantClient';
 import { CartProvider } from './components/CartContext';
 import Link from 'next/link';
+import { checkIsOpen, type OpeningHours } from '@/lib/restaurant-utils';
 
 interface RestaurantData extends DocumentData {
   name: string;
@@ -95,6 +96,13 @@ export default async function RestaurantPage({
     id: doc.id
   })) as MenuItemData[];
 
+  const rData = restaurant as {
+    paystackSubaccountCode?: string;
+    deliveryFee?: number;
+    minimumOrder?: number;
+    openingHours?: OpeningHours;
+  };
+
   return (
     <CartProvider>
       <Suspense fallback={<div className="min-h-screen bg-gray-900 flex items-center justify-center text-orange-500">Loading experience...</div>}>
@@ -104,7 +112,10 @@ export default async function RestaurantPage({
             description: restaurant.description,
             coverImage: restaurant.coverImage,
             slug: slug,
-            onlinePaymentEnabled: !!(restaurant as { paystackSubaccountCode?: string }).paystackSubaccountCode,
+            onlinePaymentEnabled: !!rData.paystackSubaccountCode,
+            deliveryFee: rData.deliveryFee ?? 0,
+            minimumOrder: rData.minimumOrder ?? 0,
+            isOpen: checkIsOpen(rData.openingHours),
           }}
           menuItems={menuItems}
           initialView={initialView as "home" | "menu" | "cart" | "checkout" | "success"}

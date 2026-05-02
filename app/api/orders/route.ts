@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { checkIsOpen } from "@/lib/restaurant-utils";
+import { sendNewOrderSMS } from "@/lib/notifications";
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -13,7 +15,6 @@ export async function POST(request: NextRequest) {
   const { restaurantId, customerName, phone, address, note, items } =
     body as Record<string, unknown>;
 
-  // Validate required string fields
   if (
     typeof restaurantId !== "string" || !restaurantId.trim() ||
     typeof customerName !== "string" || !customerName.trim() ||
@@ -23,12 +24,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  // Validate items array — only id and quantity are accepted from the client
   if (!Array.isArray(items) || items.length === 0) {
-    return NextResponse.json(
-      { error: "Order must contain at least one item" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Order must contain at least one item" }, { status: 400 });
   }
 
   for (const item of items) {
@@ -45,27 +42,27 @@ export async function POST(request: NextRequest) {
   try {
     const db = getAdminDb();
 
-    // Verify the restaurant exists
-    const restaurantDoc = await db
-      .collection("restaurants")
-      .doc(restaurantId.trim())
-      .get();
-
+    const restaurantDoc = await db.collection("restaurants").doc(restaurantId.trim()).get();
     if (!restaurantDoc.exists) {
       return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
     }
 
-    // Fetch all menu items for this restaurant from the database.
-    // Prices are NEVER taken from the client — they come from here.
+    const rData = restaurantDoc.data()!;
+
+    // Check opening hours
+    if (!checkIsOpen(rData.openingHours as Parameters<typeof checkIsOpen>[0])) {
+      return NextResponse.json({ error: "The restaurant is currently closed." }, { status: 422 });
+    }
+
+    const deliveryFee = (rData.deliveryFee as number) ?? 0;
+    const minimumOrder = (rData.minimumOrder as number) ?? 0;
+
     const menuSnap = await db
       .collection("menu_items")
       .where("restaurantId", "==", restaurantId.trim())
       .get();
 
-    const menuMap = new Map<
-      string,
-      { name: string; price: number; available: boolean }
-    >();
+    const menuMap = new Map<string, { name: string; price: number; available: boolean }>();
     for (const doc of menuSnap.docs) {
       menuMap.set(doc.id, {
         name: doc.data().name as string,
@@ -74,42 +71,30 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Validate every ordered item: must belong to this restaurant and be available
-    const validatedItems: {
-      id: string;
-      name: string;
-      price: number;
-      quantity: number;
-    }[] = [];
-    let total = 0;
+    const validatedItems: { id: string; name: string; price: number; quantity: number }[] = [];
+    let itemsTotal = 0;
 
     for (const item of items as { id: string; quantity: number }[]) {
       const menuItem = menuMap.get(item.id);
-
       if (!menuItem) {
-        return NextResponse.json(
-          { error: "Item not found or does not belong to this restaurant" },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: "Item not found or does not belong to this restaurant" }, { status: 400 });
       }
       if (!menuItem.available) {
-        return NextResponse.json(
-          { error: `"${menuItem.name}" is currently unavailable` },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: `"${menuItem.name}" is currently unavailable` }, { status: 400 });
       }
-
-      validatedItems.push({
-        id: item.id,
-        name: menuItem.name,
-        price: menuItem.price,  // price from DB — any client-supplied price is ignored
-        quantity: item.quantity,
-      });
-
-      total += menuItem.price * item.quantity;
+      validatedItems.push({ id: item.id, name: menuItem.name, price: menuItem.price, quantity: item.quantity });
+      itemsTotal += menuItem.price * item.quantity;
     }
 
-    // Write the order — total is computed server-side from verified DB prices
+    if (minimumOrder > 0 && itemsTotal < minimumOrder) {
+      return NextResponse.json(
+        { error: `Minimum order is ₦${minimumOrder.toLocaleString("en-NG")}. Please add more items.` },
+        { status: 422 }
+      );
+    }
+
+    const total = itemsTotal + deliveryFee;
+
     const orderRef = await db.collection("orders").add({
       restaurantId: restaurantId.trim(),
       customerName: customerName.trim(),
@@ -117,6 +102,8 @@ export async function POST(request: NextRequest) {
       address: address.trim(),
       note: typeof note === "string" ? note.trim() : "",
       items: validatedItems,
+      itemsTotal,
+      deliveryFee,
       total,
       paymentMethod: "cash",
       paymentStatus: "pending",
@@ -124,12 +111,12 @@ export async function POST(request: NextRequest) {
       createdAt: FieldValue.serverTimestamp(),
     });
 
+    // Fire-and-forget SMS notification
+    sendNewOrderSMS(restaurantId.trim(), total, "cash").catch(() => {});
+
     return NextResponse.json({ orderId: orderRef.id }, { status: 201 });
   } catch (error) {
     console.error("Order creation failed:", error);
-    return NextResponse.json(
-      { error: "Failed to place order. Please try again." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to place order. Please try again." }, { status: 500 });
   }
 }
