@@ -9,6 +9,18 @@ interface RestaurantData extends DocumentData {
   name: string;
   description: string;
   coverImage: string;
+  subscriptionStatus?: string;
+  subscriptionEndDate?: { toDate?: () => Date; seconds?: number };
+}
+
+function isExpired(restaurant: RestaurantData): boolean {
+  if (restaurant.subscriptionStatus === "expired") return true;
+  if (restaurant.subscriptionEndDate) {
+    const raw = restaurant.subscriptionEndDate;
+    const end = raw.toDate ? raw.toDate() : new Date((raw.seconds ?? 0) * 1000);
+    return end < new Date();
+  }
+  return false;
 }
 
 interface MenuItemData extends DocumentData {
@@ -55,7 +67,27 @@ export default async function RestaurantPage({
 
   const restaurant = docSnap.data() as RestaurantData;
 
-  // 2. Fetch Menu Items Data
+  // 2. Block ordering if subscription has expired
+  if (isExpired(restaurant)) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-black text-white italic uppercase tracking-tighter mb-3">
+            {restaurant.name}
+          </h1>
+          <p className="text-gray-400 font-medium mb-2">Online ordering is temporarily unavailable.</p>
+          <p className="text-gray-600 text-sm">Please contact the restaurant directly to place your order.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Fetch Menu Items
   const menuQuery = query(collection(db, 'menu_items'), where('restaurantId', '==', slug));
   const menuSnap = await getDocs(menuQuery);
   const menuItems = menuSnap.docs.map(doc => ({

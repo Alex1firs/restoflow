@@ -1,8 +1,11 @@
-import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { redirect, notFound } from "next/navigation";
+import { getAuthenticatedUser } from "@/lib/auth-server";
+import { getAdminDb } from "@/lib/firebase-admin";
+import { getSubscriptionInfo } from "@/lib/subscription";
 import AdminOrdersClient from "./AdminOrdersClient";
 import AdminNav from "../components/AdminNav";
-import { notFound } from "next/navigation";
+import SubscriptionBanner from "../components/SubscriptionBanner";
+import BillingSection from "../components/BillingSection";
 
 export const revalidate = 0;
 
@@ -14,23 +17,45 @@ export default async function AdminOrdersPage({ params }: Props) {
   const resolvedParams = await params;
   const slug = resolvedParams.slug;
 
-  const restaurantRef = doc(db, "restaurants", slug);
-  const restaurantSnap = await getDoc(restaurantRef);
+  // 1. Verify session — redirects to login if invalid
+  const user = await getAuthenticatedUser();
 
-  if (!restaurantSnap.exists()) {
-    return notFound();
+  // 2. Enforce ownership — silently redirect to their own restaurant
+  if (user.restaurantSlug !== slug) {
+    redirect(`/admin/${user.restaurantSlug}/orders`);
   }
+
+  // 3. Load restaurant data
+  const restaurantSnap = await getAdminDb().collection("restaurants").doc(slug).get();
+  if (!restaurantSnap.exists) return notFound();
+
+  const data = restaurantSnap.data()!;
 
   const restaurant = {
     id: restaurantSnap.id,
-    name: restaurantSnap.data().name,
-    slug: restaurantSnap.data().slug,
+    name: data.name as string,
+    slug: data.slug as string,
   };
+
+  // 4. Derive subscription state (fetches plan name from plans collection)
+  const subscription = await getSubscriptionInfo(data as Record<string, unknown>);
 
   return (
     <div className="bg-gray-100 min-h-screen">
       <AdminNav slug={slug} />
-      <AdminOrdersClient restaurant={restaurant} />
+      <SubscriptionBanner subscription={subscription} />
+      <div className="max-w-6xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
+        <AdminOrdersClient restaurant={restaurant} />
+        <aside>
+          <BillingSection
+            restaurantSlug={slug}
+            planId={subscription.planId}
+            planName={subscription.planName}
+            monthlyPrice={subscription.monthlyPrice}
+            subscriptionStatus={subscription.status}
+          />
+        </aside>
+      </div>
     </div>
   );
 }

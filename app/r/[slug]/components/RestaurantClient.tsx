@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useCart } from "./CartContext";
 
 type View = "home" | "menu" | "cart" | "checkout" | "success";
@@ -41,6 +39,7 @@ export default function RestaurantClient({
   // Form State
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [orderError, setOrderError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     customerName: "",
     phone: "",
@@ -64,35 +63,40 @@ export default function RestaurantClient({
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
-    if (items.length === 0) {
-      return;
-    }
-
+    if (items.length === 0) return;
     if (!validateForm()) return;
 
     setIsSubmitting(true);
+    setOrderError(null);
 
     try {
-      const orderData = {
-        restaurantId: restaurant.slug,
-        customerName: formData.customerName,
-        phone: formData.phone,
-        address: formData.address,
-        note: formData.note,
-        items: items,
-        total: totalPrice,
-        status: "pending",
-        createdAt: serverTimestamp()
-      };
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          restaurantId: restaurant.slug,
+          customerName: formData.customerName,
+          phone: formData.phone,
+          address: formData.address,
+          note: formData.note,
+          // Only item IDs and quantities — prices are fetched server-side from the DB
+          items: items.map((item) => ({ id: item.id, quantity: item.quantity })),
+        }),
+      });
 
-      const docRef = await addDoc(collection(db, "orders"), orderData);
-      setOrderId(docRef.id);
-      
+      const data = await response.json();
+
+      if (!response.ok) {
+        setOrderError(data.error || "Failed to place order. Please try again.");
+        return;
+      }
+
+      setOrderId(data.orderId);
       clearCart();
       setFormData({ customerName: "", phone: "", address: "", note: "" });
       handleSetView("success");
-    } catch (err) {
-      console.error("Order submission failed:", err);
+    } catch {
+      setOrderError("Network error. Please check your connection and try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -341,7 +345,14 @@ export default function RestaurantClient({
                     className="w-full bg-white/5 p-4 rounded-xl border border-white/10 outline-none focus:border-orange-500" 
                   ></textarea>
                 </div>
-                <button type="submit" disabled={isSubmitting} className="w-full bg-orange-600 text-white font-black py-6 rounded-2xl text-lg uppercase tracking-widest shadow-xl">Confirm Order</button>
+                {orderError && (
+                  <div className="bg-red-900/50 border border-red-500/30 text-red-300 text-sm font-medium p-4 rounded-2xl">
+                    {orderError}
+                  </div>
+                )}
+                <button type="submit" disabled={isSubmitting} className="w-full bg-orange-600 text-white font-black py-6 rounded-2xl text-lg uppercase tracking-widest shadow-xl disabled:opacity-60">
+                  {isSubmitting ? "Placing Order..." : "Confirm Order"}
+                </button>
               </form>
               <div className="bg-gray-800/30 backdrop-blur-md p-8 rounded-[2.5rem] border border-white/5">
                 <h3 className="font-bold text-xl uppercase mb-6">Order Summary</h3>
