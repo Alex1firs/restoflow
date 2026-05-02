@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createOrderFromPaymentReference, getOrderByReference } from "@/lib/order-payments";
-import { sendNewOrderSMS } from "@/lib/notifications";
+import { sendNewOrderAlert } from "@/lib/notifications";
 import { getAdminDb } from "@/lib/firebase-admin";
 
 export async function POST(req: NextRequest) {
@@ -43,7 +43,13 @@ export async function POST(req: NextRequest) {
       const orderSnap = await getAdminDb().collection("orders").doc(orderId).get();
       if (orderSnap.exists) {
         const d = orderSnap.data()!;
-        sendNewOrderSMS(d.restaurantId as string, d.total as number, "online").catch(() => {});
+        sendNewOrderAlert({
+          restaurantSlug: d.restaurantId as string,
+          total: d.total as number,
+          paymentMethod: "online",
+          paymentStatus: "paid",
+          customerName: (d.customerName as string) ?? "",
+        }).catch(() => {});
       }
     }
 

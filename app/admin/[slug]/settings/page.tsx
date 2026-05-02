@@ -37,6 +37,9 @@ export default async function SettingsPage({ params }: Props) {
     deliveryFee: (data.deliveryFee as number) ?? 0,
     minimumOrder: (data.minimumOrder as number) ?? 0,
     openingHours: (data.openingHours as OpeningHours) ?? null,
+    whatsappPhone: (data.whatsappPhone as string) ?? "",
+    whatsappEnabled: (data.whatsappEnabled as boolean) ?? false,
+    alertPreference: ((data.alertPreference as string) ?? "sms") as "whatsapp" | "sms" | "both",
   };
 
   return (

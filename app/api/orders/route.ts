@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { checkIsOpen } from "@/lib/restaurant-utils";
-import { sendNewOrderSMS } from "@/lib/notifications";
+import { sendNewOrderAlert } from "@/lib/notifications";
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -111,8 +111,13 @@ export async function POST(request: NextRequest) {
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    // Fire-and-forget SMS notification
-    sendNewOrderSMS(restaurantId.trim(), total, "cash").catch(() => {});
+    sendNewOrderAlert({
+      restaurantSlug: restaurantId.trim(),
+      total,
+      paymentMethod: "cash",
+      paymentStatus: "pending",
+      customerName: customerName.trim(),
+    }).catch(() => {});
 
     return NextResponse.json({ orderId: orderRef.id }, { status: 201 });
   } catch (error) {

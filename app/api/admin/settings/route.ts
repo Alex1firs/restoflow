@@ -26,6 +26,9 @@ export async function PUT(req: NextRequest) {
     deliveryFee,
     minimumOrder,
     openingHours,
+    whatsappPhone,
+    whatsappEnabled,
+    alertPreference,
   } = body as {
     name?: string;
     description?: string;
@@ -37,6 +40,9 @@ export async function PUT(req: NextRequest) {
     deliveryFee?: number;
     minimumOrder?: number;
     openingHours?: Record<string, { open: boolean; from: string; to: string }>;
+    whatsappPhone?: string;
+    whatsappEnabled?: boolean;
+    alertPreference?: "whatsapp" | "sms" | "both";
   };
 
   if (!name?.trim()) {
@@ -57,6 +63,11 @@ export async function PUT(req: NextRequest) {
       deliveryFee: typeof deliveryFee === "number" && deliveryFee >= 0 ? deliveryFee : 0,
       minimumOrder: typeof minimumOrder === "number" && minimumOrder >= 0 ? minimumOrder : 0,
       ...(openingHours && typeof openingHours === "object" ? { openingHours } : {}),
+      whatsappPhone: (whatsappPhone ?? "").trim(),
+      whatsappEnabled: whatsappEnabled === true,
+      alertPreference: ["whatsapp", "sms", "both"].includes(alertPreference ?? "")
+        ? alertPreference
+        : "sms",
     });
 
   return NextResponse.json({ success: true });
