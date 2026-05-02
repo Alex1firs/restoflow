@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHmac } from "crypto";
 import { processSuccessfulPayment, type PaystackPaymentData } from "@/lib/payments";
 import { processOnboarding } from "@/lib/onboarding";
+import { createOrderFromPaymentReference } from "@/lib/order-payments";
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
@@ -26,6 +27,8 @@ export async function POST(req: NextRequest) {
     try {
       if (metadata?.paymentType === "onboarding" && metadata?.onboardingId) {
         await processOnboarding(metadata.onboardingId, reference);
+      } else if (metadata?.paymentType === "order") {
+        await createOrderFromPaymentReference(reference);
       } else {
         await processSuccessfulPayment(event.data);
       }

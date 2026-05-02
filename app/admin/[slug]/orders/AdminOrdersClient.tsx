@@ -29,6 +29,9 @@ type Order = {
   items: OrderItem[];
   total: number;
   status: "pending" | "preparing" | "completed";
+  paymentMethod?: "online" | "cash";
+  paymentStatus?: "paid" | "pending";
+  paymentReference?: string;
   createdAt: Timestamp;
 };
 
@@ -195,6 +198,36 @@ export default function AdminOrdersClient({ restaurant }: Props) {
                   </div>
 
                   <div className="w-full mt-6">
+                    {/* Payment info */}
+                    <div className="mb-4 space-y-2">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-gray-400 font-bold uppercase tracking-wide">Payment</span>
+                        <span className={`font-black uppercase px-2 py-0.5 rounded-full text-[10px] ${
+                          order.paymentMethod === "online"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-gray-100 text-gray-600"
+                        }`}>
+                          {order.paymentMethod === "online" ? "Online" : "Cash"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-gray-400 font-bold uppercase tracking-wide">Status</span>
+                        <span className={`font-black uppercase px-2 py-0.5 rounded-full text-[10px] ${
+                          order.paymentStatus === "paid"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-yellow-100 text-yellow-700"
+                        }`}>
+                          {order.paymentStatus === "paid" ? "Paid" : "Pending"}
+                        </span>
+                      </div>
+                      {order.paymentReference && (
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-gray-400 font-bold uppercase tracking-wide">Ref</span>
+                          <span className="font-mono text-gray-500 text-[10px] truncate max-w-[120px]">{order.paymentReference}</span>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="flex justify-between items-center mb-6">
                       <span className="text-sm font-bold text-gray-400">Total</span>
                       <span className="text-2xl font-black text-gray-900">₦{order.total.toFixed(2)}</span>

@@ -16,6 +16,7 @@ export default function AdminNav({ slug }: Props) {
   const navItems = [
     { name: "Orders", href: `/admin/${slug}/orders` },
     { name: "Menu", href: `/admin/${slug}/menu` },
+    { name: "Payments", href: `/admin/${slug}/payment` },
     { name: "Settings", href: `/admin/${slug}/settings` },
     { name: "QR Code", href: `/admin/${slug}/qr` },
   ];

@@ -98,14 +98,15 @@ export default async function RestaurantPage({
   return (
     <CartProvider>
       <Suspense fallback={<div className="min-h-screen bg-gray-900 flex items-center justify-center text-orange-500">Loading experience...</div>}>
-        <RestaurantClient 
+        <RestaurantClient
           restaurant={{
             name: restaurant.name,
             description: restaurant.description,
             coverImage: restaurant.coverImage,
-            slug: slug
-          }} 
-          menuItems={menuItems} 
+            slug: slug,
+            onlinePaymentEnabled: !!(restaurant as { paystackSubaccountCode?: string }).paystackSubaccountCode,
+          }}
+          menuItems={menuItems}
           initialView={initialView as "home" | "menu" | "cart" | "checkout" | "success"}
         />
       </Suspense>

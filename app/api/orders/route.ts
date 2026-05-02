@@ -118,6 +118,8 @@ export async function POST(request: NextRequest) {
       note: typeof note === "string" ? note.trim() : "",
       items: validatedItems,
       total,
+      paymentMethod: "cash",
+      paymentStatus: "pending",
       status: "pending",
       createdAt: FieldValue.serverTimestamp(),
     });

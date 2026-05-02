@@ -22,21 +22,21 @@ interface RestaurantClientProps {
     description: string;
     coverImage: string;
     slug: string;
+    onlinePaymentEnabled: boolean;
   };
   menuItems: MenuItemData[];
   initialView?: View;
 }
 
-export default function RestaurantClient({ 
-  restaurant, 
-  menuItems, 
-  initialView = "home" 
+export default function RestaurantClient({
+  restaurant,
+  menuItems,
+  initialView = "home",
 }: RestaurantClientProps) {
   const [view, setView] = useState<View>(initialView);
   const [isHydrated, setIsHydrated] = useState(false);
   const { items, addToCart, updateQuantity, totalPrice, clearCart } = useCart();
 
-  // Form State
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [orderError, setOrderError] = useState<string | null>(null);
@@ -44,7 +44,7 @@ export default function RestaurantClient({
     customerName: "",
     phone: "",
     address: "",
-    note: ""
+    note: "",
   });
 
   useEffect(() => {
@@ -56,41 +56,35 @@ export default function RestaurantClient({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const validateForm = () => {
-    return formData.customerName && formData.phone && formData.address;
-  };
+  const validateForm = () =>
+    formData.customerName.trim() && formData.phone.trim() && formData.address.trim();
 
-  const handlePlaceOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isSubmitting) return;
-    if (items.length === 0) return;
-    if (!validateForm()) return;
+  const orderPayload = () => ({
+    restaurantId: restaurant.slug,
+    customerName: formData.customerName,
+    phone: formData.phone,
+    address: formData.address,
+    note: formData.note,
+    items: items.map((item) => ({ id: item.id, quantity: item.quantity })),
+  });
 
+  // Pay on Delivery
+  const handleCashOrder = async () => {
+    if (isSubmitting || items.length === 0 || !validateForm()) return;
     setIsSubmitting(true);
     setOrderError(null);
 
     try {
-      const response = await fetch("/api/orders", {
+      const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          restaurantId: restaurant.slug,
-          customerName: formData.customerName,
-          phone: formData.phone,
-          address: formData.address,
-          note: formData.note,
-          // Only item IDs and quantities — prices are fetched server-side from the DB
-          items: items.map((item) => ({ id: item.id, quantity: item.quantity })),
-        }),
+        body: JSON.stringify(orderPayload()),
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setOrderError(data.error || "Failed to place order. Please try again.");
+      const data = await res.json();
+      if (!res.ok) {
+        setOrderError(data.error ?? "Failed to place order. Please try again.");
         return;
       }
-
       setOrderId(data.orderId);
       clearCart();
       setFormData({ customerName: "", phone: "", address: "", note: "" });
@@ -102,36 +96,60 @@ export default function RestaurantClient({
     }
   };
 
+  // Pay Online — redirects to Paystack
+  const handleOnlinePayment = async () => {
+    if (isSubmitting || items.length === 0 || !validateForm()) return;
+    setIsSubmitting(true);
+    setOrderError(null);
+
+    try {
+      const res = await fetch("/api/orders/initialize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderPayload()),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setOrderError(data.error ?? "Could not initialize payment. Please try again.");
+        setIsSubmitting(false);
+        return;
+      }
+      // Redirect to Paystack — isSubmitting stays true (user is leaving the page)
+      window.location.href = data.authorizationUrl;
+    } catch {
+      setOrderError("Network error. Please check your connection and try again.");
+      setIsSubmitting(false);
+    }
+  };
+
   const liveMenuItems = menuItems || [];
 
   return (
-    <div 
-      className="min-h-screen bg-gray-900 text-white font-sans selection:bg-orange-500/30 overflow-x-hidden flex flex-col"
-    >
+    <div className="min-h-screen bg-gray-900 text-white font-sans selection:bg-orange-500/30 overflow-x-hidden flex flex-col">
       {/* Sticky Navigation */}
       <nav className="sticky top-0 z-50 bg-gray-900/80 backdrop-blur-xl border-b border-white/5 px-4 py-4">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <button 
+          <button
             onClick={() => handleSetView("home")}
             className="text-2xl font-black italic tracking-tighter hover:text-orange-500 transition-colors uppercase"
           >
             {restaurant.name}
           </button>
-          
+
           <div className="flex items-center gap-2 md:gap-4">
-            <button 
-              onClick={() => handleSetView("home")} 
-              className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${view === 'home' ? 'bg-white/10 text-orange-500' : 'text-gray-400 hover:text-white'}`}
+            <button
+              onClick={() => handleSetView("home")}
+              className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${view === "home" ? "bg-white/10 text-orange-500" : "text-gray-400 hover:text-white"}`}
             >
               Home
             </button>
-            <button 
-              onClick={() => handleSetView("menu")} 
-              className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${view === 'menu' ? 'bg-white/10 text-orange-500' : 'text-gray-400 hover:text-white'}`}
+            <button
+              onClick={() => handleSetView("menu")}
+              className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${view === "menu" ? "bg-white/10 text-orange-500" : "text-gray-400 hover:text-white"}`}
             >
               Menu
             </button>
-            <button 
+            <button
               onClick={() => handleSetView("cart")}
               className="relative group bg-orange-600 hover:bg-orange-500 p-2.5 rounded-xl transition-all shadow-lg shadow-orange-600/20 active:scale-95"
             >
@@ -148,16 +166,13 @@ export default function RestaurantClient({
         </div>
       </nav>
 
-      <main 
-        className={`${view === 'home' ? 'pb-24' : 'pb-12'} relative z-10 flex-1`}
-      >
+      <main className={`${view === "home" ? "pb-24" : "pb-12"} relative z-10 flex-1`}>
         {!isHydrated && (
           <div className="bg-orange-600/10 border-b border-orange-600/20 text-orange-500 p-2 text-center text-[10px] font-black uppercase tracking-widest">
-            Establishing Secure Sync... (Wait for Hydration)
+            Establishing Secure Sync...
           </div>
         )}
 
-        {/* QR Menu Mode Header */}
         {view === "menu" && (
           <div className="bg-gray-900 border-b border-white/5 py-12 px-6 text-center z-10 relative">
             <h1 className="text-4xl md:text-6xl font-black italic tracking-tighter uppercase text-white">
@@ -171,17 +186,16 @@ export default function RestaurantClient({
         {view === "home" && (
           <div className="relative h-[85vh] w-full flex items-center justify-center overflow-hidden">
             <div className="absolute inset-0 z-0">
-              <img 
-                src={(restaurant.coverImage && !restaurant.coverImage.includes('placehold.co')) ? restaurant.coverImage : "https://images.unsplash.com/photo-1544025162-d76694265947?w=1600&auto=format"} 
-                alt={restaurant.name} 
-                className="w-full h-full object-cover" 
+              <img
+                src={(restaurant.coverImage && !restaurant.coverImage.includes("placehold.co")) ? restaurant.coverImage : "https://images.unsplash.com/photo-1544025162-d76694265947?w=1600&auto=format"}
+                alt={restaurant.name}
+                className="w-full h-full object-cover"
               />
-              {/* Layered Cinematic Gradients */}
               <div className="absolute inset-0 bg-gradient-to-b from-gray-900/60 via-gray-900/40 to-gray-900"></div>
               <div className="absolute inset-0 bg-gradient-to-r from-gray-900/40 via-transparent to-gray-900/40"></div>
               <div className="absolute inset-0 bg-black/20"></div>
             </div>
-            
+
             <div className="relative z-10 max-w-6xl mx-auto px-6 text-center pointer-events-auto">
               <div className="mb-10 inline-flex items-center gap-2 bg-white/5 backdrop-blur-xl border border-white/10 px-6 py-2 rounded-full shadow-2xl animate-pulse">
                 <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
@@ -191,12 +205,12 @@ export default function RestaurantClient({
               <h1 className="text-7xl md:text-9xl font-black mb-8 text-white italic tracking-tighter uppercase leading-[0.8] drop-shadow-2xl">
                 {restaurant.name}
               </h1>
-              
+
               <p className="text-xl md:text-2xl text-gray-200 mb-14 max-w-2xl mx-auto font-medium leading-tight opacity-90 drop-shadow-lg uppercase tracking-tight italic">
                 {restaurant.description || "Experience the finest culinary delights crafted with passion and served with excellence."}
               </p>
 
-              <button 
+              <button
                 onClick={() => handleSetView("menu")}
                 className="group relative bg-orange-600 hover:bg-orange-500 text-white font-black py-7 px-16 rounded-3xl transition-all transform hover:scale-105 active:scale-95 shadow-[0_0_50px_rgba(234,88,12,0.3)] hover:shadow-[0_0_80px_rgba(234,88,12,0.5)] text-2xl uppercase tracking-[0.1em]"
               >
@@ -213,7 +227,7 @@ export default function RestaurantClient({
             <div className="text-center mb-16">
               <h2 className="text-5xl md:text-7xl font-black italic tracking-tighter uppercase">Our Menu</h2>
             </div>
-            
+
             {liveMenuItems.length === 0 ? (
               <div className="bg-white/5 border border-dashed border-white/10 rounded-3xl p-20 text-center text-gray-500">
                 <p className="text-xl font-bold">Menu is currently empty.</p>
@@ -222,22 +236,19 @@ export default function RestaurantClient({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
                 {liveMenuItems.map((item) => {
                   const itemName = item.name.toLowerCase();
-                  const itemImage = 
-                    (itemName.includes('steak') || itemName.includes('rib')) ? 'https://images.unsplash.com/photo-1600891964599-f61ba0e24092?w=800&auto=format'
-                    : itemName.includes('chicken') ? 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=800&auto=format'
-                    : itemName.includes('burger') ? 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format'
-                    : itemName.includes('frie') ? 'https://images.unsplash.com/photo-1573037153445-5626cc96760e?w=800&auto=format'
-                    : itemName.includes('salad') ? 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format'
-                    : (itemName.includes('cheesecake') || itemName.includes('dessert') || itemName.includes('cake')) ? 'https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=800&auto=format'
-                    : (itemName.includes('pasta') || itemName.includes('spaghetti')) ? 'https://images.unsplash.com/photo-1516100882582-96c3a05fe590?w=800&auto=format'
-                    : (itemName.includes('mac') && itemName.includes('cheese')) ? 'https://images.unsplash.com/photo-1543339308-43e59d6b73a6?w=800&auto=format'
-                    : itemName.includes('asparagus') ? 'https://images.unsplash.com/photo-1608039829572-78524f79c4c7?w=800&auto=format'
-                    : itemName.includes('potato') ? 'https://images.unsplash.com/photo-1541544741938-0af808871cc0?w=800&auto=format'
-                    : itemName.includes('pizza') ? 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format'
-                    : (itemName.includes('drink') || itemName.includes('soda') || itemName.includes('juice')) ? 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=800&auto=format'
-                    : (item.image && !item.image.includes('placeholder') && !item.image.includes('dummyimage')) ? item.image
-                    : 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&auto=format';
-                  
+                  const itemImage =
+                    (itemName.includes("steak") || itemName.includes("rib")) ? "https://images.unsplash.com/photo-1600891964599-f61ba0e24092?w=800&auto=format"
+                    : itemName.includes("chicken") ? "https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=800&auto=format"
+                    : itemName.includes("burger") ? "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format"
+                    : itemName.includes("frie") ? "https://images.unsplash.com/photo-1573037153445-5626cc96760e?w=800&auto=format"
+                    : itemName.includes("salad") ? "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format"
+                    : (itemName.includes("cheesecake") || itemName.includes("dessert") || itemName.includes("cake")) ? "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=800&auto=format"
+                    : (itemName.includes("pasta") || itemName.includes("spaghetti")) ? "https://images.unsplash.com/photo-1516100882582-96c3a05fe590?w=800&auto=format"
+                    : itemName.includes("pizza") ? "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format"
+                    : (itemName.includes("drink") || itemName.includes("soda") || itemName.includes("juice")) ? "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=800&auto=format"
+                    : (item.image && !item.image.includes("placeholder")) ? item.image
+                    : "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&auto=format";
+
                   return (
                     <div key={item.id} className="group bg-gray-800/50 backdrop-blur-md border border-white/5 rounded-[2.5rem] overflow-hidden flex flex-col transition-all hover:scale-[1.02] hover:shadow-2xl hover:shadow-orange-600/10 hover:border-orange-600/30">
                       <div className="relative h-64 overflow-hidden">
@@ -260,11 +271,9 @@ export default function RestaurantClient({
                           <span className="font-black text-orange-500 text-xl">₦{item.price.toFixed(2)}</span>
                         </div>
                         <p className="text-sm text-gray-400 mb-8 flex-1 leading-relaxed opacity-80">{item.description}</p>
-                        <button 
+                        <button
                           disabled={!item.available}
-                          onClick={() => {
-                            addToCart({ id: item.id, name: item.name, price: item.price });
-                          }}
+                          onClick={() => addToCart({ id: item.id, name: item.name, price: item.price })}
                           className={`w-full py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${item.available ? "bg-white text-gray-900 hover:bg-orange-600 hover:text-white" : "bg-gray-700 text-gray-500 pointer-events-none"}`}
                         >
                           {item.available ? "Add To Order" : "Sold Out"}
@@ -290,7 +299,7 @@ export default function RestaurantClient({
             ) : (
               <div className="bg-gray-800/30 backdrop-blur-md rounded-[2.5rem] border border-white/5 overflow-hidden">
                 <div className="p-8 space-y-6">
-                  {items.map(item => (
+                  {items.map((item) => (
                     <div key={item.id} className="flex items-center justify-between pb-6 border-b border-white/5 last:border-0 last:pb-0">
                       <div>
                         <h4 className="font-bold text-xl uppercase mb-1">{item.name}</h4>
@@ -321,43 +330,80 @@ export default function RestaurantClient({
           <div className="p-6 max-w-4xl mx-auto relative z-20 pointer-events-auto">
             <h2 className="text-5xl font-black mb-12 italic tracking-tighter uppercase text-center">Checkout</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-              <form onSubmit={handlePlaceOrder} className="space-y-6">
+              <div className="space-y-6">
                 <div className="bg-gray-800/30 backdrop-blur-md p-8 rounded-[2.5rem] border border-white/5 space-y-6">
-                  <input 
-                    type="text" 
-                    placeholder="Full Name" 
-                    value={formData.customerName} 
-                    onChange={e => setFormData({...formData, customerName: e.target.value})}
-                    className="w-full bg-white/5 p-4 rounded-xl border border-white/10 outline-none focus:border-orange-500" 
+                  <input
+                    type="text"
+                    placeholder="Full Name"
+                    value={formData.customerName}
+                    onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                    className="w-full bg-white/5 p-4 rounded-xl border border-white/10 outline-none focus:border-orange-500"
                   />
-                  <input 
-                    type="tel" 
-                    placeholder="Phone" 
-                    value={formData.phone} 
-                    onChange={e => setFormData({...formData, phone: e.target.value})}
-                    className="w-full bg-white/5 p-4 rounded-xl border border-white/10 outline-none focus:border-orange-500" 
+                  <input
+                    type="tel"
+                    placeholder="Phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="w-full bg-white/5 p-4 rounded-xl border border-white/10 outline-none focus:border-orange-500"
                   />
-                  <textarea 
-                    placeholder="Address" 
-                    value={formData.address} 
-                    onChange={e => setFormData({...formData, address: e.target.value})}
-                    rows={3} 
-                    className="w-full bg-white/5 p-4 rounded-xl border border-white/10 outline-none focus:border-orange-500" 
-                  ></textarea>
+                  <textarea
+                    placeholder="Delivery Address"
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    rows={3}
+                    className="w-full bg-white/5 p-4 rounded-xl border border-white/10 outline-none focus:border-orange-500"
+                  />
+                  <textarea
+                    placeholder="Special instructions (optional)"
+                    value={formData.note}
+                    onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+                    rows={2}
+                    className="w-full bg-white/5 p-4 rounded-xl border border-white/10 outline-none focus:border-orange-500 text-sm"
+                  />
                 </div>
+
                 {orderError && (
                   <div className="bg-red-900/50 border border-red-500/30 text-red-300 text-sm font-medium p-4 rounded-2xl">
                     {orderError}
                   </div>
                 )}
-                <button type="submit" disabled={isSubmitting} className="w-full bg-orange-600 text-white font-black py-6 rounded-2xl text-lg uppercase tracking-widest shadow-xl disabled:opacity-60">
-                  {isSubmitting ? "Placing Order..." : "Confirm Order"}
-                </button>
-              </form>
+
+                {/* Payment method buttons */}
+                <div className="space-y-3">
+                  <p className="text-xs font-black text-gray-500 uppercase tracking-widest">How would you like to pay?</p>
+
+                  {restaurant.onlinePaymentEnabled && (
+                    <button
+                      type="button"
+                      onClick={handleOnlinePayment}
+                      disabled={isSubmitting}
+                      className="w-full bg-orange-600 hover:bg-orange-500 disabled:opacity-60 text-white font-black py-5 rounded-2xl text-sm uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-3"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                      </svg>
+                      {isSubmitting ? "Redirecting…" : "Pay Online"}
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleCashOrder}
+                    disabled={isSubmitting}
+                    className="w-full bg-white/10 hover:bg-white/20 disabled:opacity-60 text-white font-black py-5 rounded-2xl text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-3"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    {isSubmitting ? "Placing Order…" : "Pay on Delivery"}
+                  </button>
+                </div>
+              </div>
+
               <div className="bg-gray-800/30 backdrop-blur-md p-8 rounded-[2.5rem] border border-white/5">
                 <h3 className="font-bold text-xl uppercase mb-6">Order Summary</h3>
                 <div className="space-y-4 mb-8">
-                  {items.map(item => (
+                  {items.map((item) => (
                     <div key={item.id} className="flex justify-between">
                       <span className="font-bold">{item.quantity}x {item.name}</span>
                       <span>₦{(item.quantity * item.price).toFixed(2)}</span>
@@ -368,6 +414,11 @@ export default function RestaurantClient({
                   <span>Total</span>
                   <span className="text-2xl text-orange-500">₦{totalPrice.toFixed(2)}</span>
                 </div>
+                {restaurant.onlinePaymentEnabled && (
+                  <p className="text-xs text-gray-500 mt-6 leading-relaxed">
+                    Online payments are processed securely via Paystack. Funds go directly to the restaurant.
+                  </p>
+                )}
               </div>
             </div>
           </div>
