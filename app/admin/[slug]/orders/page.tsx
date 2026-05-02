@@ -44,9 +44,10 @@ export default async function AdminOrdersPage({ params }: Props) {
     <div className="bg-gray-100 min-h-screen">
       <AdminNav slug={slug} />
       <SubscriptionBanner subscription={subscription} />
-      <div className="max-w-6xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
+      <div className="relative">
         <AdminOrdersClient restaurant={restaurant} />
-        <aside>
+        {/* Billing card pinned to top-right of content area */}
+        <div className="hidden xl:block absolute top-8 right-4 w-72">
           <BillingSection
             restaurantSlug={slug}
             planId={subscription.planId}
@@ -54,7 +55,7 @@ export default async function AdminOrdersPage({ params }: Props) {
             monthlyPrice={subscription.monthlyPrice}
             subscriptionStatus={subscription.status}
           />
-        </aside>
+        </div>
       </div>
     </div>
   );

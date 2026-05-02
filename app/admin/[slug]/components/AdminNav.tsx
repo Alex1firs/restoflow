@@ -16,10 +16,11 @@ export default function AdminNav({ slug }: Props) {
   const navItems = [
     { name: "Orders", href: `/admin/${slug}/orders` },
     { name: "Menu", href: `/admin/${slug}/menu` },
+    { name: "Settings", href: `/admin/${slug}/settings` },
+    { name: "QR Code", href: `/admin/${slug}/qr` },
   ];
 
   const handleLogout = async () => {
-    // Clear both the client-side Firebase auth state and the server-side session cookie
     await Promise.all([
       signOut(auth),
       fetch("/api/auth/session", { method: "DELETE" }),
@@ -31,7 +32,7 @@ export default function AdminNav({ slug }: Props) {
     <nav className="bg-white border-b border-gray-200">
       <div className="max-w-6xl mx-auto px-4">
         <div className="flex h-14 items-center justify-between">
-          <div className="flex gap-8 h-full items-center">
+          <div className="flex gap-6 h-full items-center">
             {navItems.map((item) => {
               const isActive = pathname === item.href;
               return (
@@ -50,12 +51,22 @@ export default function AdminNav({ slug }: Props) {
             })}
           </div>
 
-          <button
-            onClick={handleLogout}
-            className="text-sm font-bold text-gray-400 hover:text-red-600 transition-colors px-3 py-1.5 rounded-xl hover:bg-red-50"
-          >
-            Sign out
-          </button>
+          <div className="flex items-center gap-3">
+            <a
+              href={`/r/${slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-bold text-gray-400 hover:text-orange-600 transition-colors px-3 py-1.5 rounded-xl hover:bg-orange-50 border border-gray-100 hover:border-orange-200"
+            >
+              View Store ↗
+            </a>
+            <button
+              onClick={handleLogout}
+              className="text-sm font-bold text-gray-400 hover:text-red-600 transition-colors px-3 py-1.5 rounded-xl hover:bg-red-50"
+            >
+              Sign out
+            </button>
+          </div>
         </div>
       </div>
     </nav>
