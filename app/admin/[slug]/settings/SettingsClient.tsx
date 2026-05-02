@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
+import ImageUpload from "@/app/components/ImageUpload";
 
 type Props = {
   restaurant: {
     slug: string;
     name: string;
     description: string;
+    logo: string;
     coverImage: string;
     phone: string;
     address: string;
@@ -18,6 +19,7 @@ export default function SettingsClient({ restaurant }: Props) {
   const [form, setForm] = useState({
     name: restaurant.name,
     description: restaurant.description,
+    logo: restaurant.logo,
     coverImage: restaurant.coverImage,
     phone: restaurant.phone,
     address: restaurant.address,
@@ -99,29 +101,21 @@ export default function SettingsClient({ restaurant }: Props) {
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
-                Cover Image URL
-              </label>
-              <input
-                type="url"
-                value={form.coverImage}
-                onChange={(e) => set("coverImage", e.target.value)}
-                placeholder="https://images.unsplash.com/..."
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:border-orange-500 transition"
-              />
-              {form.coverImage && (
-                <div className="mt-3 rounded-xl overflow-hidden h-36 relative border border-gray-100">
-                  <Image
-                    src={form.coverImage}
-                    alt="Cover preview"
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
-                </div>
-              )}
-            </div>
+            <ImageUpload
+              label="Restaurant Logo"
+              value={form.logo}
+              onChange={(url) => set("logo", url)}
+              storagePath={`restaurants/${restaurant.slug}/logo`}
+              aspect="square"
+            />
+
+            <ImageUpload
+              label="Cover Image"
+              value={form.coverImage}
+              onChange={(url) => set("coverImage", url)}
+              storagePath={`restaurants/${restaurant.slug}/cover`}
+              aspect="wide"
+            />
           </div>
         </section>
 

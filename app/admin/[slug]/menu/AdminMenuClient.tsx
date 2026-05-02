@@ -2,16 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
-import { 
-  collection, 
-  query, 
-  where, 
-  onSnapshot, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc 
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc
 } from "firebase/firestore";
+import ImageUpload from "@/app/components/ImageUpload";
 
 type MenuItem = {
   id: string;
@@ -31,20 +32,24 @@ type Props = {
   };
 };
 
+function newImageId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export default function AdminMenuClient({ restaurant }: Props) {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [imageId, setImageId] = useState(newImageId);
 
-  // Form State
   const [formData, setFormData] = useState({
     name: "",
     price: "",
     category: "",
     description: "",
     image: "",
-    available: true
+    available: true,
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -55,9 +60,9 @@ export default function AdminMenuClient({ restaurant }: Props) {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const itemsData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data()
+      const itemsData = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data()
       })) as MenuItem[];
       setItems(itemsData);
       setLoading(false);
@@ -67,17 +72,11 @@ export default function AdminMenuClient({ restaurant }: Props) {
   }, [restaurant.slug]);
 
   const resetForm = () => {
-    setFormData({
-      name: "",
-      price: "",
-      category: "",
-      description: "",
-      image: "",
-      available: true
-    });
+    setFormData({ name: "", price: "", category: "", description: "", image: "", available: true });
     setEditingItem(null);
     setShowForm(false);
     setError(null);
+    setImageId(newImageId());
   };
 
   const handleEdit = (item: MenuItem) => {
@@ -88,17 +87,16 @@ export default function AdminMenuClient({ restaurant }: Props) {
       category: item.category,
       description: item.description,
       image: item.image,
-      available: item.available
+      available: item.available,
     });
     setShowForm(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    // Validation
     if (!formData.name.trim() || !formData.price || !formData.category.trim()) {
       setError("Please fill in all required fields.");
       return;
@@ -117,8 +115,8 @@ export default function AdminMenuClient({ restaurant }: Props) {
         price: priceNum,
         category: formData.category.trim(),
         description: formData.description.trim(),
-        image: formData.image.trim() || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format",
-        available: formData.available
+        image: formData.image || "",
+        available: formData.available,
       };
 
       if (editingItem) {
@@ -145,13 +143,15 @@ export default function AdminMenuClient({ restaurant }: Props) {
 
   const toggleAvailability = async (item: MenuItem) => {
     try {
-      await updateDoc(doc(db, "menu_items", item.id), {
-        available: !item.available
-      });
+      await updateDoc(doc(db, "menu_items", item.id), { available: !item.available });
     } catch (err) {
       console.error("Toggle failed:", err);
     }
   };
+
+  const imageStoragePath = editingItem
+    ? `restaurants/${restaurant.slug}/menu-items/${editingItem.id}`
+    : `restaurants/${restaurant.slug}/menu-items/${imageId}`;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -161,7 +161,7 @@ export default function AdminMenuClient({ restaurant }: Props) {
           <p className="text-gray-500 font-medium">{restaurant.name}</p>
         </div>
         {!showForm && (
-          <button 
+          <button
             onClick={() => setShowForm(true)}
             className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-6 rounded-2xl transition-all transform active:scale-95 shadow-lg flex items-center gap-2"
           >
@@ -177,13 +177,13 @@ export default function AdminMenuClient({ restaurant }: Props) {
             <h2 className="text-xl font-bold">{editingItem ? "Edit Menu Item" : "Add New Menu Item"}</h2>
             <button onClick={resetForm} className="text-gray-400 hover:text-gray-600 font-medium">Cancel</button>
           </div>
-          
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Item Name *</label>
-                  <input 
+                  <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({...formData, name: e.target.value})}
@@ -193,18 +193,18 @@ export default function AdminMenuClient({ restaurant }: Props) {
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Price (₦) *</label>
-                  <input 
+                  <input
                     type="number"
                     step="0.01"
                     value={formData.price}
                     onChange={(e) => setFormData({...formData, price: e.target.value})}
-                    placeholder="e.g. 12.99"
+                    placeholder="e.g. 1299"
                     className="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Category *</label>
-                  <input 
+                  <input
                     type="text"
                     value={formData.category}
                     onChange={(e) => setFormData({...formData, category: e.target.value})}
@@ -212,21 +212,9 @@ export default function AdminMenuClient({ restaurant }: Props) {
                     className="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none"
                   />
                 </div>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Image URL</label>
-                  <input 
-                    type="text"
-                    value={formData.image}
-                    onChange={(e) => setFormData({...formData, image: e.target.value})}
-                    placeholder="https://..."
-                    className="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none"
-                  />
-                </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Description</label>
-                  <textarea 
+                  <textarea
                     value={formData.description}
                     onChange={(e) => setFormData({...formData, description: e.target.value})}
                     placeholder="Brief description of the item..."
@@ -235,10 +223,19 @@ export default function AdminMenuClient({ restaurant }: Props) {
                   />
                 </div>
               </div>
+              <div className="space-y-4">
+                <ImageUpload
+                  label="Item Image"
+                  value={formData.image}
+                  onChange={(url) => setFormData({...formData, image: url})}
+                  storagePath={imageStoragePath}
+                  aspect="square"
+                />
+              </div>
             </div>
 
             <div className="flex items-center gap-3">
-              <input 
+              <input
                 type="checkbox"
                 id="available"
                 checked={formData.available}
@@ -250,7 +247,7 @@ export default function AdminMenuClient({ restaurant }: Props) {
 
             {error && <p className="text-red-500 text-sm font-medium bg-red-50 p-3 rounded-xl">{error}</p>}
 
-            <button 
+            <button
               type="submit"
               className="w-full md:w-auto bg-gray-900 hover:bg-black text-white font-bold py-4 px-12 rounded-2xl shadow-lg transition-all transform active:scale-95"
             >
@@ -270,28 +267,36 @@ export default function AdminMenuClient({ restaurant }: Props) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {items.map((item) => (
             <div key={item.id} className="bg-white border border-gray-100 rounded-3xl overflow-hidden shadow-sm flex flex-col group transition-all hover:shadow-md">
-              <div className="h-48 relative overflow-hidden">
-                <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              <div className="h-48 relative overflow-hidden bg-gray-100">
+                {item.image ? (
+                  <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-300">
+                    <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                )}
                 <div className="absolute top-4 left-4">
                   <span className="bg-white/90 backdrop-blur-sm text-[10px] font-black uppercase px-2 py-1 rounded-lg text-gray-600 border border-white">
                     {item.category}
                   </span>
                 </div>
               </div>
-              
+
               <div className="p-6 flex flex-col flex-1">
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="font-bold text-lg text-gray-900 capitalize">{item.name}</h3>
                   <span className="font-black text-orange-600">₦{item.price.toFixed(2)}</span>
                 </div>
                 <p className="text-sm text-gray-500 line-clamp-2 mb-6 italic">{item.description}</p>
-                
+
                 <div className="mt-auto space-y-4">
                   <div className="flex justify-between items-center bg-gray-50 p-2 rounded-xl">
                     <span className={`text-[10px] font-black uppercase px-2 ${item.available ? 'text-green-600' : 'text-red-400'}`}>
                       {item.available ? "Available" : "Sold Out"}
                     </span>
-                    <button 
+                    <button
                       onClick={() => toggleAvailability(item)}
                       className={`relative w-10 h-6 flex items-center rounded-full transition-colors ${item.available ? 'bg-orange-600' : 'bg-gray-300'}`}
                     >
@@ -300,15 +305,15 @@ export default function AdminMenuClient({ restaurant }: Props) {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <button 
+                    <button
                       onClick={() => handleEdit(item)}
                       className="text-xs font-bold py-2 border rounded-xl hover:bg-gray-50 transition-colors"
                     >
                       Edit
                     </button>
-                    <button 
+                    <button
                       onClick={() => handleDelete(item.id)}
-                      className="text-xs font-bold py-2 border border-red-100 text-red-500 hover:bg-red-50 transition-colors"
+                      className="text-xs font-bold py-2 border border-red-100 text-red-500 hover:bg-red-50 transition-colors rounded-xl"
                     >
                       Delete
                     </button>

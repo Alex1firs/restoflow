@@ -15,9 +15,10 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { name, description, coverImage, phone, address } = body as {
+  const { name, description, logo, coverImage, phone, address } = body as {
     name?: string;
     description?: string;
+    logo?: string;
     coverImage?: string;
     phone?: string;
     address?: string;
@@ -33,6 +34,7 @@ export async function PUT(req: NextRequest) {
     .update({
       name: name.trim(),
       description: (description ?? "").trim(),
+      logo: (logo ?? "").trim(),
       coverImage: (coverImage ?? "").trim(),
       phone: (phone ?? "").trim(),
       address: (address ?? "").trim(),

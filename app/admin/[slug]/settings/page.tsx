@@ -28,6 +28,7 @@ export default async function SettingsPage({ params }: Props) {
     slug,
     name: (data.name as string) ?? "",
     description: (data.description as string) ?? "",
+    logo: (data.logo as string) ?? "",
     coverImage: (data.coverImage as string) ?? "",
     phone: (data.phone as string) ?? "",
     address: (data.address as string) ?? "",
