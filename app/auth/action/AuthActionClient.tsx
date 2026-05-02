@@ -43,12 +43,12 @@ export default function AuthActionClient() {
       setTimeout(() => router.push("/admin/login"), 3000);
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? "";
-      if (code === "auth/invalid-action-code") {
-        setErrorMsg("This reset link has expired or already been used. Please request a new one.");
+      if (code === "auth/invalid-action-code" || code === "auth/expired-action-code") {
+        setErrorMsg("This reset link has expired or already been used. Please request a new one from the login page.");
       } else if (code === "auth/weak-password") {
         setErrorMsg("Password is too weak. Use at least 8 characters.");
       } else {
-        setErrorMsg("Something went wrong. Please try again.");
+        setErrorMsg(`Error: ${code || "unknown"}. Please try again.`);
       }
       setState("error");
     }
