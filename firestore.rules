@@ -47,6 +47,13 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ─── Onboardings ────────────────────────────────────────────────────────────
+    // Created via /api/onboarding (public). Read/update via Admin SDK only.
+    match /onboardings/{id} {
+      allow read:  if false;
+      allow write: if false;
+    }
+
     // ─── Payments ───────────────────────────────────────────────────────────────
     // Created exclusively via Admin SDK (webhook + verify routes).
     // The restaurant owner can read their own payment records.

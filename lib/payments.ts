@@ -12,6 +12,9 @@ export type PaystackPaymentData = {
     paymentType?: string;
     ownerUid?: string;
     planName?: string;
+    onboardingId?: string;
+    restaurantSlug?: string;
+    email?: string;
   };
   customer?: { email?: string };
 };

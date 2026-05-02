@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac } from "crypto";
 import { processSuccessfulPayment, type PaystackPaymentData } from "@/lib/payments";
+import { processOnboarding } from "@/lib/onboarding";
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
@@ -21,10 +22,15 @@ export async function POST(req: NextRequest) {
   }
 
   if (event.event === "charge.success") {
+    const { metadata, reference } = event.data as PaystackPaymentData & { reference: string };
     try {
-      await processSuccessfulPayment(event.data);
+      if (metadata?.paymentType === "onboarding" && metadata?.onboardingId) {
+        await processOnboarding(metadata.onboardingId, reference);
+      } else {
+        await processSuccessfulPayment(event.data);
+      }
     } catch (err) {
-      console.error("Webhook processSuccessfulPayment error:", err);
+      console.error("Webhook processing error:", err);
       return NextResponse.json({ error: "Processing failed" }, { status: 500 });
     }
   }
