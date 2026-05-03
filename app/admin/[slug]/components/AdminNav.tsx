@@ -7,20 +7,25 @@ import { auth } from "@/lib/firebase";
 
 type Props = {
   slug: string;
+  role?: "owner" | "manager" | "staff";
 };
 
-export default function AdminNav({ slug }: Props) {
+export default function AdminNav({ slug, role = "owner" }: Props) {
   const pathname = usePathname();
   const router = useRouter();
 
-  const navItems = [
-    { name: "Dashboard", href: `/admin/${slug}/dashboard` },
-    { name: "Orders", href: `/admin/${slug}/orders` },
-    { name: "Menu", href: `/admin/${slug}/menu` },
-    { name: "Payments", href: `/admin/${slug}/payment` },
-    { name: "Store", href: `/admin/${slug}/settings` },
-    { name: "QR Code", href: `/admin/${slug}/qr` },
+  const allItems = [
+    { name: "Dashboard", href: `/admin/${slug}/dashboard`, roles: ["owner", "manager", "staff"] },
+    { name: "Orders", href: `/admin/${slug}/orders`, roles: ["owner", "manager", "staff"] },
+    { name: "Menu", href: `/admin/${slug}/menu`, roles: ["owner", "manager"] },
+    { name: "Reports", href: `/admin/${slug}/reports`, roles: ["owner", "manager"] },
+    { name: "Payments", href: `/admin/${slug}/payment`, roles: ["owner"] },
+    { name: "Store", href: `/admin/${slug}/settings`, roles: ["owner"] },
+    { name: "QR Code", href: `/admin/${slug}/qr`, roles: ["owner"] },
+    { name: "Staff", href: `/admin/${slug}/staff`, roles: ["owner"] },
   ];
+
+  const navItems = allItems.filter((item) => item.roles.includes(role));
 
   const handleLogout = async () => {
     await Promise.all([
@@ -34,14 +39,14 @@ export default function AdminNav({ slug }: Props) {
     <nav className="bg-white border-b border-gray-200">
       <div className="max-w-6xl mx-auto px-4">
         <div className="flex h-14 items-center justify-between">
-          <div className="flex gap-6 h-full items-center">
+          <div className="flex gap-6 h-full items-center overflow-x-auto">
             {navItems.map((item) => {
               const isActive = pathname === item.href;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`text-sm font-bold transition-all border-b-2 h-full flex items-center px-1 ${
+                  className={`text-sm font-bold transition-all border-b-2 h-full flex items-center px-1 whitespace-nowrap ${
                     isActive
                       ? "border-orange-600 text-orange-600"
                       : "border-transparent text-gray-500 hover:text-gray-900"
@@ -53,7 +58,7 @@ export default function AdminNav({ slug }: Props) {
             })}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-shrink-0">
             <a
               href={`/r/${slug}`}
               target="_blank"

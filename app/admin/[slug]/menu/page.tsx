@@ -23,6 +23,7 @@ export default async function AdminMenuPage({ params }: Props) {
   if (user.restaurantSlug !== slug) {
     redirect(`/admin/${user.restaurantSlug}/menu`);
   }
+  if (user.role === "staff") redirect(`/admin/${slug}/dashboard`);
 
   // 3. Load restaurant data
   const restaurantSnap = await getAdminDb().collection("restaurants").doc(slug).get();
@@ -41,7 +42,7 @@ export default async function AdminMenuPage({ params }: Props) {
 
   return (
     <div className="bg-gray-100 min-h-screen">
-      <AdminNav slug={slug} />
+      <AdminNav slug={slug} role={user.role as "owner" | "manager" | "staff"} />
       <SubscriptionBanner subscription={subscription} />
       <AdminMenuClient restaurant={restaurant} />
     </div>

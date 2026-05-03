@@ -17,6 +17,7 @@ export default async function PaymentSettingsPage({ params }: Props) {
   if (user.restaurantSlug !== slug) {
     redirect(`/admin/${user.restaurantSlug}/payment`);
   }
+  if (user.role !== "owner") redirect(`/admin/${slug}/dashboard`);
 
   const snap = await getAdminDb().collection("restaurants").doc(slug).get();
   if (!snap.exists) return notFound();
@@ -34,7 +35,7 @@ export default async function PaymentSettingsPage({ params }: Props) {
 
   return (
     <div className="bg-gray-100 min-h-screen">
-      <AdminNav slug={slug} />
+      <AdminNav slug={slug} role="owner" />
       <SubscriptionBanner subscription={subscription} />
       <PaymentSettingsClient current={current} />
     </div>

@@ -2,73 +2,71 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper: is this authenticated user the owner of the given restaurant?
-    function isOwnerOf(restaurantId) {
+    // Is this user authenticated and does their restaurantSlug match?
+    // Works for owner, manager, and staff — all share the same restaurantSlug.
+    function isRestaurantMember(restaurantId) {
       return request.auth != null
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.restaurantSlug == restaurantId;
     }
 
+    // Same check using the resource's restaurantId field (for existing docs)
+    function isMemberOf(restaurantId) {
+      return isRestaurantMember(restaurantId);
+    }
+
+    // Only owner or manager may write menu items
+    function isManagerOrOwner(restaurantId) {
+      let role = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'owner');
+      return isRestaurantMember(restaurantId) && role in ['owner', 'manager'];
+    }
+
     // ─── Plans ──────────────────────────────────────────────────────────────────
-    // Public read (used for pricing display). Managed via Admin SDK only.
     match /plans/{planId} {
       allow read:  if true;
       allow write: if false;
     }
 
     // ─── Restaurants ────────────────────────────────────────────────────────────
-    // Public read (customers need to load the restaurant page).
-    // No client-side writes — managed via Firebase Admin SDK or Console only.
     match /restaurants/{slug} {
       allow read:  if true;
       allow write: if false;
     }
 
     // ─── Menu Items ─────────────────────────────────────────────────────────────
-    // Public read (customers browse the menu).
-    // Only the restaurant owner may create, update, or delete their own items.
     match /menu_items/{itemId} {
       allow read:   if true;
-      allow create: if isOwnerOf(request.resource.data.restaurantId);
-      allow update: if isOwnerOf(resource.data.restaurantId);
-      allow delete: if isOwnerOf(resource.data.restaurantId);
+      allow create: if isManagerOrOwner(request.resource.data.restaurantId);
+      allow update: if isManagerOrOwner(resource.data.restaurantId);
+      allow delete: if isManagerOrOwner(resource.data.restaurantId);
     }
 
     // ─── Orders ─────────────────────────────────────────────────────────────────
-    // Create is blocked from the client SDK — all orders go through /api/orders
-    // which uses Firebase Admin SDK and validates prices server-side.
-    // Single-document GET is public so customers can track their order by ID
-    // (the random orderId is effectively unguessable). LIST requires ownership.
-    // Status updates now route through /api/orders/[orderId]/status (Admin SDK)
-    // so client-side update is kept only as a fallback with the same constraints.
     match /orders/{orderId} {
       allow create: if false;
       allow get:    if true;
-      allow list:   if isOwnerOf(resource.data.restaurantId);
-      allow update: if isOwnerOf(resource.data.restaurantId)
+      allow list:   if isMemberOf(resource.data.restaurantId);
+      allow update: if isManagerOrOwner(resource.data.restaurantId)
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'rejectionReason'])
                     && request.resource.data.status in ['pending', 'preparing', 'ready', 'completed', 'rejected'];
       allow delete: if false;
     }
 
     // ─── Onboardings ────────────────────────────────────────────────────────────
-    // Created via /api/onboarding (public). Read/update via Admin SDK only.
     match /onboardings/{id} {
       allow read:  if false;
       allow write: if false;
     }
 
     // ─── Payments ───────────────────────────────────────────────────────────────
-    // Created exclusively via Admin SDK (webhook + verify routes).
-    // The restaurant owner can read their own payment records.
     match /payments/{paymentId} {
-      allow read:   if isOwnerOf(resource.data.restaurantId);
-      allow write:  if false;
+      allow read:  if isMemberOf(resource.data.restaurantId);
+      allow write: if false;
     }
 
     // ─── Users ──────────────────────────────────────────────────────────────────
-    // Each user can read their own profile (needed by LoginClient to get
-    // their restaurantSlug). Writes are handled server-side only.
+    // Each user can read their own profile. Staff can list their restaurant's users
+    // via the staff management page (server-side Admin SDK).
     match /users/{userId} {
       allow read:  if request.auth != null && request.auth.uid == userId;
       allow write: if false;

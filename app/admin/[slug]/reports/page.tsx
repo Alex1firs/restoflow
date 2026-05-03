@@ -4,36 +4,29 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { getSubscriptionInfo } from "@/lib/subscription";
 import AdminNav from "../components/AdminNav";
 import SubscriptionBanner from "../components/SubscriptionBanner";
-import QRClient from "./QRClient";
-
-type Props = { params: Promise<{ slug: string }> };
+import ReportsClient from "./ReportsClient";
 
 export const revalidate = 0;
 
-export default async function QRPage({ params }: Props) {
+type Props = { params: Promise<{ slug: string }> };
+
+export default async function ReportsPage({ params }: Props) {
   const { slug } = await params;
   const user = await getAuthenticatedUser();
 
-  if (user.restaurantSlug !== slug) {
-    redirect(`/admin/${user.restaurantSlug}/qr`);
-  }
-  if (user.role !== "owner") redirect(`/admin/${slug}/dashboard`);
+  if (user.restaurantSlug !== slug) redirect(`/admin/${user.restaurantSlug}/reports`);
+  if (user.role === "staff") redirect(`/admin/${slug}/dashboard`);
 
   const snap = await getAdminDb().collection("restaurants").doc(slug).get();
   if (!snap.exists) return notFound();
 
-  const data = snap.data()!;
-  const subscription = await getSubscriptionInfo(data as Record<string, unknown>);
+  const subscription = await getSubscriptionInfo(snap.data()! as Record<string, unknown>);
 
   return (
     <div className="bg-gray-100 min-h-screen">
-      <AdminNav slug={slug} role="owner" />
+      <AdminNav slug={slug} role={user.role as "owner" | "manager" | "staff"} />
       <SubscriptionBanner subscription={subscription} />
-      <QRClient
-        slug={slug}
-        restaurantName={data.name as string}
-        appUrl={process.env.NEXT_PUBLIC_APP_URL ?? ""}
-      />
+      <ReportsClient slug={slug} />
     </div>
   );
 }

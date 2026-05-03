@@ -30,7 +30,7 @@ export default async function DashboardPage({ params }: Props) {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <AdminNav slug={slug} />
+      <AdminNav slug={slug} role={user.role as "owner" | "manager" | "staff"} />
       <SubscriptionBanner subscription={subscription} />
       <DashboardClient slug={slug} />
     </div>
