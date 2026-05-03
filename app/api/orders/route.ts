@@ -3,6 +3,7 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { checkIsOpen } from "@/lib/restaurant-utils";
 import { sendNewOrderAlert } from "@/lib/notifications";
+import { sendCustomerNotification } from "@/lib/customer-notifications";
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -12,7 +13,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { restaurantId, customerName, phone, address, note, items } =
+  const { restaurantId, customerName, phone, address, note, items, deliveryType } =
     body as Record<string, unknown>;
 
   if (
@@ -95,6 +96,9 @@ export async function POST(request: NextRequest) {
 
     const total = itemsTotal + deliveryFee;
 
+    const resolvedDeliveryType =
+      deliveryType === "pickup" ? "pickup" : "delivery";
+
     const orderRef = await db.collection("orders").add({
       restaurantId: restaurantId.trim(),
       customerName: customerName.trim(),
@@ -108,8 +112,13 @@ export async function POST(request: NextRequest) {
       paymentMethod: "cash",
       paymentStatus: "pending",
       status: "pending",
+      deliveryType: resolvedDeliveryType,
       createdAt: FieldValue.serverTimestamp(),
     });
+
+    const orderId = orderRef.id;
+    const restaurantName = (rData.name as string | undefined) ?? restaurantId.trim();
+    const itemsSummary = validatedItems.map((i) => `${i.quantity}× ${i.name}`).join(", ");
 
     sendNewOrderAlert({
       restaurantSlug: restaurantId.trim(),
@@ -119,7 +128,19 @@ export async function POST(request: NextRequest) {
       customerName: customerName.trim(),
     }).catch(() => {});
 
-    return NextResponse.json({ orderId: orderRef.id }, { status: 201 });
+    sendCustomerNotification("created", {
+      orderId,
+      customerName: customerName.trim(),
+      customerPhone: phone.trim(),
+      restaurantName,
+      restaurantAddress: rData.address as string | undefined,
+      total,
+      itemsSummary,
+      paymentMethod: "cash",
+      deliveryType: resolvedDeliveryType,
+    }).catch(() => {});
+
+    return NextResponse.json({ orderId }, { status: 201 });
   } catch (error) {
     console.error("Order creation failed:", error);
     return NextResponse.json({ error: "Failed to place order. Please try again." }, { status: 500 });

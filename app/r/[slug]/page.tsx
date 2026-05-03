@@ -4,7 +4,17 @@ import { doc, getDoc, collection, query, where, getDocs, DocumentData } from 'fi
 import RestaurantClient from './components/RestaurantClient';
 import { CartProvider } from './components/CartContext';
 import Link from 'next/link';
-import { checkIsOpen, type OpeningHours } from '@/lib/restaurant-utils';
+import { checkIsOpen, todayHours, type OpeningHours } from '@/lib/restaurant-utils';
+
+function formatTodayHours(from: string, to: string): string {
+  const fmt = (t: string) => {
+    const [h, m] = t.split(":").map(Number);
+    const ampm = h >= 12 ? "PM" : "AM";
+    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `${h12}:${m.toString().padStart(2, "0")} ${ampm}`;
+  };
+  return `${fmt(from)} – ${fmt(to)}`;
+}
 
 interface RestaurantData extends DocumentData {
   name: string;
@@ -37,18 +47,13 @@ interface MenuItemData extends DocumentData {
 
 export const revalidate = 0;
 
-export default async function RestaurantPage({ 
+export default async function RestaurantPage({
   params,
-  searchParams
-}: { 
+}: {
   params: Promise<{ slug: string }>,
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   const resolvedParams = await params;
-  const resolvedSearchParams = await searchParams;
   const slug = resolvedParams.slug;
-  const viewParam = resolvedSearchParams.view;
-  const initialView = (Array.isArray(viewParam) ? viewParam[0] : viewParam) || 'home';
 
   // 1. Fetch Restaurant Data
   const docRef = doc(db, 'restaurants', slug);
@@ -71,18 +76,16 @@ export default async function RestaurantPage({
   // 2. Block ordering if subscription has expired
   if (isExpired(restaurant)) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-white flex items-center justify-center px-4">
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-black text-white italic uppercase tracking-tighter mb-3">
-            {restaurant.name}
-          </h1>
-          <p className="text-gray-400 font-medium mb-2">Online ordering is temporarily unavailable.</p>
-          <p className="text-gray-600 text-sm">Please contact the restaurant directly to place your order.</p>
+          <h1 className="text-2xl font-black text-gray-900 mb-3">{restaurant.name}</h1>
+          <p className="text-gray-500 font-medium mb-2">Online ordering is temporarily unavailable.</p>
+          <p className="text-gray-400 text-sm">Please contact the restaurant directly to place your order.</p>
         </div>
       </div>
     );
@@ -101,24 +104,39 @@ export default async function RestaurantPage({
     deliveryFee?: number;
     minimumOrder?: number;
     openingHours?: OpeningHours;
+    logo?: string;
+    address?: string;
+    deliveryEnabled?: boolean;
+    pickupEnabled?: boolean;
   };
+
+  const todayH = todayHours(rData.openingHours);
+  const todayHoursLabel = todayH
+    ? todayH.open
+      ? formatTodayHours(todayH.from, todayH.to)
+      : "Closed today"
+    : null;
 
   return (
     <CartProvider>
-      <Suspense fallback={<div className="min-h-screen bg-gray-900 flex items-center justify-center text-orange-500">Loading experience...</div>}>
+      <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center text-orange-500">Loading…</div>}>
         <RestaurantClient
           restaurant={{
             name: restaurant.name,
             description: restaurant.description,
             coverImage: restaurant.coverImage,
+            logo: rData.logo ?? "",
+            address: rData.address ?? "",
             slug: slug,
             onlinePaymentEnabled: !!rData.paystackSubaccountCode,
             deliveryFee: rData.deliveryFee ?? 0,
             minimumOrder: rData.minimumOrder ?? 0,
             isOpen: checkIsOpen(rData.openingHours),
+            deliveryEnabled: rData.deliveryEnabled !== false,
+            pickupEnabled: rData.pickupEnabled !== false,
+            todayHoursLabel,
           }}
           menuItems={menuItems}
-          initialView={initialView as "home" | "menu" | "cart" | "checkout" | "success"}
         />
       </Suspense>
     </CartProvider>

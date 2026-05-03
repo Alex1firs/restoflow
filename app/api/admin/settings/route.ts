@@ -22,11 +22,13 @@ export async function PUT(req: NextRequest) {
     coverImage,
     phone,
     address,
+    whatsappPhone,
     notificationPhone,
     deliveryFee,
     minimumOrder,
+    deliveryEnabled,
+    pickupEnabled,
     openingHours,
-    whatsappPhone,
     whatsappEnabled,
     alertPreference,
   } = body as {
@@ -36,11 +38,13 @@ export async function PUT(req: NextRequest) {
     coverImage?: string;
     phone?: string;
     address?: string;
+    whatsappPhone?: string;
     notificationPhone?: string;
     deliveryFee?: number;
     minimumOrder?: number;
+    deliveryEnabled?: boolean;
+    pickupEnabled?: boolean;
     openingHours?: Record<string, { open: boolean; from: string; to: string }>;
-    whatsappPhone?: string;
     whatsappEnabled?: boolean;
     alertPreference?: "whatsapp" | "sms" | "both";
   };
@@ -59,11 +63,13 @@ export async function PUT(req: NextRequest) {
       coverImage: (coverImage ?? "").trim(),
       phone: (phone ?? "").trim(),
       address: (address ?? "").trim(),
+      whatsappPhone: (whatsappPhone ?? "").trim(),
       notificationPhone: (notificationPhone ?? "").trim(),
       deliveryFee: typeof deliveryFee === "number" && deliveryFee >= 0 ? deliveryFee : 0,
       minimumOrder: typeof minimumOrder === "number" && minimumOrder >= 0 ? minimumOrder : 0,
+      deliveryEnabled: deliveryEnabled !== false,
+      pickupEnabled: pickupEnabled !== false,
       ...(openingHours && typeof openingHours === "object" ? { openingHours } : {}),
-      whatsappPhone: (whatsappPhone ?? "").trim(),
       whatsappEnabled: whatsappEnabled === true,
       alertPreference: ["whatsapp", "sms", "both"].includes(alertPreference ?? "")
         ? alertPreference

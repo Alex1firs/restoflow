@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { restaurantId, customerName, phone, address, note, items } =
+  const { restaurantId, customerName, phone, address, note, items, deliveryType } =
     body as Record<string, unknown>;
 
   if (
@@ -136,6 +136,7 @@ export async function POST(req: NextRequest) {
       itemsTotal,
       deliveryFee,
       total,
+      deliveryType: deliveryType === "pickup" ? "pickup" : "delivery",
       createdAt: FieldValue.serverTimestamp(),
     });
 

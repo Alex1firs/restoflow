@@ -18,11 +18,14 @@ export async function createOrderFromPaymentReference(reference: string): Promis
       address: d.address,
       note: d.note,
       items: d.items,
+      itemsTotal: d.itemsTotal ?? null,
+      deliveryFee: d.deliveryFee ?? 0,
       total: d.total,
       paymentMethod: "online",
       paymentStatus: "paid",
       paymentReference: reference,
       status: "pending",
+      deliveryType: d.deliveryType ?? "delivery",
       createdAt: FieldValue.serverTimestamp(),
     });
     tx.delete(pendingRef);

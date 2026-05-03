@@ -33,13 +33,18 @@ export default async function SettingsPage({ params }: Props) {
     coverImage: (data.coverImage as string) ?? "",
     phone: (data.phone as string) ?? "",
     address: (data.address as string) ?? "",
+    whatsappPhone: (data.whatsappPhone as string) ?? "",
     notificationPhone: (data.notificationPhone as string) ?? "",
     deliveryFee: (data.deliveryFee as number) ?? 0,
     minimumOrder: (data.minimumOrder as number) ?? 0,
+    deliveryEnabled: (data.deliveryEnabled as boolean) ?? true,
+    pickupEnabled: (data.pickupEnabled as boolean) ?? true,
     openingHours: (data.openingHours as OpeningHours) ?? null,
-    whatsappPhone: (data.whatsappPhone as string) ?? "",
     whatsappEnabled: (data.whatsappEnabled as boolean) ?? false,
     alertPreference: ((data.alertPreference as string) ?? "sms") as "whatsapp" | "sms" | "both",
+    paymentConfigured: !!(data.paystackSubaccountCode as string | undefined),
+    paymentAccountName: (data.paystackAccountName as string) ?? "",
+    paymentBankName: (data.paystackBankName as string) ?? "",
   };
 
   return (

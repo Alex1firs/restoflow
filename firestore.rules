@@ -37,10 +37,14 @@ service cloud.firestore {
     // ─── Orders ─────────────────────────────────────────────────────────────────
     // Create is blocked from the client SDK — all orders go through /api/orders
     // which uses Firebase Admin SDK and validates prices server-side.
-    // The restaurant owner can read orders and advance the status field only.
+    // Single-document GET is public so customers can track their order by ID
+    // (the random orderId is effectively unguessable). LIST requires ownership.
+    // Status updates now route through /api/orders/[orderId]/status (Admin SDK)
+    // so client-side update is kept only as a fallback with the same constraints.
     match /orders/{orderId} {
       allow create: if false;
-      allow read:   if isOwnerOf(resource.data.restaurantId);
+      allow get:    if true;
+      allow list:   if isOwnerOf(resource.data.restaurantId);
       allow update: if isOwnerOf(resource.data.restaurantId)
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'rejectionReason'])
                     && request.resource.data.status in ['pending', 'preparing', 'ready', 'completed', 'rejected'];

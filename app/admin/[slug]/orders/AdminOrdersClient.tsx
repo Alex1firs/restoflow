@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { db } from "@/lib/firebase";
-import { collection, query, where, orderBy, onSnapshot, updateDoc, doc, Timestamp } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, Timestamp } from "firebase/firestore";
 
 type OrderStatus = "pending" | "preparing" | "ready" | "completed" | "rejected";
 
@@ -118,7 +118,12 @@ export default function AdminOrdersClient({ restaurant }: Props) {
   const advance = async (orderId: string, next: OrderStatus) => {
     setUpdating(orderId);
     try {
-      await updateDoc(doc(db, "orders", orderId), { status: next });
+      const res = await fetch(`/api/orders/${orderId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: next }),
+      });
+      if (!res.ok) throw new Error("Failed");
     } catch {
       alert("Failed to update status. Please try again.");
     } finally {
@@ -127,10 +132,15 @@ export default function AdminOrdersClient({ restaurant }: Props) {
   };
 
   const reject = async (orderId: string) => {
-    if (!window.confirm("Reject this order? The customer will not be automatically notified.")) return;
+    if (!window.confirm("Reject this order? The customer will be notified.")) return;
     setUpdating(orderId);
     try {
-      await updateDoc(doc(db, "orders", orderId), { status: "rejected" });
+      const res = await fetch(`/api/orders/${orderId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "rejected" }),
+      });
+      if (!res.ok) throw new Error("Failed");
       setRejectingId(null);
     } catch {
       alert("Failed to reject order.");

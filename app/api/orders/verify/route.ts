@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createOrderFromPaymentReference, getOrderByReference } from "@/lib/order-payments";
 import { sendNewOrderAlert } from "@/lib/notifications";
+import { sendCustomerNotification } from "@/lib/customer-notifications";
 import { getAdminDb } from "@/lib/firebase-admin";
 
 export async function POST(req: NextRequest) {
@@ -38,17 +39,48 @@ export async function POST(req: NextRequest) {
       orderId = await getOrderByReference(reference.trim());
     }
 
-    // Send SMS if this was a newly created order
     if (isNew && orderId) {
       const orderSnap = await getAdminDb().collection("orders").doc(orderId).get();
       if (orderSnap.exists) {
         const d = orderSnap.data()!;
+        const restaurantSnap = await getAdminDb().collection("restaurants").doc(d.restaurantId as string).get();
+        const rData = restaurantSnap.data() ?? {};
+        const restaurantName = (rData.name as string | undefined) ?? (d.restaurantId as string);
+        const itemsSummary = (d.items as { name: string; quantity: number }[])
+          .map((i) => `${i.quantity}× ${i.name}`)
+          .join(", ");
+
+        // Alert restaurant owner
         sendNewOrderAlert({
           restaurantSlug: d.restaurantId as string,
           total: d.total as number,
           paymentMethod: "online",
           paymentStatus: "paid",
           customerName: (d.customerName as string) ?? "",
+        }).catch(() => {});
+
+        // Notify customer: order created
+        sendCustomerNotification("created", {
+          orderId,
+          customerName: (d.customerName as string) ?? "",
+          customerPhone: (d.phone as string) ?? "",
+          restaurantName,
+          restaurantAddress: rData.address as string | undefined,
+          total: d.total as number,
+          itemsSummary,
+          paymentMethod: "online",
+          deliveryType: (d.deliveryType as "delivery" | "pickup") ?? "delivery",
+        }).catch(() => {});
+
+        // Notify customer: payment confirmed
+        sendCustomerNotification("paid", {
+          orderId,
+          customerName: (d.customerName as string) ?? "",
+          customerPhone: (d.phone as string) ?? "",
+          restaurantName,
+          total: d.total as number,
+          itemsSummary,
+          paymentMethod: "online",
         }).catch(() => {});
       }
     }
