@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { restaurantId, customerName, phone, address, note, items, deliveryType } =
+  const { restaurantId, customerName, phone, address, note, items, deliveryType, orderType, scheduledFor } =
     body as Record<string, unknown>;
 
   if (
@@ -50,12 +50,38 @@ export async function POST(request: NextRequest) {
 
     const rData = restaurantDoc.data()!;
 
+    const isScheduled = orderType === "scheduled";
+
     // Check opening hours
-    if (!checkIsOpen(rData.openingHours as Parameters<typeof checkIsOpen>[0])) {
+    if (!isScheduled && !checkIsOpen(rData.openingHours as Parameters<typeof checkIsOpen>[0])) {
       return NextResponse.json({ error: "The restaurant is currently closed." }, { status: 422 });
     }
 
-    const deliveryFee = (rData.deliveryFee as number) ?? 0;
+    if (isScheduled) {
+      if (typeof scheduledFor !== "string" || !scheduledFor) {
+        return NextResponse.json({ error: "Please choose a time for your scheduled order" }, { status: 400 });
+      }
+      
+      const date = new Date(scheduledFor);
+      if (isNaN(date.getTime()) || date < new Date()) {
+        return NextResponse.json({ error: "Please choose a valid future time" }, { status: 400 });
+      }
+
+      // Check if scheduled time is within opening hours for that day
+      const dayStr = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"][date.getDay()];
+      const hours = (rData.openingHours as any)?.[dayStr];
+      if (!hours || !hours.open) {
+        return NextResponse.json({ error: "The restaurant is closed on the selected day" }, { status: 422 });
+      }
+      
+      const timeStr = date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+      if (timeStr < hours.from || timeStr > hours.to) {
+        return NextResponse.json({ error: "Please choose a time within opening hours" }, { status: 422 });
+      }
+    }
+
+    const resolvedDeliveryType = deliveryType === "pickup" ? "pickup" : "delivery";
+    const deliveryFee = resolvedDeliveryType === "delivery" ? ((rData.deliveryFee as number) ?? 0) : 0;
     const minimumOrder = (rData.minimumOrder as number) ?? 0;
 
     const menuSnap = await db
@@ -96,9 +122,6 @@ export async function POST(request: NextRequest) {
 
     const total = itemsTotal + deliveryFee;
 
-    const resolvedDeliveryType =
-      deliveryType === "pickup" ? "pickup" : "delivery";
-
     const orderRef = await db.collection("orders").add({
       restaurantId: restaurantId.trim(),
       customerName: customerName.trim(),
@@ -111,8 +134,10 @@ export async function POST(request: NextRequest) {
       total,
       paymentMethod: "cash",
       paymentStatus: "pending",
-      status: "pending",
+      status: isScheduled ? "scheduled" : "pending",
       deliveryType: resolvedDeliveryType,
+      orderType: isScheduled ? "scheduled" : "normal",
+      ...(isScheduled ? { scheduledFor } : {}),
       createdAt: FieldValue.serverTimestamp(),
     });
 

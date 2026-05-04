@@ -64,6 +64,10 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
 
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
+  const [isScheduledOrder, setIsScheduledOrder] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [deliveryType, setDeliveryType] = useState<DeliveryType>(
@@ -159,9 +163,9 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
 
   // Body scroll lock
   useEffect(() => {
-    document.body.style.overflow = cartOpen || checkoutOpen ? "hidden" : "";
+    document.body.style.overflow = cartOpen || checkoutOpen || scheduleOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [cartOpen, checkoutOpen]);
+  }, [cartOpen, checkoutOpen, scheduleOpen]);
 
   // Active section tracking (sticky nav highlight)
   useEffect(() => {
@@ -241,6 +245,50 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
     items: items.map((i) => ({ id: i.id, quantity: i.quantity })),
   });
 
+  const handleScheduleSubmit = async () => {
+    if (items.length === 0) {
+      setOrderError("Please add items before scheduling");
+      return;
+    }
+    const err = validateForm();
+    if (err) { setOrderError(err); return; }
+    if (!scheduleDate || !scheduleTime) {
+      setOrderError("Please select a date and time");
+      return;
+    }
+
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setOrderError(null);
+
+    const payload = {
+      ...buildPayload(),
+      orderType: "scheduled",
+      scheduledFor: `${scheduleDate}T${scheduleTime}`,
+    };
+
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to schedule order");
+      }
+      setOrderId(data.orderId);
+      setIsScheduledOrder(true);
+      setOrderSuccess(true);
+      clearCart();
+    } catch (e: any) {
+      setOrderError(e.message || "Something went wrong.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleCashOrder = async () => {
     const err = validateForm();
     if (err) { setOrderError(err); return; }
@@ -315,9 +363,13 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h1 className="text-3xl font-black text-gray-900 mb-2">Order Received!</h1>
+        <h1 className="text-3xl font-black text-gray-900 mb-2">
+          {isScheduledOrder ? "Order Scheduled!" : "Order Received!"}
+        </h1>
         <p className="text-gray-500 mb-8 max-w-sm leading-relaxed">
-          {restaurant.name} has received your order and will start preparing it shortly.
+          {isScheduledOrder
+            ? `${restaurant.name} has received your scheduled order and will prepare it for ${new Date(`${scheduleDate}T${scheduleTime}`).toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" })}.`
+            : `${restaurant.name} has received your order and will start preparing it shortly.`}
         </p>
         {orderId && (
           <div className="w-full max-w-sm bg-gray-50 border border-gray-100 rounded-2xl p-5 mb-6 text-left">
@@ -333,7 +385,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
           </div>
         )}
         <button
-          onClick={() => { setOrderSuccess(false); setOrderId(null); }}
+          onClick={() => { setOrderSuccess(false); setOrderId(null); setIsScheduledOrder(false); }}
           className="text-sm font-bold text-gray-400 hover:text-gray-700 transition-colors"
         >
           Order Again
@@ -575,7 +627,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
                   Browse Menu →
                 </button>
                 <button
-                  onClick={() => alert("Scheduled ordering coming soon!")}
+                  onClick={() => setScheduleOpen(true)}
                   className="flex-shrink-0 bg-white/5 hover:bg-white/10 text-white text-xs font-bold px-4 py-2 rounded-xl border border-white/10 transition-all"
                 >
                   Schedule Order
@@ -1277,6 +1329,193 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
           </div>
         </div>
       )}
+      {/* ── SCHEDULE MODAL ────────────────────────────────────────────────────── */}
+      {scheduleOpen && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setScheduleOpen(false)}
+          />
+          <div className="relative bg-white w-full md:max-w-lg rounded-t-3xl md:rounded-3xl max-h-[95vh] overflow-y-auto shadow-2xl">
+            <div className="flex flex-col px-5 pt-5 pb-4 border-b border-gray-100 sticky top-0 bg-white z-10">
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="text-lg font-black text-gray-900">Schedule Your Order</h2>
+                <button
+                  onClick={() => setScheduleOpen(false)}
+                  className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="text-sm text-gray-500 font-medium">We&apos;re currently closed. Choose when you want your order prepared.</p>
+            </div>
+
+            <div className="px-5 py-5 space-y-5">
+              {items.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 font-medium mb-4">Browse the menu first, then schedule your order.</p>
+                  <button
+                    onClick={() => { setScheduleOpen(false); scrollTo("menu"); }}
+                    className="bg-gray-900 text-white font-bold px-6 py-3 rounded-xl hover:bg-gray-800 transition-colors"
+                  >
+                    Browse Menu
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* Delivery / Pickup toggle */}
+                  {restaurant.deliveryEnabled && restaurant.pickupEnabled && (
+                    <div>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Order type</p>
+                      <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-xl">
+                        <button
+                          onClick={() => setDeliveryType("delivery")}
+                          className={`py-2.5 rounded-lg text-sm font-bold transition-all ${
+                            deliveryType === "delivery" ? "bg-white shadow" : "text-gray-500"
+                          }`}
+                          style={deliveryType === "delivery" ? { color: primary } : {}}
+                        >
+                          Delivery
+                        </button>
+                        <button
+                          onClick={() => setDeliveryType("pickup")}
+                          className={`py-2.5 rounded-lg text-sm font-bold transition-all ${
+                            deliveryType === "pickup" ? "bg-white shadow" : "text-gray-500"
+                          }`}
+                          style={deliveryType === "pickup" ? { color: primary } : {}}
+                        >
+                          Pickup
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Schedule Time */}
+                  <div className="space-y-3">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">When do you want it?</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        type="date"
+                        value={scheduleDate}
+                        onChange={(e) => setScheduleDate(e.target.value)}
+                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none text-gray-900 transition-all focus:border-gray-900"
+                      />
+                      <input
+                        type="time"
+                        value={scheduleTime}
+                        onChange={(e) => setScheduleTime(e.target.value)}
+                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none text-gray-900 transition-all focus:border-gray-900"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Contact details */}
+                  <div className="space-y-3">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Your details</p>
+                    <input
+                      type="text"
+                      placeholder="Full name *"
+                      value={formData.customerName}
+                      onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 text-gray-900 placeholder-gray-400 transition-all"
+                      style={{ ["--tw-ring-color" as string]: primary + "40" } as React.CSSProperties}
+                      onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
+                      onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
+                    />
+                    <input
+                      type="tel"
+                      placeholder="Phone number *"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none text-gray-900 placeholder-gray-400 transition-all"
+                      onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
+                      onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
+                    />
+                  </div>
+
+                  {/* Delivery address */}
+                  {deliveryType === "delivery" && (
+                    <div>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Delivery address</p>
+                      <textarea
+                        placeholder="Enter your full delivery address *"
+                        value={formData.address}
+                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                        rows={2}
+                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none text-gray-900 placeholder-gray-400 resize-none transition-all"
+                        onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
+                        onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Note */}
+                  <textarea
+                    placeholder="Special instructions (optional)"
+                    value={formData.note}
+                    onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+                    rows={2}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none text-gray-900 placeholder-gray-400 resize-none transition-all"
+                    onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
+                  />
+
+                  {/* Order summary */}
+                  <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Order summary</p>
+                    <div className="space-y-1.5 mb-3">
+                      {items.map((item) => (
+                        <div key={item.id} className="flex justify-between text-sm">
+                          <span className="text-gray-600">{item.quantity}× {item.name}</span>
+                          <span className="font-medium text-gray-700">{fmt(item.quantity * item.price)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="border-t border-gray-200 pt-2 space-y-1.5">
+                      <div className="flex justify-between text-sm text-gray-500">
+                        <span>Subtotal</span>
+                        <span>{fmt(subtotal)}</span>
+                      </div>
+                      {deliveryType === "delivery" && restaurant.deliveryFee > 0 && (
+                        <div className="flex justify-between text-sm text-gray-500">
+                          <span>Delivery fee</span>
+                          <span>{fmt(restaurant.deliveryFee)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between font-black text-base pt-1.5 border-t border-gray-200">
+                        <span>Total</span>
+                        <span style={{ color: primary }}>{fmt(orderTotal)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {restaurant.minimumOrder > 0 && !meetsMinimum && (
+                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3 font-medium">
+                      Add {fmt(restaurant.minimumOrder - subtotal)} more to meet the minimum order
+                    </p>
+                  )}
+
+                  {orderError && (
+                    <div className="bg-red-50 border border-red-200 text-red-600 text-sm font-medium px-4 py-3 rounded-xl">
+                      {orderError}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleScheduleSubmit}
+                    disabled={isSubmitting || !meetsMinimum}
+                    style={meetsMinimum ? { backgroundColor: primary } : {}}
+                    className="w-full text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2.5 transition-all hover:opacity-90 disabled:opacity-60 disabled:bg-gray-400 active:scale-[0.99]"
+                  >
+                    {isSubmitting ? "Scheduling…" : "Schedule Order"}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { db } from "@/lib/firebase";
 import { collection, query, where, orderBy, onSnapshot, Timestamp } from "firebase/firestore";
 
-type OrderStatus = "pending" | "preparing" | "ready" | "completed" | "rejected";
+type OrderStatus = "scheduled" | "pending" | "preparing" | "ready" | "completed" | "rejected";
 
 type OrderItem = { id: string; name: string; price: number; quantity: number };
 
@@ -23,6 +23,8 @@ type Order = {
   paymentStatus?: "paid" | "pending";
   paymentReference?: string;
   rejectionReason?: string;
+  orderType?: "normal" | "scheduled";
+  scheduledFor?: string | Timestamp;
   createdAt: Timestamp;
 };
 
@@ -50,6 +52,7 @@ function playBeep() {
 }
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; badge: string; dot: string }> = {
+  scheduled: { label: "Scheduled", badge: "bg-cyan-100 text-cyan-800 border-cyan-200", dot: "bg-cyan-500" },
   pending:   { label: "New Order", badge: "bg-amber-100 text-amber-800 border-amber-200", dot: "bg-amber-500" },
   preparing: { label: "Preparing", badge: "bg-blue-100 text-blue-800 border-blue-200",   dot: "bg-blue-500" },
   ready:     { label: "Ready",     badge: "bg-purple-100 text-purple-800 border-purple-200", dot: "bg-purple-500" },
@@ -161,7 +164,7 @@ export default function AdminOrdersClient({ restaurant }: Props) {
     return d.toDateString() === now.toDateString();
   };
 
-  const activeStatuses: OrderStatus[] = ["pending", "preparing", "ready"];
+  const activeStatuses: OrderStatus[] = ["scheduled", "pending", "preparing", "ready"];
   const todayOrders = orders.filter((o) => isToday(o.createdAt));
   const activeOrders = orders.filter((o) => activeStatuses.includes(o.status));
 
@@ -258,6 +261,20 @@ export default function AdminOrdersClient({ restaurant }: Props) {
                       </span>
                     </div>
 
+                    {order.orderType === "scheduled" && order.scheduledFor && (
+                      <div className="bg-cyan-50 border border-cyan-100 px-3 py-2 rounded-xl mb-4 flex items-center gap-2">
+                        <span className="text-cyan-600">🗓️</span>
+                        <div>
+                          <p className="text-[10px] font-black text-cyan-700 uppercase mb-0.5">Scheduled For</p>
+                          <p className="text-sm text-cyan-800 font-bold">
+                            {typeof order.scheduledFor === "string" 
+                              ? new Date(order.scheduledFor).toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" })
+                              : fmt(order.scheduledFor)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div>
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Customer</p>
@@ -319,6 +336,16 @@ export default function AdminOrdersClient({ restaurant }: Props) {
 
                     {/* Actions */}
                     <div className="space-y-2 mt-auto">
+                      {order.status === "scheduled" && (
+                        <>
+                          <button onClick={() => advance(order.id, "preparing")} disabled={busy} className="w-full py-3 rounded-2xl bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest transition-all active:scale-95">
+                            {busy ? "…" : "Accept & Start Preparing"}
+                          </button>
+                          <button onClick={() => reject(order.id)} disabled={busy} className="w-full py-2.5 rounded-2xl bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-600 font-black text-xs uppercase tracking-widest transition-all border border-red-100">
+                            {busy ? "…" : "Reject"}
+                          </button>
+                        </>
+                      )}
                       {order.status === "pending" && (
                         <>
                           <button onClick={() => advance(order.id, "preparing")} disabled={busy} className="w-full py-3 rounded-2xl bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest transition-all active:scale-95">
