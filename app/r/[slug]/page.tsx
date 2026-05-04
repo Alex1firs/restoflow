@@ -8,6 +8,7 @@ import { CartProvider } from './components/CartContext';
 import Link from 'next/link';
 import { checkIsOpen, todayHours, type OpeningHours } from '@/lib/restaurant-utils';
 import { buildPageTitle, buildPageDescription, buildJsonLd, buildCanonicalUrl, type RestaurantSEOData } from '@/lib/seo-utils';
+import SEOSections from './components/SEOSections';
 
 function formatTodayHours(from: string, to: string): string {
   const fmt = (t: string) => {
@@ -174,6 +175,22 @@ export default async function RestaurantPage({
 
   const jsonLd = seoData ? buildJsonLd(seoData) : null;
 
+  const restaurantProps = {
+    name: restaurant.name,
+    description: restaurant.description,
+    coverImage: restaurant.coverImage,
+    logo: rData.logo ?? "",
+    address: rData.address ?? "",
+    slug,
+    onlinePaymentEnabled: !!rData.paystackSubaccountCode,
+    deliveryFee: rData.deliveryFee ?? 0,
+    minimumOrder: rData.minimumOrder ?? 0,
+    isOpen: checkIsOpen(rData.openingHours),
+    deliveryEnabled: rData.deliveryEnabled !== false,
+    pickupEnabled: rData.pickupEnabled !== false,
+    todayHoursLabel,
+  };
+
   return (
     <>
       {jsonLd && (
@@ -184,26 +201,22 @@ export default async function RestaurantPage({
       )}
       <CartProvider>
         <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center text-orange-500">Loading…</div>}>
-          <RestaurantClient
-            restaurant={{
-              name: restaurant.name,
-              description: restaurant.description,
-              coverImage: restaurant.coverImage,
-              logo: rData.logo ?? "",
-              address: rData.address ?? "",
-              slug: slug,
-              onlinePaymentEnabled: !!rData.paystackSubaccountCode,
-              deliveryFee: rData.deliveryFee ?? 0,
-              minimumOrder: rData.minimumOrder ?? 0,
-              isOpen: checkIsOpen(rData.openingHours),
-              deliveryEnabled: rData.deliveryEnabled !== false,
-              pickupEnabled: rData.pickupEnabled !== false,
-              todayHoursLabel,
-            }}
-            menuItems={menuItems}
-          />
+          <RestaurantClient restaurant={restaurantProps} menuItems={menuItems} />
         </Suspense>
       </CartProvider>
+      <SEOSections
+        restaurant={restaurantProps}
+        seo={{
+          seoTitle: seoData?.seoTitle,
+          seoDescription: seoData?.seoDescription,
+          serviceAreas: seoData?.serviceAreas,
+          foodKeywords: seoData?.foodKeywords,
+          googleBusinessUrl: seoData?.googleBusinessUrl,
+          instagramUrl: seoData?.instagramUrl,
+          tiktokUrl: seoData?.tiktokUrl,
+        }}
+        menuItems={menuItems}
+      />
     </>
   );
 }

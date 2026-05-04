@@ -18,6 +18,7 @@ import {
   type OpeningHours,
 } from "@/lib/restaurant-utils";
 import { buildPageTitle, buildPageDescription, buildJsonLd, type RestaurantSEOData } from "@/lib/seo-utils";
+import SEOSections from "@/app/r/[slug]/components/SEOSections";
 
 export const revalidate = 0;
 
@@ -238,37 +239,43 @@ export default async function RDomainPage({
   };
   const jsonLd = buildJsonLd(seoData);
 
+  const restaurantProps = {
+    name: restaurant.name,
+    description: restaurant.description,
+    coverImage: restaurant.coverImage,
+    logo: rData.logo ?? "",
+    address: rData.address ?? "",
+    slug,
+    onlinePaymentEnabled: !!rData.paystackSubaccountCode,
+    deliveryFee: rData.deliveryFee ?? 0,
+    minimumOrder: rData.minimumOrder ?? 0,
+    isOpen: checkIsOpen(rData.openingHours),
+    deliveryEnabled: rData.deliveryEnabled !== false,
+    pickupEnabled: rData.pickupEnabled !== false,
+    todayHoursLabel,
+  };
+
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-    <CartProvider>
-      <Suspense
-        fallback={
-          <div className="min-h-screen bg-white flex items-center justify-center text-orange-500">
-            Loading…
-          </div>
-        }
-      >
-        <RestaurantClient
-          restaurant={{
-            name: restaurant.name,
-            description: restaurant.description,
-            coverImage: restaurant.coverImage,
-            logo: rData.logo ?? "",
-            address: rData.address ?? "",
-            slug,
-            onlinePaymentEnabled: !!rData.paystackSubaccountCode,
-            deliveryFee: rData.deliveryFee ?? 0,
-            minimumOrder: rData.minimumOrder ?? 0,
-            isOpen: checkIsOpen(rData.openingHours),
-            deliveryEnabled: rData.deliveryEnabled !== false,
-            pickupEnabled: rData.pickupEnabled !== false,
-            todayHoursLabel,
-          }}
-          menuItems={menuItems}
-        />
-      </Suspense>
-    </CartProvider>
+      <CartProvider>
+        <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center text-orange-500">Loading…</div>}>
+          <RestaurantClient restaurant={restaurantProps} menuItems={menuItems} />
+        </Suspense>
+      </CartProvider>
+      <SEOSections
+        restaurant={restaurantProps}
+        seo={{
+          seoTitle: seoData.seoTitle,
+          seoDescription: seoData.seoDescription,
+          serviceAreas: seoData.serviceAreas,
+          foodKeywords: seoData.foodKeywords,
+          googleBusinessUrl: seoData.googleBusinessUrl,
+          instagramUrl: seoData.instagramUrl,
+          tiktokUrl: seoData.tiktokUrl,
+        }}
+        menuItems={menuItems}
+      />
     </>
   );
 }
