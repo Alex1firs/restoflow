@@ -21,6 +21,7 @@ export default function AdminNav({ slug, role = "owner" }: Props) {
     { name: "Reports", href: `/admin/${slug}/reports`, roles: ["owner", "manager"] },
     { name: "Payments", href: `/admin/${slug}/payment`, roles: ["owner"] },
     { name: "Store", href: `/admin/${slug}/settings`, roles: ["owner"] },
+    { name: "Domain", href: `/admin/${slug}/domain`, roles: ["owner"] },
     { name: "QR Code", href: `/admin/${slug}/qr`, roles: ["owner"] },
     { name: "Staff", href: `/admin/${slug}/staff`, roles: ["owner"] },
   ];
