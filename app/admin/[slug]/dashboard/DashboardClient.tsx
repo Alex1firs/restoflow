@@ -66,6 +66,8 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
   const [checklistExpanded, setChecklistExpanded] = useState(!setupChecklist?.canSubmit);
   const startOfDayRef = useRef(getLagosStartOfDay());
 
@@ -124,6 +126,7 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
   const submitForReview = async () => {
     if (setupChecklist && !setupChecklist.canSubmit) return;
     setIsSubmittingReview(true);
+    setSubmitError(null);
     try {
       const res = await fetch(`/api/admin/restaurants/${slug}/status`, {
         method: "PATCH",
@@ -134,9 +137,10 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
         const d = await res.json().catch(() => ({}));
         throw new Error(d.error ?? "Failed to submit");
       }
-      window.location.reload();
+      setSubmitSuccess(true);
+      setTimeout(() => window.location.reload(), 3500);
     } catch (e: unknown) {
-      alert("Failed to submit for review: " + (e instanceof Error ? e.message : String(e)));
+      setSubmitError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
     } finally {
       setIsSubmittingReview(false);
     }
@@ -144,6 +148,26 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
 
   return (
     <div className="min-h-screen bg-gray-50">
+
+      {/* Success toast */}
+      {submitSuccess && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4 pointer-events-none">
+          <div className="bg-white border border-green-200 shadow-2xl rounded-2xl px-5 py-4 flex items-start gap-3 pointer-events-auto">
+            <div className="shrink-0 w-9 h-9 bg-green-100 rounded-full flex items-center justify-center">
+              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-black text-gray-900">Submitted for review</p>
+              <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                Your restaurant has been sent to the RestoFlow team. We&apos;ll notify you once it is approved.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
 
         {/* Header */}
@@ -219,23 +243,37 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 shrink-0">
-                  <a
-                    href={`/admin/${slug}/preview`}
-                    target="_blank"
-                    className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors"
-                  >
-                    Preview Website
-                  </a>
-                  {(status === "draft" || status === "rejected") && (
-                    <button
-                      onClick={submitForReview}
-                      disabled={isSubmittingReview || (setupChecklist != null && !setupChecklist.canSubmit)}
-                      title={setupChecklist && !setupChecklist.canSubmit ? "Complete all required steps first" : undefined}
-                      className="bg-gray-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                <div className="shrink-0 flex flex-col items-end gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <a
+                      href={`/admin/${slug}/preview`}
+                      target="_blank"
+                      className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors"
                     >
-                      {isSubmittingReview ? "Submitting…" : status === "rejected" ? "Resubmit for Review" : "Submit for Review"}
-                    </button>
+                      Preview Website
+                    </a>
+                    {(status === "draft" || status === "rejected") && (
+                      <button
+                        onClick={submitForReview}
+                        disabled={isSubmittingReview || (setupChecklist != null && !setupChecklist.canSubmit)}
+                        className="bg-gray-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {isSubmittingReview ? "Submitting…" : status === "rejected" ? "Resubmit for Review" : "Submit for Review"}
+                      </button>
+                    )}
+                  </div>
+                  {/* Blocked hint */}
+                  {(status === "draft" || status === "rejected") && setupChecklist && !setupChecklist.canSubmit && (
+                    <p className="text-[11px] font-semibold text-red-500 text-right">
+                      Complete required setup items before submitting.
+                    </p>
+                  )}
+                  {/* Inline submission error */}
+                  {submitError && (
+                    <div className="bg-white border border-red-200 rounded-xl px-4 py-3 max-w-xs text-right">
+                      <p className="text-xs font-black text-red-700">Could not submit for review</p>
+                      <p className="text-xs text-red-500 mt-0.5">{submitError}</p>
+                    </div>
                   )}
                 </div>
               </div>
