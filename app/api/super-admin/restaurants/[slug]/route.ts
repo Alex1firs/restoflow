@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSuperAdminUser } from "@/lib/auth-server";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { sendApprovalNotification, sendRejectionNotification } from "@/lib/restaurant-notifications";
 
 async function guardSuperAdmin() {
   try {
@@ -19,7 +20,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sl
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
 
-  const { action, days, planId } = body as { action: string; days?: number; planId?: string };
+  const { action, days, planId, reason } = body as {
+    action: string;
+    days?: number;
+    planId?: string;
+    reason?: string;
+  };
   const db = getAdminDb();
   const ref = db.collection("restaurants").doc(slug);
   const snap = await ref.get();
@@ -72,6 +78,37 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sl
     case "changePlan": {
       if (!planId) return NextResponse.json({ error: "planId required" }, { status: 400 });
       await ref.update({ planId, updatedAt: FieldValue.serverTimestamp() });
+      break;
+    }
+    case "approve": {
+      await ref.update({ status: "live", updatedAt: FieldValue.serverTimestamp() });
+      const approveData = snap.data()!;
+      const approvePhone = (approveData.notificationPhone as string) || (approveData.phone as string) || "";
+      const approveName = (approveData.name as string) || slug;
+      if (approvePhone) {
+        sendApprovalNotification(approvePhone, approveName).catch(() => {});
+      }
+      break;
+    }
+    case "reject": {
+      if (!reason?.trim()) {
+        return NextResponse.json({ error: "Rejection reason is required" }, { status: 400 });
+      }
+      await ref.update({
+        status: "rejected",
+        rejectionReason: reason.trim(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      const rejectData = snap.data()!;
+      const rejectPhone = (rejectData.notificationPhone as string) || (rejectData.phone as string) || "";
+      const rejectName = (rejectData.name as string) || slug;
+      if (rejectPhone) {
+        sendRejectionNotification(rejectPhone, rejectName, reason.trim()).catch(() => {});
+      }
+      break;
+    }
+    case "suspendRestaurant": {
+      await ref.update({ status: "suspended", updatedAt: FieldValue.serverTimestamp() });
       break;
     }
     default:

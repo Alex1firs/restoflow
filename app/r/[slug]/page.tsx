@@ -25,6 +25,7 @@ interface RestaurantData extends DocumentData {
   coverImage: string;
   subscriptionStatus?: string;
   subscriptionEndDate?: { toDate?: () => Date; seconds?: number };
+  status?: string;
 }
 
 function isExpired(restaurant: RestaurantData): boolean {
@@ -147,6 +148,26 @@ export default async function RestaurantPage({
           <h1 className="text-2xl font-black text-gray-900 mb-3">{restaurant.name}</h1>
           <p className="text-gray-500 font-medium mb-2">Online ordering is temporarily unavailable.</p>
           <p className="text-gray-400 text-sm">Please contact the restaurant directly to place your order.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Drafts, pending review, rejected, or suspended are NOT visible to the public.
+  // The owner can view them via the /admin/[slug]/preview route.
+  if (restaurant.status !== "live") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
+        <div className="text-center p-8 bg-white rounded-2xl shadow-sm border max-w-md">
+          <div className="w-16 h-16 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-black text-gray-900 mb-3">Not Available Yet</h1>
+          <p className="text-gray-500 font-medium mb-4">
+            This restaurant is currently setting up their profile and is not yet available for public orders.
+          </p>
         </div>
       </div>
     );

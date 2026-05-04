@@ -7,6 +7,7 @@ import { auth } from "@/lib/firebase";
 
 const NAV = [
   { label: "Overview", href: "/super-admin/overview" },
+  { label: "Reviews", href: "/super-admin/reviews" },
   { label: "Restaurants", href: "/super-admin/restaurants" },
   { label: "Subscriptions", href: "/super-admin/subscriptions" },
   { label: "Payments", href: "/super-admin/payments" },

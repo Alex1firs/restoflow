@@ -48,6 +48,7 @@ interface RestaurantClientProps {
     instagramUrl?: string;
     tiktokUrl?: string;
   };
+  isPreview?: boolean;
 }
 
 function fmt(n: number) {
@@ -59,7 +60,7 @@ function parseList(s?: string): string[] {
   return s.split(",").map((x) => x.trim()).filter(Boolean);
 }
 
-export default function RestaurantClient({ restaurant, menuItems, seo }: RestaurantClientProps) {
+export default function RestaurantClient({ restaurant, menuItems, seo, isPreview }: RestaurantClientProps) {
   const { items, addToCart, updateQuantity, clearCart, totalPrice, totalItems } = useCart();
 
   const [cartOpen, setCartOpen] = useState(false);
@@ -246,6 +247,10 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
   });
 
   const handleScheduleSubmit = async () => {
+    if (isPreview) {
+      setOrderError("Orders cannot be placed in Preview Mode.");
+      return;
+    }
     if (items.length === 0) {
       setOrderError("Please add items before scheduling");
       return;
@@ -290,6 +295,10 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
   };
 
   const handleCashOrder = async () => {
+    if (isPreview) {
+      setOrderError("Orders cannot be placed in Preview Mode.");
+      return;
+    }
     const err = validateForm();
     if (err) { setOrderError(err); return; }
     if (isSubmitting) return;
@@ -316,6 +325,10 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
   };
 
   const handleOnlinePayment = async () => {
+    if (isPreview) {
+      setOrderError("Orders cannot be placed in Preview Mode.");
+      return;
+    }
     const err = validateForm();
     if (err) { setOrderError(err); return; }
     if (isSubmitting) return;
@@ -403,7 +416,13 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
 
   // ── Main page ───────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-white text-gray-900 pb-24">
+    <div className="min-h-screen bg-white text-gray-900 pb-24 relative">
+      {isPreview && (
+        <div className="bg-amber-500 text-white font-black text-xs tracking-widest uppercase text-center py-2.5 px-4 sticky top-0 z-[100] shadow-md flex items-center justify-center gap-2">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+          PREVIEW MODE - Orders are disabled
+        </div>
+      )}
 
       {/* ── HERO ──────────────────────────────────────────────────────────────── */}
       <section className="relative h-[70vh] min-h-[480px] max-h-[760px] overflow-hidden group bg-gray-900">

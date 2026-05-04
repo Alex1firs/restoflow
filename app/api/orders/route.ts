@@ -50,6 +50,10 @@ export async function POST(request: NextRequest) {
 
     const rData = restaurantDoc.data()!;
 
+    if (rData.status !== "live") {
+      return NextResponse.json({ error: "Restaurant is not currently accepting orders." }, { status: 403 });
+    }
+
     const isScheduled = orderType === "scheduled";
 
     // Check opening hours
