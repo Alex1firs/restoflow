@@ -29,32 +29,26 @@ export async function sendNewOrderAlert(params: NewOrderAlertParams): Promise<vo
 
     const tasks: Promise<void>[] = [];
 
+    // SMS is always primary — fires for every new order if notificationPhone is set
+    if (notificationPhone) {
+      tasks.push(dispatchSMS({ ...params, restaurantName, notificationPhone }).catch((err) => {
+        console.error("SMS alert failed:", err);
+      }));
+    }
+
+    // WhatsApp is secondary — only fires if explicitly enabled
     const sendWhatsApp =
       whatsappEnabled &&
       rawWhatsappPhone &&
       (alertPreference === "whatsapp" || alertPreference === "both");
-
-    const sendSMS =
-      notificationPhone &&
-      (alertPreference === "sms" || alertPreference === "both" ||
-        // backward compat: no preference set yet → fall back to SMS
-        (!whatsappEnabled));
 
     if (sendWhatsApp) {
       tasks.push(
         dispatchWhatsApp({ ...params, restaurantName, whatsappPhone: rawWhatsappPhone })
           .catch((err) => {
             console.error("WhatsApp alert failed:", err);
-            // fallback to SMS if available
-            if (notificationPhone) {
-              return dispatchSMS({ ...params, notificationPhone }).catch(() => {});
-            }
           })
       );
-    }
-
-    if (sendSMS) {
-      tasks.push(dispatchSMS({ ...params, notificationPhone }).catch(() => {}));
     }
 
     if (tasks.length > 0) await Promise.allSettled(tasks);
@@ -99,34 +93,42 @@ async function dispatchWhatsApp(
 }
 
 async function dispatchSMS(
-  params: NewOrderAlertParams & { notificationPhone: string }
+  params: NewOrderAlertParams & { restaurantName: string; notificationPhone: string }
 ): Promise<void> {
   const termiiKey = process.env.TERMII_API_KEY;
   if (!termiiKey) return;
 
-  const digits = params.notificationPhone.replace(/\D/g, "");
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
-  const paymentLabel =
-    params.paymentMethod === "online" ? "Paid online ✓" : "Pay on delivery";
-  const message = [
-    `New order on RestoFlow!`,
-    `₦${params.total.toLocaleString("en-NG")} — ${paymentLabel}`,
-    `Customer: ${params.customerName}`,
-    `View: ${appUrl}/admin/${params.restaurantSlug}/orders`,
-  ].join("\n");
+  const raw = params.notificationPhone.replace(/\D/g, "");
+  const to = raw.startsWith("0") && raw.length === 11 ? "234" + raw.slice(1) : raw;
 
-  await fetch("https://api.ng.termii.com/api/sms/send", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      api_key: termiiKey,
-      to: digits,
-      from: "RestoFlow",
-      sms: message,
-      type: "plain",
-      channel: "generic",
-    }),
-  });
+  const paymentMethod = params.paymentMethod === "online" ? "Online" : "Cash";
+  const paymentStatus = params.paymentStatus === "paid" ? "Paid ✓" : "Pending";
+  const message =
+    `🍽️ New Order — ${params.restaurantName ?? params.restaurantSlug}\n\n` +
+    `Total: ₦${params.total.toLocaleString("en-NG")}\n` +
+    `Payment: ${paymentMethod}/${paymentStatus}\n\n` +
+    `⚡ Check dashboard now`;
+
+  try {
+    const res = await fetch("https://v3.api.termii.com/api/sms/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_key: termiiKey,
+        to,
+        from: "RestoFlow",
+        sms: message,
+        type: "plain",
+        channel: "generic",
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(`Termii SMS error ${res.status}:`, text);
+    }
+  } catch (err) {
+    console.error("Termii SMS send failed:", err);
+  }
 }
 
 // Legacy shim kept for any direct callers that haven't been updated
