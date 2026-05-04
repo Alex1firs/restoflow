@@ -298,7 +298,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
     <div className="min-h-screen bg-white text-gray-900">
 
       {/* ── HERO ──────────────────────────────────────────────────────────────── */}
-      <section className="relative h-[62vh] min-h-[400px] max-h-[680px] overflow-hidden">
+      <section className="relative h-[70vh] min-h-[480px] max-h-[760px] overflow-hidden group">
         <img
           src={
             restaurant.coverImage && restaurant.coverImage.startsWith("http")
@@ -306,9 +306,9 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
               : "https://images.unsplash.com/photo-1544025162-d76694265947?w=1600&auto=format"
           }
           alt={restaurant.name}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover transition-transform duration-[8000ms] group-hover:scale-110"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-transparent" />
 
         {/* Open / Closed badge */}
         <div className="absolute top-5 right-5">
@@ -326,79 +326,89 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
         </div>
 
         {/* Hero content — centered, bottom-anchored */}
-        <div className="absolute inset-0 flex flex-col items-center justify-end pb-12 px-6 text-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-end pb-10 px-6 text-center">
           {restaurant.logo && (
             <div className="w-20 h-20 rounded-2xl border-2 border-white/30 shadow-2xl overflow-hidden mb-4 bg-white/10 backdrop-blur-sm flex-shrink-0">
               <img src={restaurant.logo} alt="logo" className="w-full h-full object-cover" />
             </div>
           )}
-          <h1 className="text-3xl md:text-5xl font-black text-white leading-tight mb-2 drop-shadow-lg">
+          <h1 className="text-4xl md:text-6xl font-black text-white leading-tight mb-2 drop-shadow-2xl tracking-tight">
             {restaurant.name}
           </h1>
-          {restaurant.address && (
-            <p className="text-sm text-white/65 flex items-center gap-1.5 mb-7">
-              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              {restaurant.address}
+          {restaurant.description && (
+            <p className="text-white/70 text-sm md:text-base mb-4 max-w-md leading-relaxed">
+              {restaurant.description.length > 100 ? restaurant.description.slice(0, 100) + "…" : restaurant.description}
             </p>
           )}
+          {/* Stats row */}
+          <div className="flex items-center gap-2 flex-wrap justify-center mb-6">
+            <span className="bg-white/15 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full border border-white/20">
+              ⭐ 4.5
+            </span>
+            <span className="bg-white/15 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full border border-white/20">
+              ⏱ 20–35 min
+            </span>
+            {restaurant.deliveryEnabled && (
+              <span className="bg-white/15 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full border border-white/20">
+                🚚 {restaurant.deliveryFee > 0 ? `${fmt(restaurant.deliveryFee)} delivery` : "Free delivery"}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             <button
               onClick={() => scrollTo("menu")}
-              className="bg-orange-600 hover:bg-orange-500 text-white font-bold px-7 py-3.5 rounded-2xl shadow-lg shadow-orange-600/40 transition-all active:scale-95"
+              className="bg-orange-600 hover:bg-orange-500 hover:scale-105 text-white font-bold px-8 py-4 rounded-2xl shadow-lg shadow-orange-600/50 transition-all duration-200 active:scale-95 hover:shadow-xl hover:shadow-orange-600/40"
             >
               Start Order
             </button>
             <button
-              onClick={() => scrollTo("about")}
-              className="bg-white/15 hover:bg-white/25 text-white font-bold px-7 py-3.5 rounded-2xl backdrop-blur-sm border border-white/20 transition-all active:scale-95"
+              onClick={() => scrollTo("menu")}
+              className="bg-white/10 hover:bg-white/25 hover:scale-105 text-white font-bold px-8 py-4 rounded-2xl backdrop-blur-sm border border-white/30 transition-all duration-200 active:scale-95"
             >
-              About
+              View Menu
             </button>
           </div>
         </div>
       </section>
 
       {/* ── QUICK INFO BAR ────────────────────────────────────────────────────── */}
-      <div className="bg-orange-50 border-b border-orange-100 px-4 py-3">
+      <div className="bg-orange-600 px-4 py-3">
         <div className="max-w-4xl mx-auto flex flex-wrap gap-x-5 gap-y-2 text-sm justify-center sm:justify-start">
           {restaurant.deliveryEnabled && (
-            <span className="flex items-center gap-1.5 text-orange-700 font-medium">
-              <svg className="w-4 h-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span className="flex items-center gap-1.5 text-white font-semibold">
+              <svg className="w-4 h-4 text-white/70 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
               </svg>
               {restaurant.deliveryFee > 0 ? `${fmt(restaurant.deliveryFee)} delivery` : "Free delivery"}
             </span>
           )}
           {restaurant.pickupEnabled && (
-            <span className="flex items-center gap-1.5 text-orange-700 font-medium">
-              <svg className="w-4 h-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span className="flex items-center gap-1.5 text-white font-semibold">
+              <svg className="w-4 h-4 text-white/70 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
               Pickup available
             </span>
           )}
           {restaurant.minimumOrder > 0 && (
-            <span className="flex items-center gap-1.5 text-orange-700 font-medium">
-              <svg className="w-4 h-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span className="flex items-center gap-1.5 text-white font-semibold">
+              <svg className="w-4 h-4 text-white/70 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
               Min {fmt(restaurant.minimumOrder)}
             </span>
           )}
           {restaurant.todayHoursLabel && (
-            <span className="flex items-center gap-1.5 text-orange-700 font-medium">
-              <svg className="w-4 h-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span className="flex items-center gap-1.5 text-white font-semibold">
+              <svg className="w-4 h-4 text-white/70 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               {restaurant.todayHoursLabel}
             </span>
           )}
           {restaurant.onlinePaymentEnabled && (
-            <span className="flex items-center gap-1.5 text-orange-700 font-medium">
-              <svg className="w-4 h-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span className="flex items-center gap-1.5 text-white font-semibold">
+              <svg className="w-4 h-4 text-white/70 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
               </svg>
               Pay online
@@ -407,17 +417,30 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
         </div>
       </div>
 
+      {/* ── TRUST STRIP ───────────────────────────────────────────────────────── */}
+      <div className="bg-gray-950 text-white py-3 overflow-x-auto">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="flex items-center gap-5 text-xs font-bold min-w-max mx-auto justify-center">
+            <span className="text-orange-400">🔥 120+ orders today</span>
+            <span className="text-white/20">|</span>
+            <span className="text-yellow-300">⭐ Rated 4.6 by customers</span>
+            <span className="text-white/20">|</span>
+            <span className="text-green-400">⚡ Fast delivery in 20–30 mins</span>
+          </div>
+        </div>
+      </div>
+
       {/* ── STICKY PAGE NAV ───────────────────────────────────────────────────── */}
-      <nav className="sticky top-0 z-30 h-11 bg-white border-b border-gray-100 shadow-sm flex items-center">
+      <nav className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 w-full">
-          <div className="flex gap-1 overflow-x-auto scrollbar-hide">
+          <div className="flex gap-1 overflow-x-auto scrollbar-hide py-2">
             {navSections.map((s) => (
               <button
                 key={s.id}
                 onClick={() => scrollTo(s.id)}
-                className={`flex-shrink-0 px-5 py-1.5 rounded-full text-sm font-bold transition-all ${
+                className={`flex-shrink-0 px-5 py-2 rounded-full text-sm font-bold transition-all duration-200 ${
                   activeSection === s.id
-                    ? "bg-orange-600 text-white shadow-sm"
+                    ? "bg-orange-600 text-white shadow-md shadow-orange-600/25 scale-105"
                     : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
                 }`}
               >
@@ -440,14 +463,14 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
       {/* ── MENU SECTION ──────────────────────────────────────────────────────── */}
       <section id="menu" ref={menuSectionRef} className="scroll-mt-11">
         {/* Sticky category tabs */}
-        <div className="sticky top-11 z-20 bg-white border-b border-gray-100">
+        <div className="sticky top-[44px] z-20 bg-white/95 backdrop-blur-sm border-b border-gray-100">
           <div className="max-w-4xl mx-auto">
-            <div ref={categoryTabsRef} className="flex gap-1 overflow-x-auto px-4 py-2 scrollbar-hide">
+            <div ref={categoryTabsRef} className="flex gap-2 overflow-x-auto px-4 py-3 scrollbar-hide">
               <button
                 onClick={() => setActiveCategory(null)}
-                className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold transition-all ${
+                className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all duration-200 ${
                   activeCategory === null
-                    ? "bg-gray-900 text-white shadow-sm"
+                    ? "bg-gray-900 text-white shadow-md scale-105"
                     : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
                 }`}
               >
@@ -457,9 +480,9 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
-                  className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold transition-all ${
+                  className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all duration-200 ${
                     activeCategory === cat
-                      ? "bg-gray-900 text-white shadow-sm"
+                      ? "bg-gray-900 text-white shadow-md scale-105"
                       : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
                   }`}
                 >
@@ -471,30 +494,35 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
         </div>
 
         {/* Menu grid */}
-        <div className="max-w-4xl mx-auto px-4 py-6 pb-8">
+        <div className="max-w-4xl mx-auto px-4 py-8 pb-12">
           {filteredItems.length === 0 ? (
             <div className="text-center py-20">
               <p className="text-gray-400 text-lg font-medium">No items here yet.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredItems.map((item) => {
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {filteredItems.map((item, idx) => {
                 const cartItem = items.find((i) => i.id === item.id);
                 const qty = cartItem?.quantity ?? 0;
                 return (
                   <div
                     key={item.id}
-                    className={`bg-white rounded-2xl border overflow-hidden flex flex-col transition-all ${
+                    className={`group bg-white rounded-3xl border overflow-hidden flex flex-col transition-all duration-300 ${
                       item.available
-                        ? "border-gray-100 hover:border-orange-200 hover:shadow-md"
+                        ? "border-gray-100 hover:border-orange-200 hover:shadow-2xl hover:-translate-y-1"
                         : "border-gray-100 opacity-60"
                     }`}
                   >
-                    <div className="relative h-44 overflow-hidden bg-gray-100 flex-shrink-0">
+                    <div className="relative h-48 overflow-hidden bg-gray-100 flex-shrink-0">
+                      {idx < 3 && item.available && (
+                        <div className="absolute top-3 left-3 z-10 bg-orange-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-md tracking-wide">
+                          🔥 Popular
+                        </div>
+                      )}
                       <img
                         src={getItemImage(item)}
                         alt={item.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       />
                       {!item.available && (
                         <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
@@ -506,7 +534,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
                     </div>
                     <div className="p-4 flex flex-col flex-1">
                       <div className="flex justify-between items-start gap-2 mb-1">
-                        <h3 className="font-bold text-base text-gray-900 leading-snug">{item.name}</h3>
+                        <h3 className="font-black text-[15px] text-gray-900 leading-snug">{item.name}</h3>
                         <span className="font-black text-orange-600 text-base flex-shrink-0">{fmt(item.price)}</span>
                       </div>
                       {item.description && (
@@ -554,56 +582,103 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
 
       {/* ── ABOUT SECTION ─────────────────────────────────────────────────────── */}
       <section id="about" ref={aboutSectionRef} className="scroll-mt-11 bg-gray-50 border-t border-gray-100">
-        <div className="max-w-4xl mx-auto px-4 py-12">
-          <p className="text-xs font-black text-orange-600 uppercase tracking-widest mb-2">About</p>
-          <h2 className="text-2xl font-black text-gray-900 mb-4">{restaurant.name}</h2>
-          {restaurant.description && (
-            <p className="text-gray-600 leading-relaxed mb-6 max-w-2xl">{restaurant.description}</p>
-          )}
-          {keywords.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-8">
-              {keywords.map((k) => (
-                <span key={k} className="bg-orange-50 text-orange-700 text-sm font-bold px-3 py-1.5 rounded-full border border-orange-100">
-                  {k}
-                </span>
-              ))}
+        <div className="max-w-4xl mx-auto px-4 py-14">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+            {/* LEFT: description + chips */}
+            <div>
+              <p className="text-xs font-black text-orange-600 uppercase tracking-widest mb-2">About</p>
+              <h2 className="text-2xl font-black text-gray-900 mb-4">About {restaurant.name}</h2>
+              {restaurant.description && (
+                <p className="text-gray-600 leading-relaxed mb-6">{restaurant.description}</p>
+              )}
+              {keywords.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {keywords.map((k) => (
+                    <span key={k} className="bg-orange-50 text-orange-700 text-sm font-bold px-3 py-1.5 rounded-full border border-orange-100">
+                      {k}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-          {areas.length > 0 && (
-            <>
-              <h3 className="text-base font-black text-gray-900 mb-3">Delivery Areas</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                {areas.map((area) => (
-                  <div key={area} className="flex items-center gap-2 text-sm text-gray-700 bg-white rounded-xl px-3 py-2.5 border border-gray-100">
-                    <svg className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                    </svg>
-                    <span className="font-medium">{area}</span>
+            {/* RIGHT: info cards */}
+            <div className="space-y-3">
+              {restaurant.address && (
+                <div className="bg-white rounded-2xl border border-gray-100 px-4 py-4 flex items-start gap-3 shadow-sm">
+                  <span className="text-2xl flex-shrink-0">📍</span>
+                  <div>
+                    <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-0.5">Address</p>
+                    <p className="text-sm font-medium text-gray-800">{restaurant.address}</p>
                   </div>
-                ))}
+                </div>
+              )}
+              {restaurant.todayHoursLabel && (
+                <div className="bg-white rounded-2xl border border-gray-100 px-4 py-4 flex items-start gap-3 shadow-sm">
+                  <span className="text-2xl flex-shrink-0">🕒</span>
+                  <div>
+                    <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-0.5">Hours Today</p>
+                    <p className="text-sm font-medium text-gray-800">{restaurant.todayHoursLabel}</p>
+                  </div>
+                </div>
+              )}
+              <div className="bg-white rounded-2xl border border-gray-100 px-4 py-4 flex items-start gap-3 shadow-sm">
+                <span className="text-2xl flex-shrink-0">🚚</span>
+                <div>
+                  <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-0.5">Delivery</p>
+                  <p className="text-sm font-medium text-gray-800">
+                    {restaurant.deliveryEnabled
+                      ? restaurant.deliveryFee > 0
+                        ? `${fmt(restaurant.deliveryFee)} delivery fee`
+                        : "Free delivery on all orders"
+                      : "Pickup only"}
+                  </p>
+                </div>
               </div>
-            </>
-          )}
+              {areas.length > 0 && (
+                <div className="bg-white rounded-2xl border border-gray-100 px-4 py-4 shadow-sm">
+                  <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Delivery Areas</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {areas.map((area) => (
+                      <span key={area} className="text-xs font-medium text-gray-600 bg-gray-50 border border-gray-100 px-2.5 py-1 rounded-lg">
+                        {area}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 
       {/* ── POPULAR SECTION ───────────────────────────────────────────────────── */}
       {popularItems.length > 0 && (
-        <section id="popular" ref={popularSectionRef} className="scroll-mt-11 border-t border-gray-100 bg-white">
-          <div className="max-w-4xl mx-auto px-4 py-12">
+        <section id="popular" ref={popularSectionRef} className="scroll-mt-11 border-t border-gray-100 bg-orange-50/40">
+          <div className="max-w-4xl mx-auto px-4 py-14">
             <p className="text-xs font-black text-orange-600 uppercase tracking-widest mb-2">Most Loved</p>
-            <h2 className="text-2xl font-black text-gray-900 mb-6">Popular Items</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {popularItems.map((item) => {
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-black text-gray-900">Popular Items</h2>
+              <button
+                onClick={() => scrollTo("menu")}
+                className="text-sm font-bold text-orange-600 hover:text-orange-500 transition-colors"
+              >
+                View all →
+              </button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              {popularItems.slice(0, 4).map((item) => {
                 const cartItem = items.find((i) => i.id === item.id);
                 const qty = cartItem?.quantity ?? 0;
                 return (
-                  <div key={item.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:border-orange-200 hover:shadow-md transition-all">
-                    <div className="h-32 overflow-hidden bg-gray-50">
+                  <div key={item.id} className="group bg-white rounded-3xl border border-gray-100 overflow-hidden hover:border-orange-200 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300">
+                    <div className="relative h-40 overflow-hidden bg-gray-50">
+                      <div className="absolute top-2.5 left-2.5 z-10 bg-orange-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-md tracking-wide">
+                        Most Ordered
+                      </div>
                       <img
                         src={getItemImage(item)}
                         alt={item.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                         loading="lazy"
                       />
                     </div>
@@ -640,29 +715,33 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
 
       {/* ── FAQ SECTION ───────────────────────────────────────────────────────── */}
       <section id="faq" ref={faqSectionRef} className="scroll-mt-11 bg-gray-50 border-t border-gray-100">
-        <div className="max-w-4xl mx-auto px-4 py-12">
+        <div className="max-w-4xl mx-auto px-4 py-14">
           <p className="text-xs font-black text-orange-600 uppercase tracking-widest mb-2">Help</p>
           <h2 className="text-2xl font-black text-gray-900 mb-6">Frequently Asked Questions</h2>
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {faqs.map((faq, i) => (
-              <div key={i} className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
+              <div key={i} className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
                 <button
                   onClick={() => setOpenFaq(openFaq === i ? null : i)}
                   className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors"
                 >
                   <span className="font-bold text-gray-900 text-sm pr-4">{faq.q}</span>
-                  <svg
-                    className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform duration-200 ${openFaq === i ? "rotate-180" : ""}`}
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 ${openFaq === i ? "bg-orange-600 text-white" : "bg-gray-100 text-gray-500"}`}>
+                    <svg
+                      className={`w-3.5 h-3.5 transition-transform duration-200 ${openFaq === i ? "rotate-180" : ""}`}
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
                 </button>
-                {openFaq === i && (
-                  <div className="px-5 pb-4 border-t border-gray-50">
-                    <p className="text-gray-500 text-sm leading-relaxed pt-3">{faq.a}</p>
+                <div className={`grid transition-all duration-300 ease-in-out ${openFaq === i ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                  <div className="overflow-hidden">
+                    <div className="px-5 pb-4 border-t border-gray-50">
+                      <p className="text-gray-500 text-sm leading-relaxed pt-3">{faq.a}</p>
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
             ))}
           </div>
@@ -671,43 +750,57 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
 
       {/* ── FOOTER ────────────────────────────────────────────────────────────── */}
       <footer className="border-t border-gray-100 bg-white">
-        <div className="max-w-4xl mx-auto px-4 py-10">
+        <div className="max-w-4xl mx-auto px-4 py-12">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
             <div>
               {restaurant.logo && (
-                <div className="w-10 h-10 rounded-xl overflow-hidden mb-3 border border-gray-100">
+                <div className="w-12 h-12 rounded-2xl overflow-hidden mb-3 border border-gray-100 shadow-sm">
                   <img src={restaurant.logo} alt="logo" className="w-full h-full object-cover" />
                 </div>
               )}
-              <p className="font-black text-gray-900 text-lg">{restaurant.name}</p>
+              <p className="font-black text-gray-900 text-xl">{restaurant.name}</p>
               {restaurant.address && (
                 <p className="text-sm text-gray-400 mt-1">{restaurant.address}</p>
               )}
             </div>
-            {(seo?.googleBusinessUrl || seo?.instagramUrl || seo?.tiktokUrl) && (
-              <div className="flex flex-wrap gap-2">
-                {seo.googleBusinessUrl && (
-                  <a href={seo.googleBusinessUrl} target="_blank" rel="noopener noreferrer"
-                    className="text-sm font-bold text-gray-500 hover:text-orange-600 px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 hover:border-orange-200 transition-colors">
-                    Google
-                  </a>
-                )}
-                {seo.instagramUrl && (
-                  <a href={seo.instagramUrl} target="_blank" rel="noopener noreferrer"
-                    className="text-sm font-bold text-gray-500 hover:text-orange-600 px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 hover:border-orange-200 transition-colors">
-                    Instagram
-                  </a>
-                )}
-                {seo.tiktokUrl && (
-                  <a href={seo.tiktokUrl} target="_blank" rel="noopener noreferrer"
-                    className="text-sm font-bold text-gray-500 hover:text-orange-600 px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 hover:border-orange-200 transition-colors">
-                    TikTok
-                  </a>
-                )}
-              </div>
-            )}
+            <div className="flex flex-col items-start sm:items-end gap-3">
+              <button
+                onClick={() => scrollTo("menu")}
+                className="bg-orange-600 hover:bg-orange-500 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-all active:scale-95 hover:shadow-lg hover:shadow-orange-600/25"
+              >
+                Order Online →
+              </button>
+              {(seo?.googleBusinessUrl || seo?.instagramUrl || seo?.tiktokUrl) && (
+                <div className="flex flex-wrap gap-2">
+                  {seo.googleBusinessUrl && (
+                    <a href={seo.googleBusinessUrl} target="_blank" rel="noopener noreferrer"
+                      className="w-10 h-10 bg-gray-50 rounded-xl border border-gray-100 hover:border-orange-200 hover:bg-orange-50 flex items-center justify-center transition-all group" title="Google Business">
+                      <svg className="w-5 h-5 text-gray-500 group-hover:text-orange-600 transition-colors" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 11h8.533c.044.385.067.773.067 1.167C20.6 17.48 16.956 21 11.8 21 6.928 21 3 17.07 3 12.2S6.928 3.4 11.8 3.4c2.418 0 4.444.897 5.995 2.362l-2.43 2.43c-.678-.647-1.854-1.406-3.565-1.406-3.065 0-5.567 2.527-5.567 5.614 0 3.086 2.502 5.613 5.567 5.613 3.559 0 4.892-2.548 5.098-3.875H12V11z"/>
+                      </svg>
+                    </a>
+                  )}
+                  {seo.instagramUrl && (
+                    <a href={seo.instagramUrl} target="_blank" rel="noopener noreferrer"
+                      className="w-10 h-10 bg-gray-50 rounded-xl border border-gray-100 hover:border-orange-200 hover:bg-orange-50 flex items-center justify-center transition-all group" title="Instagram">
+                      <svg className="w-5 h-5 text-gray-500 group-hover:text-orange-600 transition-colors" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                      </svg>
+                    </a>
+                  )}
+                  {seo.tiktokUrl && (
+                    <a href={seo.tiktokUrl} target="_blank" rel="noopener noreferrer"
+                      className="w-10 h-10 bg-gray-50 rounded-xl border border-gray-100 hover:border-orange-200 hover:bg-orange-50 flex items-center justify-center transition-all group" title="TikTok">
+                      <svg className="w-5 h-5 text-gray-500 group-hover:text-orange-600 transition-colors" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.31 6.31 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.19 8.19 0 004.79 1.52V6.75a4.85 4.85 0 01-1.02-.06z"/>
+                      </svg>
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-          <div className="border-t border-gray-100 mt-8 pt-6 text-center">
+          <div className="border-t border-gray-100 mt-10 pt-6 text-center">
             <p className="text-xs text-gray-300 font-medium">Powered by RestoFlow</p>
           </div>
         </div>
