@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { db } from "@/lib/firebase";
@@ -16,12 +17,50 @@ import {
   todayHours,
   type OpeningHours,
 } from "@/lib/restaurant-utils";
-
-// Required env vars (set in Vercel dashboard / .env.local):
-// VERCEL_API_TOKEN  — Vercel personal or team access token
-// VERCEL_PROJECT_ID — Vercel project ID
+import { buildPageTitle, buildPageDescription, buildJsonLd, type RestaurantSEOData } from "@/lib/seo-utils";
 
 export const revalidate = 0;
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ domain?: string }>;
+}): Promise<Metadata> {
+  const { domain } = await searchParams;
+  if (!domain) return { title: "Restaurant" };
+  try {
+    const snap = await getAdminDb().collection("restaurants").where("customDomain", "==", domain).limit(1).get();
+    if (snap.empty) return { title: "Restaurant" };
+    const d = snap.docs[0].data();
+    const slug = snap.docs[0].id;
+    const seo: RestaurantSEOData = {
+      slug,
+      name: (d.name as string) ?? "",
+      description: (d.description as string) ?? "",
+      seoTitle: (d.seoTitle as string) ?? "",
+      seoDescription: (d.seoDescription as string) ?? "",
+      serviceAreas: (d.serviceAreas as string) ?? "",
+      foodKeywords: (d.foodKeywords as string) ?? "",
+      address: (d.address as string) ?? "",
+      phone: (d.phone as string) ?? "",
+      logo: (d.logo as string) ?? "",
+      coverImage: (d.coverImage as string) ?? "",
+      customDomain: domain,
+      openingHours: (d.openingHours as OpeningHours) ?? null,
+    };
+    const title = buildPageTitle(seo);
+    const description = buildPageDescription(seo);
+    const canonical = `https://${domain}`;
+    return {
+      title,
+      description,
+      openGraph: { title, description, url: canonical, type: "website", ...(seo.coverImage && { images: [{ url: seo.coverImage, alt: seo.name }] }) },
+      twitter: { card: "summary_large_image", title, description },
+      alternates: { canonical },
+      robots: { index: true, follow: true },
+    };
+  } catch { return { title: "Restaurant" }; }
+}
 
 function formatTodayHours(from: string, to: string): string {
   const fmt = (t: string) => {
@@ -179,7 +218,29 @@ export default async function RDomainPage({
       : "Closed today"
     : null;
 
+  const seoData: RestaurantSEOData = {
+    slug,
+    name: restaurant.name,
+    description: restaurant.description,
+    seoTitle: (restaurantDoc.data().seoTitle as string) ?? "",
+    seoDescription: (restaurantDoc.data().seoDescription as string) ?? "",
+    serviceAreas: (restaurantDoc.data().serviceAreas as string) ?? "",
+    foodKeywords: (restaurantDoc.data().foodKeywords as string) ?? "",
+    googleBusinessUrl: (restaurantDoc.data().googleBusinessUrl as string) ?? "",
+    instagramUrl: (restaurantDoc.data().instagramUrl as string) ?? "",
+    tiktokUrl: (restaurantDoc.data().tiktokUrl as string) ?? "",
+    address: rData.address ?? "",
+    phone: (restaurantDoc.data().phone as string) ?? "",
+    logo: rData.logo ?? "",
+    coverImage: restaurant.coverImage,
+    customDomain: domain,
+    openingHours: rData.openingHours ?? null,
+  };
+  const jsonLd = buildJsonLd(seoData);
+
   return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
     <CartProvider>
       <Suspense
         fallback={
@@ -208,5 +269,6 @@ export default async function RDomainPage({
         />
       </Suspense>
     </CartProvider>
+    </>
   );
 }

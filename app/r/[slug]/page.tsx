@@ -1,10 +1,13 @@
+import type { Metadata } from "next";
 import { Suspense } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, DocumentData } from 'firebase/firestore';
+import { getAdminDb } from "@/lib/firebase-admin";
 import RestaurantClient from './components/RestaurantClient';
 import { CartProvider } from './components/CartContext';
 import Link from 'next/link';
 import { checkIsOpen, todayHours, type OpeningHours } from '@/lib/restaurant-utils';
+import { buildPageTitle, buildPageDescription, buildJsonLd, buildCanonicalUrl, type RestaurantSEOData } from '@/lib/seo-utils';
 
 function formatTodayHours(from: string, to: string): string {
   const fmt = (t: string) => {
@@ -47,6 +50,64 @@ interface MenuItemData extends DocumentData {
 
 export const revalidate = 0;
 
+async function fetchSEOData(slug: string): Promise<RestaurantSEOData | null> {
+  try {
+    const snap = await getAdminDb().collection("restaurants").doc(slug).get();
+    if (!snap.exists) return null;
+    const d = snap.data()!;
+    return {
+      slug,
+      name: (d.name as string) ?? "",
+      description: (d.description as string) ?? "",
+      seoTitle: (d.seoTitle as string) ?? "",
+      seoDescription: (d.seoDescription as string) ?? "",
+      serviceAreas: (d.serviceAreas as string) ?? "",
+      foodKeywords: (d.foodKeywords as string) ?? "",
+      googleBusinessUrl: (d.googleBusinessUrl as string) ?? "",
+      instagramUrl: (d.instagramUrl as string) ?? "",
+      tiktokUrl: (d.tiktokUrl as string) ?? "",
+      address: (d.address as string) ?? "",
+      phone: (d.phone as string) ?? "",
+      logo: (d.logo as string) ?? "",
+      coverImage: (d.coverImage as string) ?? "",
+      customDomain: (d.customDomain as string) ?? "",
+      openingHours: (d.openingHours as OpeningHours) ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const seo = await fetchSEOData(slug);
+  if (!seo) return { title: "Restaurant" };
+
+  const title = buildPageTitle(seo);
+  const description = buildPageDescription(seo);
+  const canonical = buildCanonicalUrl(seo);
+  const keywords = [
+    seo.foodKeywords, seo.serviceAreas,
+    "food delivery", "order food online", "restaurant",
+  ].filter(Boolean).join(", ");
+
+  return {
+    title,
+    description,
+    keywords,
+    openGraph: {
+      title,
+      description,
+      url: canonical,
+      type: "website",
+      ...(seo.coverImage && { images: [{ url: seo.coverImage, alt: seo.name }] }),
+    },
+    twitter: { card: "summary_large_image", title, description },
+    alternates: { canonical },
+    robots: { index: true, follow: true },
+  };
+}
+
 export default async function RestaurantPage({
   params,
 }: {
@@ -55,9 +116,10 @@ export default async function RestaurantPage({
   const resolvedParams = await params;
   const slug = resolvedParams.slug;
 
-  // 1. Fetch Restaurant Data
-  const docRef = doc(db, 'restaurants', slug);
-  const docSnap = await getDoc(docRef);
+  const [seoData, docSnap] = await Promise.all([
+    fetchSEOData(slug),
+    getDoc(doc(db, 'restaurants', slug)),
+  ]);
 
   if (!docSnap.exists()) {
     return (
@@ -73,7 +135,6 @@ export default async function RestaurantPage({
 
   const restaurant = docSnap.data() as RestaurantData;
 
-  // 2. Block ordering if subscription has expired
   if (isExpired(restaurant)) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center px-4">
@@ -91,13 +152,9 @@ export default async function RestaurantPage({
     );
   }
 
-  // Fetch Menu Items
   const menuQuery = query(collection(db, 'menu_items'), where('restaurantId', '==', slug));
   const menuSnap = await getDocs(menuQuery);
-  const menuItems = menuSnap.docs.map(doc => ({
-    ...doc.data(),
-    id: doc.id
-  })) as MenuItemData[];
+  const menuItems = menuSnap.docs.map(d => ({ ...d.data(), id: d.id })) as MenuItemData[];
 
   const rData = restaurant as {
     paystackSubaccountCode?: string;
@@ -112,33 +169,41 @@ export default async function RestaurantPage({
 
   const todayH = todayHours(rData.openingHours);
   const todayHoursLabel = todayH
-    ? todayH.open
-      ? formatTodayHours(todayH.from, todayH.to)
-      : "Closed today"
+    ? todayH.open ? formatTodayHours(todayH.from, todayH.to) : "Closed today"
     : null;
 
+  const jsonLd = seoData ? buildJsonLd(seoData) : null;
+
   return (
-    <CartProvider>
-      <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center text-orange-500">Loading…</div>}>
-        <RestaurantClient
-          restaurant={{
-            name: restaurant.name,
-            description: restaurant.description,
-            coverImage: restaurant.coverImage,
-            logo: rData.logo ?? "",
-            address: rData.address ?? "",
-            slug: slug,
-            onlinePaymentEnabled: !!rData.paystackSubaccountCode,
-            deliveryFee: rData.deliveryFee ?? 0,
-            minimumOrder: rData.minimumOrder ?? 0,
-            isOpen: checkIsOpen(rData.openingHours),
-            deliveryEnabled: rData.deliveryEnabled !== false,
-            pickupEnabled: rData.pickupEnabled !== false,
-            todayHoursLabel,
-          }}
-          menuItems={menuItems}
+    <>
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-      </Suspense>
-    </CartProvider>
+      )}
+      <CartProvider>
+        <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center text-orange-500">Loading…</div>}>
+          <RestaurantClient
+            restaurant={{
+              name: restaurant.name,
+              description: restaurant.description,
+              coverImage: restaurant.coverImage,
+              logo: rData.logo ?? "",
+              address: rData.address ?? "",
+              slug: slug,
+              onlinePaymentEnabled: !!rData.paystackSubaccountCode,
+              deliveryFee: rData.deliveryFee ?? 0,
+              minimumOrder: rData.minimumOrder ?? 0,
+              isOpen: checkIsOpen(rData.openingHours),
+              deliveryEnabled: rData.deliveryEnabled !== false,
+              pickupEnabled: rData.pickupEnabled !== false,
+              todayHoursLabel,
+            }}
+            menuItems={menuItems}
+          />
+        </Suspense>
+      </CartProvider>
+    </>
   );
 }
