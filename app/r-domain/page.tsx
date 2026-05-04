@@ -18,7 +18,6 @@ import {
   type OpeningHours,
 } from "@/lib/restaurant-utils";
 import { buildPageTitle, buildPageDescription, buildJsonLd, type RestaurantSEOData } from "@/lib/seo-utils";
-import SEOSections from "@/app/r/[slug]/components/SEOSections";
 
 export const revalidate = 0;
 
@@ -260,22 +259,21 @@ export default async function RDomainPage({
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <CartProvider>
         <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center text-orange-500">Loading…</div>}>
-          <RestaurantClient restaurant={restaurantProps} menuItems={menuItems} />
+          <RestaurantClient
+            restaurant={restaurantProps}
+            menuItems={menuItems}
+            seo={{
+              seoTitle: seoData.seoTitle,
+              seoDescription: seoData.seoDescription,
+              serviceAreas: seoData.serviceAreas,
+              foodKeywords: seoData.foodKeywords,
+              googleBusinessUrl: seoData.googleBusinessUrl,
+              instagramUrl: seoData.instagramUrl,
+              tiktokUrl: seoData.tiktokUrl,
+            }}
+          />
         </Suspense>
       </CartProvider>
-      <SEOSections
-        restaurant={restaurantProps}
-        seo={{
-          seoTitle: seoData.seoTitle,
-          seoDescription: seoData.seoDescription,
-          serviceAreas: seoData.serviceAreas,
-          foodKeywords: seoData.foodKeywords,
-          googleBusinessUrl: seoData.googleBusinessUrl,
-          instagramUrl: seoData.instagramUrl,
-          tiktokUrl: seoData.tiktokUrl,
-        }}
-        menuItems={menuItems}
-      />
     </>
   );
 }

@@ -33,9 +33,27 @@ interface RestaurantClientProps {
     todayHoursLabel: string | null;
   };
   menuItems: MenuItemData[];
+  seo?: {
+    seoTitle?: string;
+    seoDescription?: string;
+    serviceAreas?: string;
+    foodKeywords?: string;
+    googleBusinessUrl?: string;
+    instagramUrl?: string;
+    tiktokUrl?: string;
+  };
 }
 
-export default function RestaurantClient({ restaurant, menuItems }: RestaurantClientProps) {
+function fmt(n: number) {
+  return `₦${n.toLocaleString("en-NG")}`;
+}
+
+function parseList(s?: string): string[] {
+  if (!s?.trim()) return [];
+  return s.split(",").map((x) => x.trim()).filter(Boolean);
+}
+
+export default function RestaurantClient({ restaurant, menuItems, seo }: RestaurantClientProps) {
   const { items, addToCart, updateQuantity, clearCart, totalPrice, totalItems } = useCart();
 
   const [cartOpen, setCartOpen] = useState(false);
@@ -44,31 +62,69 @@ export default function RestaurantClient({ restaurant, menuItems }: RestaurantCl
   const [deliveryType, setDeliveryType] = useState<DeliveryType>(
     restaurant.deliveryEnabled ? "delivery" : "pickup"
   );
-
   const [formData, setFormData] = useState({ customerName: "", phone: "", address: "", note: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [orderSuccess, setOrderSuccess] = useState(false);
+  const [activeSection, setActiveSection] = useState("menu");
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const categoryTabsRef = useRef<HTMLDivElement>(null);
+  const menuSectionRef = useRef<HTMLElement>(null);
+  const aboutSectionRef = useRef<HTMLElement>(null);
+  const popularSectionRef = useRef<HTMLElement>(null);
+  const faqSectionRef = useRef<HTMLElement>(null);
 
   const categories = [...new Set(menuItems.map((i) => i.category))].filter(Boolean);
-  const filteredItems = activeCategory
-    ? menuItems.filter((i) => i.category === activeCategory)
-    : menuItems;
-
+  const filteredItems = activeCategory ? menuItems.filter((i) => i.category === activeCategory) : menuItems;
   const subtotal = totalPrice;
   const effectiveDeliveryFee = deliveryType === "pickup" ? 0 : restaurant.deliveryFee;
   const orderTotal = subtotal + effectiveDeliveryFee;
   const meetsMinimum = restaurant.minimumOrder <= 0 || subtotal >= restaurant.minimumOrder;
 
+  const areas = parseList(seo?.serviceAreas);
+  const keywords = parseList(seo?.foodKeywords);
+  const popularItems = menuItems.filter((i) => i.available).slice(0, 4);
+
+  const paymentMethods = [
+    restaurant.onlinePaymentEnabled ? "Online payment (card/transfer)" : null,
+    restaurant.deliveryEnabled ? "Cash on delivery" : null,
+    restaurant.pickupEnabled ? "Cash on pickup" : null,
+  ].filter(Boolean) as string[];
+
+  const faqs = [
+    {
+      q: `How long does ${restaurant.name} take to deliver?`,
+      a: "Most orders are prepared and dispatched within 20–40 minutes. Delivery time depends on your location.",
+    },
+    {
+      q: `What payment methods does ${restaurant.name} accept?`,
+      a: paymentMethods.length > 0
+        ? `${restaurant.name} accepts: ${paymentMethods.join(", ")}.`
+        : `${restaurant.name} accepts cash on delivery and cash on pickup.`,
+    },
+    {
+      q: `Where does ${restaurant.name} deliver?`,
+      a: areas.length > 0
+        ? `${restaurant.name} delivers to ${areas.join(", ")} and surrounding areas.`
+        : `${restaurant.name} delivers to several locations. Enter your address at checkout to confirm coverage.`,
+    },
+    {
+      q: `What kind of food does ${restaurant.name} serve?`,
+      a: keywords.length > 0
+        ? `${restaurant.name} serves ${keywords.join(", ")}.`
+        : `${restaurant.name} serves a variety of freshly prepared meals. Browse the menu to see all available items.`,
+    },
+    ...(restaurant.deliveryFee > 0
+      ? [{ q: `What is the delivery fee at ${restaurant.name}?`, a: `The delivery fee is ${fmt(restaurant.deliveryFee)}. This is added at checkout.` }]
+      : [{ q: `Does ${restaurant.name} offer free delivery?`, a: `Yes — ${restaurant.name} currently offers free delivery on all orders.` }]
+    ),
+  ];
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setCartOpen(false);
-        setCheckoutOpen(false);
-      }
+      if (e.key === "Escape") { setCartOpen(false); setCheckoutOpen(false); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -78,6 +134,33 @@ export default function RestaurantClient({ restaurant, menuItems }: RestaurantCl
     document.body.style.overflow = cartOpen || checkoutOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [cartOpen, checkoutOpen]);
+
+  useEffect(() => {
+    const refs = [
+      { id: "menu", ref: menuSectionRef },
+      { id: "about", ref: aboutSectionRef },
+      { id: "popular", ref: popularSectionRef },
+      { id: "faq", ref: faqSectionRef },
+    ];
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) setActiveSection(entry.target.id);
+        }
+      },
+      { rootMargin: "-20% 0px -60% 0px" }
+    );
+    refs.forEach(({ ref }) => { if (ref.current) observer.observe(ref.current); });
+    return () => observer.disconnect();
+  }, []);
+
+  const scrollTo = (id: string) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const offset = 44;
+    const top = el.getBoundingClientRect().top + window.scrollY - offset;
+    window.scrollTo({ top, behavior: "smooth" });
+  };
 
   const openCheckout = () => {
     setCartOpen(false);
@@ -89,7 +172,7 @@ export default function RestaurantClient({ restaurant, menuItems }: RestaurantCl
     if (!formData.customerName.trim()) return "Please enter your name.";
     if (!formData.phone.trim()) return "Please enter your phone number.";
     if (deliveryType === "delivery" && !formData.address.trim()) return "Please enter your delivery address.";
-    if (!meetsMinimum) return `Minimum order is ₦${restaurant.minimumOrder.toLocaleString("en-NG")}.`;
+    if (!meetsMinimum) return `Minimum order is ${fmt(restaurant.minimumOrder)}.`;
     return null;
   };
 
@@ -179,7 +262,7 @@ export default function RestaurantClient({ restaurant, menuItems }: RestaurantCl
         </div>
         <h1 className="text-3xl font-black text-gray-900 mb-2">Order Received!</h1>
         <p className="text-gray-500 mb-8 max-w-sm leading-relaxed">
-          {restaurant.name} has received your order and will start preparing it shortly. You&apos;ll receive a WhatsApp confirmation shortly.
+          {restaurant.name} has received your order and will start preparing it shortly.
         </p>
         {orderId && (
           <div className="w-full max-w-sm bg-gray-50 border border-gray-100 rounded-2xl p-5 mb-6 text-left">
@@ -203,12 +286,19 @@ export default function RestaurantClient({ restaurant, menuItems }: RestaurantCl
     );
   }
 
+  const navSections = [
+    { id: "menu", label: "Menu" },
+    { id: "about", label: "About" },
+    ...(popularItems.length > 0 ? [{ id: "popular", label: "Popular" }] : []),
+    { id: "faq", label: "FAQ" },
+  ];
+
   // ── Main page ───────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-white text-gray-900">
 
-      {/* HERO */}
-      <div className="relative h-64 md:h-80 w-full overflow-hidden">
+      {/* ── HERO ──────────────────────────────────────────────────────────────── */}
+      <section className="relative h-[62vh] min-h-[400px] max-h-[680px] overflow-hidden">
         <img
           src={
             restaurant.coverImage && restaurant.coverImage.startsWith("http")
@@ -218,220 +308,412 @@ export default function RestaurantClient({ restaurant, menuItems }: RestaurantCl
           alt={restaurant.name}
           className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10" />
 
         {/* Open / Closed badge */}
-        <div className="absolute top-4 right-4">
+        <div className="absolute top-5 right-5">
           {restaurant.isOpen ? (
             <span className="inline-flex items-center gap-1.5 bg-green-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg">
               <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
               Open Now
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg">
+            <span className="inline-flex items-center gap-1.5 bg-red-500/90 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg">
               <span className="w-1.5 h-1.5 bg-white rounded-full" />
               Closed
             </span>
           )}
         </div>
 
-        {/* Restaurant info overlay */}
-        <div className="absolute bottom-0 left-0 right-0 p-5 flex items-end gap-4">
+        {/* Hero content — centered, bottom-anchored */}
+        <div className="absolute inset-0 flex flex-col items-center justify-end pb-12 px-6 text-center">
           {restaurant.logo && (
-            <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl border-2 border-white shadow-xl overflow-hidden flex-shrink-0 bg-white">
+            <div className="w-20 h-20 rounded-2xl border-2 border-white/30 shadow-2xl overflow-hidden mb-4 bg-white/10 backdrop-blur-sm flex-shrink-0">
               <img src={restaurant.logo} alt="logo" className="w-full h-full object-cover" />
             </div>
           )}
-          <div className="text-white pb-1 min-w-0">
-            <h1 className="text-2xl md:text-3xl font-black leading-tight truncate">{restaurant.name}</h1>
-            {restaurant.address && (
-              <p className="text-sm text-white/70 mt-0.5 flex items-center gap-1 truncate">
-                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                {restaurant.address}
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* QUICK INFO BAR */}
-      <div className="bg-white border-b border-gray-100 px-4 py-4">
-        <div className="max-w-4xl mx-auto">
-          {restaurant.description && (
-            <p className="text-sm text-gray-500 mb-3 leading-relaxed">{restaurant.description}</p>
+          <h1 className="text-3xl md:text-5xl font-black text-white leading-tight mb-2 drop-shadow-lg">
+            {restaurant.name}
+          </h1>
+          {restaurant.address && (
+            <p className="text-sm text-white/65 flex items-center gap-1.5 mb-7">
+              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              {restaurant.address}
+            </p>
           )}
-          <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
-            {restaurant.deliveryEnabled && (
-              <span className="flex items-center gap-1.5 text-gray-600">
-                <svg className="w-4 h-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
-                </svg>
-                {restaurant.deliveryFee > 0 ? `₦${restaurant.deliveryFee.toLocaleString("en-NG")} delivery` : "Free delivery"}
-              </span>
-            )}
-            {restaurant.pickupEnabled && (
-              <span className="flex items-center gap-1.5 text-gray-600">
-                <svg className="w-4 h-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
-                Pickup available
-              </span>
-            )}
-            {restaurant.minimumOrder > 0 && (
-              <span className="flex items-center gap-1.5 text-gray-600">
-                <svg className="w-4 h-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                Min ₦{restaurant.minimumOrder.toLocaleString("en-NG")}
-              </span>
-            )}
-            {restaurant.onlinePaymentEnabled && (
-              <span className="flex items-center gap-1.5 text-gray-600">
-                <svg className="w-4 h-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                </svg>
-                Online payment
-              </span>
-            )}
-            {restaurant.todayHoursLabel && (
-              <span className="flex items-center gap-1.5 text-gray-600">
-                <svg className="w-4 h-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {restaurant.todayHoursLabel}
-              </span>
-            )}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => scrollTo("menu")}
+              className="bg-orange-600 hover:bg-orange-500 text-white font-bold px-7 py-3.5 rounded-2xl shadow-lg shadow-orange-600/40 transition-all active:scale-95"
+            >
+              Start Order
+            </button>
+            <button
+              onClick={() => scrollTo("about")}
+              className="bg-white/15 hover:bg-white/25 text-white font-bold px-7 py-3.5 rounded-2xl backdrop-blur-sm border border-white/20 transition-all active:scale-95"
+            >
+              About
+            </button>
           </div>
+        </div>
+      </section>
+
+      {/* ── QUICK INFO BAR ────────────────────────────────────────────────────── */}
+      <div className="bg-orange-50 border-b border-orange-100 px-4 py-3">
+        <div className="max-w-4xl mx-auto flex flex-wrap gap-x-5 gap-y-2 text-sm justify-center sm:justify-start">
+          {restaurant.deliveryEnabled && (
+            <span className="flex items-center gap-1.5 text-orange-700 font-medium">
+              <svg className="w-4 h-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+              </svg>
+              {restaurant.deliveryFee > 0 ? `${fmt(restaurant.deliveryFee)} delivery` : "Free delivery"}
+            </span>
+          )}
+          {restaurant.pickupEnabled && (
+            <span className="flex items-center gap-1.5 text-orange-700 font-medium">
+              <svg className="w-4 h-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              </svg>
+              Pickup available
+            </span>
+          )}
+          {restaurant.minimumOrder > 0 && (
+            <span className="flex items-center gap-1.5 text-orange-700 font-medium">
+              <svg className="w-4 h-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              Min {fmt(restaurant.minimumOrder)}
+            </span>
+          )}
+          {restaurant.todayHoursLabel && (
+            <span className="flex items-center gap-1.5 text-orange-700 font-medium">
+              <svg className="w-4 h-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {restaurant.todayHoursLabel}
+            </span>
+          )}
+          {restaurant.onlinePaymentEnabled && (
+            <span className="flex items-center gap-1.5 text-orange-700 font-medium">
+              <svg className="w-4 h-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+              Pay online
+            </span>
+          )}
         </div>
       </div>
 
-      {/* CLOSED BANNER */}
-      {!restaurant.isOpen && (
-        <div className="bg-amber-50 border-b border-amber-200 px-4 py-3 text-center">
-          <p className="text-sm font-medium text-amber-700">We&apos;re currently closed — browse the menu and come back when we open!</p>
-        </div>
-      )}
-
-      {/* STICKY CATEGORY TABS */}
-      <div className="sticky top-0 z-30 bg-white border-b border-gray-100 shadow-sm">
-        <div className="max-w-4xl mx-auto">
-          <div ref={categoryTabsRef} className="flex gap-1 overflow-x-auto px-4 py-2.5 scrollbar-hide">
-            <button
-              onClick={() => setActiveCategory(null)}
-              className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all ${
-                activeCategory === null
-                  ? "bg-orange-600 text-white shadow-sm"
-                  : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
-              }`}
-            >
-              All
-            </button>
-            {categories.map((cat) => (
+      {/* ── STICKY PAGE NAV ───────────────────────────────────────────────────── */}
+      <nav className="sticky top-0 z-30 h-11 bg-white border-b border-gray-100 shadow-sm flex items-center">
+        <div className="max-w-4xl mx-auto px-4 w-full">
+          <div className="flex gap-1 overflow-x-auto scrollbar-hide">
+            {navSections.map((s) => (
               <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all ${
-                  activeCategory === cat
+                key={s.id}
+                onClick={() => scrollTo(s.id)}
+                className={`flex-shrink-0 px-5 py-1.5 rounded-full text-sm font-bold transition-all ${
+                  activeSection === s.id
                     ? "bg-orange-600 text-white shadow-sm"
                     : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
                 }`}
               >
-                {cat}
+                {s.label}
               </button>
             ))}
           </div>
         </div>
-      </div>
+      </nav>
 
-      {/* MENU GRID */}
-      <div className="max-w-4xl mx-auto px-4 py-6 pb-36">
-        {filteredItems.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-gray-400 text-lg font-medium">No items here yet.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredItems.map((item) => {
-              const cartItem = items.find((i) => i.id === item.id);
-              const qty = cartItem?.quantity ?? 0;
-              return (
-                <div
-                  key={item.id}
-                  className={`bg-white rounded-2xl border overflow-hidden flex flex-col transition-all ${
-                    item.available
-                      ? "border-gray-100 hover:border-orange-200 hover:shadow-md"
-                      : "border-gray-100 opacity-60"
+      {/* ── CLOSED BANNER ─────────────────────────────────────────────────────── */}
+      {!restaurant.isOpen && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-3 text-center">
+          <p className="text-sm font-medium text-amber-700">
+            We&apos;re currently closed — browse the menu and come back when we open!
+          </p>
+        </div>
+      )}
+
+      {/* ── MENU SECTION ──────────────────────────────────────────────────────── */}
+      <section id="menu" ref={menuSectionRef} className="scroll-mt-11">
+        {/* Sticky category tabs */}
+        <div className="sticky top-11 z-20 bg-white border-b border-gray-100">
+          <div className="max-w-4xl mx-auto">
+            <div ref={categoryTabsRef} className="flex gap-1 overflow-x-auto px-4 py-2 scrollbar-hide">
+              <button
+                onClick={() => setActiveCategory(null)}
+                className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold transition-all ${
+                  activeCategory === null
+                    ? "bg-gray-900 text-white shadow-sm"
+                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                }`}
+              >
+                All
+              </button>
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-bold transition-all ${
+                    activeCategory === cat
+                      ? "bg-gray-900 text-white shadow-sm"
+                      : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
                   }`}
                 >
-                  <div className="relative h-44 overflow-hidden bg-gray-100 flex-shrink-0">
-                    <img
-                      src={getItemImage(item)}
-                      alt={item.name}
-                      className="w-full h-full object-cover"
-                    />
-                    {!item.available && (
-                      <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                        <span className="bg-gray-800 text-white text-xs font-bold px-3 py-1.5 rounded-full">
-                          Sold Out
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-4 flex flex-col flex-1">
-                    <div className="flex justify-between items-start gap-2 mb-1">
-                      <h3 className="font-bold text-base text-gray-900 leading-snug">{item.name}</h3>
-                      <span className="font-black text-orange-600 text-base flex-shrink-0">
-                        ₦{item.price.toLocaleString("en-NG")}
-                      </span>
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Menu grid */}
+        <div className="max-w-4xl mx-auto px-4 py-6 pb-8">
+          {filteredItems.length === 0 ? (
+            <div className="text-center py-20">
+              <p className="text-gray-400 text-lg font-medium">No items here yet.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredItems.map((item) => {
+                const cartItem = items.find((i) => i.id === item.id);
+                const qty = cartItem?.quantity ?? 0;
+                return (
+                  <div
+                    key={item.id}
+                    className={`bg-white rounded-2xl border overflow-hidden flex flex-col transition-all ${
+                      item.available
+                        ? "border-gray-100 hover:border-orange-200 hover:shadow-md"
+                        : "border-gray-100 opacity-60"
+                    }`}
+                  >
+                    <div className="relative h-44 overflow-hidden bg-gray-100 flex-shrink-0">
+                      <img
+                        src={getItemImage(item)}
+                        alt={item.name}
+                        className="w-full h-full object-cover"
+                      />
+                      {!item.available && (
+                        <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                          <span className="bg-gray-800 text-white text-xs font-bold px-3 py-1.5 rounded-full">
+                            Sold Out
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    {item.description && (
-                      <p className="text-xs text-gray-400 mb-3 leading-relaxed line-clamp-2">
-                        {item.description}
-                      </p>
-                    )}
-                    <div className="mt-auto">
+                    <div className="p-4 flex flex-col flex-1">
+                      <div className="flex justify-between items-start gap-2 mb-1">
+                        <h3 className="font-bold text-base text-gray-900 leading-snug">{item.name}</h3>
+                        <span className="font-black text-orange-600 text-base flex-shrink-0">{fmt(item.price)}</span>
+                      </div>
+                      {item.description && (
+                        <p className="text-xs text-gray-400 mb-3 leading-relaxed line-clamp-2">{item.description}</p>
+                      )}
+                      <div className="mt-auto">
+                        {qty === 0 ? (
+                          <button
+                            disabled={!item.available || !restaurant.isOpen}
+                            onClick={() => addToCart({ id: item.id, name: item.name, price: item.price })}
+                            className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all ${
+                              item.available && restaurant.isOpen
+                                ? "bg-orange-600 text-white hover:bg-orange-500 active:scale-95"
+                                : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                            }`}
+                          >
+                            {!restaurant.isOpen ? "Closed" : !item.available ? "Sold Out" : "Add to Cart"}
+                          </button>
+                        ) : (
+                          <div className="flex items-center justify-between bg-orange-50 rounded-xl p-1">
+                            <button
+                              onClick={() => updateQuantity(item.id, qty - 1)}
+                              className="w-9 h-9 bg-white rounded-lg shadow-sm flex items-center justify-center font-bold text-gray-700 hover:bg-orange-600 hover:text-white transition-colors"
+                            >
+                              −
+                            </button>
+                            <span className="font-bold text-orange-600 text-sm">{qty}</span>
+                            <button
+                              onClick={() => updateQuantity(item.id, qty + 1)}
+                              className="w-9 h-9 bg-white rounded-lg shadow-sm flex items-center justify-center font-bold text-gray-700 hover:bg-orange-600 hover:text-white transition-colors"
+                            >
+                              +
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── ABOUT SECTION ─────────────────────────────────────────────────────── */}
+      <section id="about" ref={aboutSectionRef} className="scroll-mt-11 bg-gray-50 border-t border-gray-100">
+        <div className="max-w-4xl mx-auto px-4 py-12">
+          <p className="text-xs font-black text-orange-600 uppercase tracking-widest mb-2">About</p>
+          <h2 className="text-2xl font-black text-gray-900 mb-4">{restaurant.name}</h2>
+          {restaurant.description && (
+            <p className="text-gray-600 leading-relaxed mb-6 max-w-2xl">{restaurant.description}</p>
+          )}
+          {keywords.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-8">
+              {keywords.map((k) => (
+                <span key={k} className="bg-orange-50 text-orange-700 text-sm font-bold px-3 py-1.5 rounded-full border border-orange-100">
+                  {k}
+                </span>
+              ))}
+            </div>
+          )}
+          {areas.length > 0 && (
+            <>
+              <h3 className="text-base font-black text-gray-900 mb-3">Delivery Areas</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                {areas.map((area) => (
+                  <div key={area} className="flex items-center gap-2 text-sm text-gray-700 bg-white rounded-xl px-3 py-2.5 border border-gray-100">
+                    <svg className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                    </svg>
+                    <span className="font-medium">{area}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </section>
+
+      {/* ── POPULAR SECTION ───────────────────────────────────────────────────── */}
+      {popularItems.length > 0 && (
+        <section id="popular" ref={popularSectionRef} className="scroll-mt-11 border-t border-gray-100 bg-white">
+          <div className="max-w-4xl mx-auto px-4 py-12">
+            <p className="text-xs font-black text-orange-600 uppercase tracking-widest mb-2">Most Loved</p>
+            <h2 className="text-2xl font-black text-gray-900 mb-6">Popular Items</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {popularItems.map((item) => {
+                const cartItem = items.find((i) => i.id === item.id);
+                const qty = cartItem?.quantity ?? 0;
+                return (
+                  <div key={item.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:border-orange-200 hover:shadow-md transition-all">
+                    <div className="h-32 overflow-hidden bg-gray-50">
+                      <img
+                        src={getItemImage(item)}
+                        alt={item.name}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="p-3">
+                      <p className="font-black text-gray-900 text-sm leading-snug mb-0.5">{item.name}</p>
+                      <p className="text-orange-600 font-black text-sm mb-2">{fmt(item.price)}</p>
                       {qty === 0 ? (
                         <button
-                          disabled={!item.available || !restaurant.isOpen}
+                          disabled={!restaurant.isOpen}
                           onClick={() => addToCart({ id: item.id, name: item.name, price: item.price })}
-                          className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all ${
-                            item.available && restaurant.isOpen
+                          className={`w-full py-1.5 rounded-lg text-xs font-bold transition-all ${
+                            restaurant.isOpen
                               ? "bg-orange-600 text-white hover:bg-orange-500 active:scale-95"
                               : "bg-gray-100 text-gray-400 cursor-not-allowed"
                           }`}
                         >
-                          {!restaurant.isOpen ? "Closed" : !item.available ? "Sold Out" : "Add to Cart"}
+                          {restaurant.isOpen ? "Add to Cart" : "Closed"}
                         </button>
                       ) : (
-                        <div className="flex items-center justify-between bg-orange-50 rounded-xl p-1">
-                          <button
-                            onClick={() => updateQuantity(item.id, qty - 1)}
-                            className="w-9 h-9 bg-white rounded-lg shadow-sm flex items-center justify-center font-bold text-gray-700 hover:bg-orange-600 hover:text-white transition-colors"
-                          >
-                            −
-                          </button>
-                          <span className="font-bold text-orange-600 text-sm">{qty}</span>
-                          <button
-                            onClick={() => updateQuantity(item.id, qty + 1)}
-                            className="w-9 h-9 bg-white rounded-lg shadow-sm flex items-center justify-center font-bold text-gray-700 hover:bg-orange-600 hover:text-white transition-colors"
-                          >
-                            +
-                          </button>
+                        <div className="flex items-center justify-between bg-orange-50 rounded-lg px-1 py-0.5">
+                          <button onClick={() => updateQuantity(item.id, qty - 1)} className="w-7 h-7 flex items-center justify-center font-bold text-gray-600 hover:text-orange-600 transition-colors">−</button>
+                          <span className="font-bold text-orange-600 text-xs">{qty}</span>
+                          <button onClick={() => updateQuantity(item.id, qty + 1)} className="w-7 h-7 flex items-center justify-center font-bold text-gray-600 hover:text-orange-600 transition-colors">+</button>
                         </div>
                       )}
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        )}
-      </div>
+        </section>
+      )}
 
-      {/* STICKY CART BAR */}
+      {/* ── FAQ SECTION ───────────────────────────────────────────────────────── */}
+      <section id="faq" ref={faqSectionRef} className="scroll-mt-11 bg-gray-50 border-t border-gray-100">
+        <div className="max-w-4xl mx-auto px-4 py-12">
+          <p className="text-xs font-black text-orange-600 uppercase tracking-widest mb-2">Help</p>
+          <h2 className="text-2xl font-black text-gray-900 mb-6">Frequently Asked Questions</h2>
+          <div className="space-y-2">
+            {faqs.map((faq, i) => (
+              <div key={i} className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
+                <button
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors"
+                >
+                  <span className="font-bold text-gray-900 text-sm pr-4">{faq.q}</span>
+                  <svg
+                    className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform duration-200 ${openFaq === i ? "rotate-180" : ""}`}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {openFaq === i && (
+                  <div className="px-5 pb-4 border-t border-gray-50">
+                    <p className="text-gray-500 text-sm leading-relaxed pt-3">{faq.a}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FOOTER ────────────────────────────────────────────────────────────── */}
+      <footer className="border-t border-gray-100 bg-white">
+        <div className="max-w-4xl mx-auto px-4 py-10">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+            <div>
+              {restaurant.logo && (
+                <div className="w-10 h-10 rounded-xl overflow-hidden mb-3 border border-gray-100">
+                  <img src={restaurant.logo} alt="logo" className="w-full h-full object-cover" />
+                </div>
+              )}
+              <p className="font-black text-gray-900 text-lg">{restaurant.name}</p>
+              {restaurant.address && (
+                <p className="text-sm text-gray-400 mt-1">{restaurant.address}</p>
+              )}
+            </div>
+            {(seo?.googleBusinessUrl || seo?.instagramUrl || seo?.tiktokUrl) && (
+              <div className="flex flex-wrap gap-2">
+                {seo.googleBusinessUrl && (
+                  <a href={seo.googleBusinessUrl} target="_blank" rel="noopener noreferrer"
+                    className="text-sm font-bold text-gray-500 hover:text-orange-600 px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 hover:border-orange-200 transition-colors">
+                    Google
+                  </a>
+                )}
+                {seo.instagramUrl && (
+                  <a href={seo.instagramUrl} target="_blank" rel="noopener noreferrer"
+                    className="text-sm font-bold text-gray-500 hover:text-orange-600 px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 hover:border-orange-200 transition-colors">
+                    Instagram
+                  </a>
+                )}
+                {seo.tiktokUrl && (
+                  <a href={seo.tiktokUrl} target="_blank" rel="noopener noreferrer"
+                    className="text-sm font-bold text-gray-500 hover:text-orange-600 px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 hover:border-orange-200 transition-colors">
+                    TikTok
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="border-t border-gray-100 mt-8 pt-6 text-center">
+            <p className="text-xs text-gray-300 font-medium">Powered by RestoFlow</p>
+          </div>
+        </div>
+      </footer>
+
+      {/* ── STICKY CART BAR ───────────────────────────────────────────────────── */}
       {totalItems > 0 && !cartOpen && !checkoutOpen && (
         <div className="fixed bottom-0 left-0 right-0 z-40 p-4 bg-white border-t border-gray-100 shadow-2xl">
           <div className="max-w-4xl mx-auto">
@@ -443,13 +725,13 @@ export default function RestaurantClient({ restaurant, menuItems }: RestaurantCl
                 {totalItems}
               </span>
               <span className="font-bold text-base">View Cart</span>
-              <span className="font-bold">₦{orderTotal.toLocaleString("en-NG")}</span>
+              <span className="font-bold">{fmt(orderTotal)}</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* CART DRAWER */}
+      {/* ── CART DRAWER ───────────────────────────────────────────────────────── */}
       {cartOpen && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end md:justify-center md:items-end">
           <div
@@ -473,7 +755,7 @@ export default function RestaurantClient({ restaurant, menuItems }: RestaurantCl
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-sm text-gray-900 truncate">{item.name}</p>
                     <p className="text-sm text-orange-600 font-bold">
-                      ₦{(item.price * item.quantity).toLocaleString("en-NG")}
+                      {fmt(item.price * item.quantity)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 bg-gray-50 rounded-xl p-1 flex-shrink-0">
@@ -499,23 +781,23 @@ export default function RestaurantClient({ restaurant, menuItems }: RestaurantCl
               <div className="space-y-2 mb-4">
                 <div className="flex justify-between text-sm text-gray-500">
                   <span>Subtotal</span>
-                  <span className="font-medium text-gray-700">₦{subtotal.toLocaleString("en-NG")}</span>
+                  <span className="font-medium text-gray-700">{fmt(subtotal)}</span>
                 </div>
                 {restaurant.deliveryEnabled && deliveryType === "delivery" && restaurant.deliveryFee > 0 && (
                   <div className="flex justify-between text-sm text-gray-500">
                     <span>Delivery fee</span>
-                    <span className="font-medium text-gray-700">₦{restaurant.deliveryFee.toLocaleString("en-NG")}</span>
+                    <span className="font-medium text-gray-700">{fmt(restaurant.deliveryFee)}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-black text-base pt-2 border-t border-gray-200">
                   <span>Total</span>
-                  <span className="text-orange-600">₦{orderTotal.toLocaleString("en-NG")}</span>
+                  <span className="text-orange-600">{fmt(orderTotal)}</span>
                 </div>
               </div>
 
               {restaurant.minimumOrder > 0 && !meetsMinimum && (
                 <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3 font-medium">
-                  Add ₦{(restaurant.minimumOrder - subtotal).toLocaleString("en-NG")} more to meet the minimum order
+                  Add {fmt(restaurant.minimumOrder - subtotal)} more to meet the minimum order
                 </p>
               )}
 
@@ -535,7 +817,7 @@ export default function RestaurantClient({ restaurant, menuItems }: RestaurantCl
         </div>
       )}
 
-      {/* CHECKOUT MODAL */}
+      {/* ── CHECKOUT MODAL ────────────────────────────────────────────────────── */}
       {checkoutOpen && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
           <div
@@ -635,24 +917,20 @@ export default function RestaurantClient({ restaurant, menuItems }: RestaurantCl
                 <div className="space-y-1.5 mb-3">
                   {items.map((item) => (
                     <div key={item.id} className="flex justify-between text-sm">
-                      <span className="text-gray-600">
-                        {item.quantity}× {item.name}
-                      </span>
-                      <span className="font-medium text-gray-700">
-                        ₦{(item.quantity * item.price).toLocaleString("en-NG")}
-                      </span>
+                      <span className="text-gray-600">{item.quantity}× {item.name}</span>
+                      <span className="font-medium text-gray-700">{fmt(item.quantity * item.price)}</span>
                     </div>
                   ))}
                 </div>
                 <div className="border-t border-gray-200 pt-2 space-y-1.5">
                   <div className="flex justify-between text-sm text-gray-500">
                     <span>Subtotal</span>
-                    <span>₦{subtotal.toLocaleString("en-NG")}</span>
+                    <span>{fmt(subtotal)}</span>
                   </div>
                   {deliveryType === "delivery" && restaurant.deliveryFee > 0 && (
                     <div className="flex justify-between text-sm text-gray-500">
                       <span>Delivery fee</span>
-                      <span>₦{restaurant.deliveryFee.toLocaleString("en-NG")}</span>
+                      <span>{fmt(restaurant.deliveryFee)}</span>
                     </div>
                   )}
                   {deliveryType === "pickup" && (
@@ -663,7 +941,7 @@ export default function RestaurantClient({ restaurant, menuItems }: RestaurantCl
                   )}
                   <div className="flex justify-between font-black text-base pt-1.5 border-t border-gray-200">
                     <span>Total</span>
-                    <span className="text-orange-600">₦{orderTotal.toLocaleString("en-NG")}</span>
+                    <span className="text-orange-600">{fmt(orderTotal)}</span>
                   </div>
                 </div>
               </div>
@@ -708,10 +986,6 @@ export default function RestaurantClient({ restaurant, menuItems }: RestaurantCl
           </div>
         </div>
       )}
-
-      <footer className="py-8 text-center border-t border-gray-100">
-        <p className="text-xs text-gray-300 font-medium">Powered by RestoFlow</p>
-      </footer>
     </div>
   );
 }
