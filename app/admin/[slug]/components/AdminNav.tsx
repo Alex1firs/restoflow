@@ -4,11 +4,32 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { useState, useEffect } from "react";
 
 type Props = {
   slug: string;
   role?: "owner" | "manager" | "staff";
 };
+
+function DomainDot({ slug }: { slug: string }) {
+  const [status, setStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/admin/domain")
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d?.domainStatus) setStatus(d.domainStatus); })
+      .catch(() => {});
+  }, [slug]);
+
+  if (!status) return null;
+  const color =
+    status === "connected" ? "bg-green-500" :
+    status === "pending_dns" ? "bg-yellow-400" :
+    status === "error" ? "bg-red-500" : null;
+
+  if (!color) return null;
+  return <span className={`ml-1.5 w-2 h-2 rounded-full ${color} inline-block flex-shrink-0`} />;
+}
 
 export default function AdminNav({ slug, role = "owner" }: Props) {
   const pathname = usePathname();
@@ -21,7 +42,7 @@ export default function AdminNav({ slug, role = "owner" }: Props) {
     { name: "Reports", href: `/admin/${slug}/reports`, roles: ["owner", "manager"] },
     { name: "Payments", href: `/admin/${slug}/payment`, roles: ["owner"] },
     { name: "Store", href: `/admin/${slug}/settings`, roles: ["owner"] },
-    { name: "Domain", href: `/admin/${slug}/domain`, roles: ["owner"] },
+    { name: "Domain", href: `/admin/${slug}/domain`, roles: ["owner"], badge: <DomainDot slug={slug} /> },
     { name: "QR Code", href: `/admin/${slug}/qr`, roles: ["owner"] },
     { name: "Staff", href: `/admin/${slug}/staff`, roles: ["owner"] },
   ];
@@ -54,6 +75,7 @@ export default function AdminNav({ slug, role = "owner" }: Props) {
                   }`}
                 >
                   {item.name}
+                  {"badge" in item ? item.badge : null}
                 </Link>
               );
             })}
