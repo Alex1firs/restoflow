@@ -366,7 +366,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
                 : "https://images.unsplash.com/photo-1544025162-d76694265947?w=1600&auto=format"
             }
             alt={restaurant.name}
-            className="w-full h-full object-cover transition-transform duration-[8000ms] group-hover:scale-110"
+            className="w-full h-full object-cover transition-transform duration-[8000ms] group-hover:scale-110 blur-[2px] scale-105"
           />
         </div>
         <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-transparent" />
@@ -489,9 +489,14 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
       <div className="bg-gray-950 text-white py-3 overflow-x-auto">
         <div className="max-w-4xl mx-auto px-4">
           <div className="flex items-center gap-5 text-xs font-bold min-w-max mx-auto justify-center">
-            {ordersToday && (
+            {ordersToday ? (
               <>
                 <span className="text-orange-400" style={{ color: accent }}>🔥 {ordersToday}+ orders today</span>
+                <span className="text-white/20">|</span>
+              </>
+            ) : (
+              <>
+                <span className="text-orange-400" style={{ color: accent }}>⚡ Trending now</span>
                 <span className="text-white/20">|</span>
               </>
             )}
@@ -676,9 +681,15 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
                             style={item.available && restaurant.isOpen ? { backgroundColor: primary } : {}}
                             className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all ${
                               item.available && restaurant.isOpen
-                                ? "text-white hover:opacity-90 active:scale-95"
+                                ? "text-white hover:opacity-90 active:scale-95 hover:shadow-[0_4px_14px_0_rgba(0,0,0,0.39)]"
                                 : "bg-gray-100 text-gray-400 cursor-not-allowed"
                             }`}
+                            onMouseEnter={(e) => {
+                              if (item.available && restaurant.isOpen) e.currentTarget.style.boxShadow = `0 4px 14px 0 ${primary}66`;
+                            }}
+                            onMouseLeave={(e) => {
+                              if (item.available && restaurant.isOpen) e.currentTarget.style.boxShadow = "";
+                            }}
                           >
                             {!restaurant.isOpen ? "Closed" : !item.available ? "Sold Out" : "+ Add"}
                           </button>
@@ -797,9 +808,9 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
         <section id="popular" ref={popularSectionRef} className="scroll-mt-11 border-t border-gray-100 bg-orange-50/40">
           <div className="max-w-4xl mx-auto px-4 py-14">
             <div data-fade="popular" className={fade("popular")}>
-              <p className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: primary }}>Most Loved</p>
+              <p className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: primary }}>Chef&apos;s Special</p>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-black text-gray-900">Popular Items</h2>
+                <h2 className="text-2xl font-black text-gray-900">Top Picks</h2>
                 <button
                   onClick={() => scrollTo("menu")}
                   className="text-sm font-bold transition-colors hover:opacity-70"
@@ -838,9 +849,15 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
                             style={restaurant.isOpen ? { backgroundColor: primary } : {}}
                             className={`w-full py-1.5 rounded-lg text-xs font-bold transition-all ${
                               restaurant.isOpen
-                                ? "text-white hover:opacity-90 active:scale-95"
+                                ? "text-white hover:opacity-90 active:scale-95 hover:shadow-[0_4px_14px_0_rgba(0,0,0,0.39)]"
                                 : "bg-gray-100 text-gray-400 cursor-not-allowed"
                             }`}
+                            onMouseEnter={(e) => {
+                              if (restaurant.isOpen) e.currentTarget.style.boxShadow = `0 4px 14px 0 ${primary}66`;
+                            }}
+                            onMouseLeave={(e) => {
+                              if (restaurant.isOpen) e.currentTarget.style.boxShadow = "";
+                            }}
                           >
                             {restaurant.isOpen ? "+ Add" : "Closed"}
                           </button>
