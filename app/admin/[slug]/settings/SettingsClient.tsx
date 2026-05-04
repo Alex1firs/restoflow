@@ -28,6 +28,12 @@ type Props = {
     paymentConfigured: boolean;
     paymentAccountName: string;
     paymentBankName: string;
+    primaryColor: string;
+    accentColor: string;
+    promoBanner: string;
+    rating: number | null;
+    ordersToday: number | null;
+    deliveryTime: string;
   };
 };
 
@@ -47,6 +53,12 @@ export default function SettingsClient({ restaurant }: Props) {
     pickupEnabled: restaurant.pickupEnabled,
     whatsappEnabled: restaurant.whatsappEnabled,
     alertPreference: restaurant.alertPreference as AlertPreference,
+    primaryColor: restaurant.primaryColor || "#ea580c",
+    accentColor: restaurant.accentColor || "#f97316",
+    promoBanner: restaurant.promoBanner || "",
+    rating: restaurant.rating || "",
+    ordersToday: restaurant.ordersToday || "",
+    deliveryTime: restaurant.deliveryTime || "20–35 min",
   });
 
   const [openingHours, setOpeningHours] = useState<OpeningHours>(
@@ -176,6 +188,73 @@ export default function SettingsClient({ restaurant }: Props) {
             />
             <p className="text-xs text-gray-400 mt-1">Shown below your name on the ordering page</p>
           </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Primary Color">
+              <input
+                type="color"
+                value={form.primaryColor}
+                onChange={(e) => setField("primaryColor", e.target.value)}
+                className="w-full h-12 rounded-xl cursor-pointer border border-gray-200"
+              />
+            </Field>
+            <Field label="Accent Color">
+              <input
+                type="color"
+                value={form.accentColor}
+                onChange={(e) => setField("accentColor", e.target.value)}
+                className="w-full h-12 rounded-xl cursor-pointer border border-gray-200"
+              />
+            </Field>
+          </div>
+        </Section>
+
+        {/* ── SECTION 1.5: CONVERSION FEATURES ────────────────────── */}
+        <Section title="Conversion Features" hint="Engage customers and build trust">
+          <Field label="Promo Banner">
+            <input
+              type="text"
+              value={form.promoBanner}
+              onChange={(e) => setField("promoBanner", e.target.value)}
+              placeholder="e.g. Free delivery on your first order!"
+              className={inputCls}
+            />
+            <p className="text-xs text-gray-400 mt-1">Appears at the top of the ordering page if set</p>
+          </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Field label="Display Rating">
+              <input
+                type="number"
+                step="0.1"
+                min="1"
+                max="5"
+                value={form.rating}
+                onChange={(e) => setField("rating", e.target.value ? Number(e.target.value) : "")}
+                placeholder="e.g. 4.8"
+                className={inputCls}
+              />
+              <p className="text-xs text-gray-400 mt-1">Leave empty to hide</p>
+            </Field>
+            <Field label="Orders Today">
+              <input
+                type="number"
+                min="0"
+                value={form.ordersToday}
+                onChange={(e) => setField("ordersToday", e.target.value ? Number(e.target.value) : "")}
+                placeholder="e.g. 120"
+                className={inputCls}
+              />
+              <p className="text-xs text-gray-400 mt-1">Leave empty to hide</p>
+            </Field>
+            <Field label="Est. Delivery Time">
+              <input
+                type="text"
+                value={form.deliveryTime}
+                onChange={(e) => setField("deliveryTime", e.target.value)}
+                placeholder="e.g. 20–35 min"
+                className={inputCls}
+              />
+            </Field>
+          </div>
         </Section>
 
         {/* ── SECTION 2: BUSINESS INFORMATION ─────────────────────── */}

@@ -31,6 +31,12 @@ export async function PUT(req: NextRequest) {
     openingHours,
     whatsappEnabled,
     alertPreference,
+    primaryColor,
+    accentColor,
+    promoBanner,
+    rating,
+    ordersToday,
+    deliveryTime,
   } = body as {
     name?: string;
     description?: string;
@@ -47,6 +53,12 @@ export async function PUT(req: NextRequest) {
     openingHours?: Record<string, { open: boolean; from: string; to: string }>;
     whatsappEnabled?: boolean;
     alertPreference?: "whatsapp" | "sms" | "both";
+    primaryColor?: string;
+    accentColor?: string;
+    promoBanner?: string;
+    rating?: number | string;
+    ordersToday?: number | string;
+    deliveryTime?: string;
   };
 
   if (!name?.trim()) {
@@ -74,6 +86,12 @@ export async function PUT(req: NextRequest) {
       alertPreference: ["whatsapp", "sms", "both"].includes(alertPreference ?? "")
         ? alertPreference
         : "sms",
+      primaryColor: (primaryColor ?? "").trim(),
+      accentColor: (accentColor ?? "").trim(),
+      promoBanner: (promoBanner ?? "").trim(),
+      rating: typeof rating === "number" ? rating : null,
+      ordersToday: typeof ordersToday === "number" ? ordersToday : null,
+      deliveryTime: (deliveryTime ?? "").trim(),
     });
 
   return NextResponse.json({ success: true });

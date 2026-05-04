@@ -46,6 +46,12 @@ export default async function SettingsPage({ params }: Props) {
     paymentConfigured: !!(data.paystackSubaccountCode as string | undefined),
     paymentAccountName: (data.paystackAccountName as string) ?? "",
     paymentBankName: (data.paystackBankName as string) ?? "",
+    primaryColor: (data.primaryColor as string) ?? "",
+    accentColor: (data.accentColor as string) ?? "",
+    promoBanner: (data.promoBanner as string) ?? "",
+    rating: (data.rating as number) ?? null,
+    ordersToday: (data.ordersToday as number) ?? null,
+    deliveryTime: (data.deliveryTime as string) ?? "",
   };
 
   return (

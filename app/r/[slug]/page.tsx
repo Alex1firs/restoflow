@@ -165,6 +165,12 @@ export default async function RestaurantPage({
     address?: string;
     deliveryEnabled?: boolean;
     pickupEnabled?: boolean;
+    primaryColor?: string;
+    accentColor?: string;
+    promoBanner?: string;
+    rating?: number;
+    ordersToday?: number;
+    deliveryTime?: string;
   };
 
   const todayH = todayHours(rData.openingHours);
@@ -188,6 +194,12 @@ export default async function RestaurantPage({
     deliveryEnabled: rData.deliveryEnabled !== false,
     pickupEnabled: rData.pickupEnabled !== false,
     todayHoursLabel,
+    primaryColor: rData.primaryColor ?? "",
+    accentColor: rData.accentColor ?? "",
+    promoBanner: rData.promoBanner ?? "",
+    rating: rData.rating ?? null,
+    ordersToday: rData.ordersToday ?? null,
+    deliveryTime: rData.deliveryTime ?? "",
   };
 
   return (

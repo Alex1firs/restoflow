@@ -32,9 +32,11 @@ interface RestaurantClientProps {
     pickupEnabled: boolean;
     todayHoursLabel: string | null;
     primaryColor?: string;
+    accentColor?: string;
     promoBanner?: string;
-    rating?: number;
-    ordersToday?: number;
+    rating?: number | null;
+    ordersToday?: number | null;
+    deliveryTime?: string;
   };
   menuItems: MenuItemData[];
   seo?: {
@@ -62,6 +64,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
 
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [deliveryType, setDeliveryType] = useState<DeliveryType>(
     restaurant.deliveryEnabled ? "delivery" : "pickup"
@@ -84,8 +87,10 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
 
   // Brand colors
   const primary = restaurant.primaryColor || "#ea580c";
-  const rating = restaurant.rating ?? 4.5;
-  const ordersToday = restaurant.ordersToday ?? 120;
+  const accent = restaurant.accentColor || primary;
+  const rating = restaurant.rating;
+  const ordersToday = restaurant.ordersToday;
+  const deliveryTime = restaurant.deliveryTime || "20–35 min";
 
   const categories = [...new Set(menuItems.map((i) => i.category))].filter(Boolean);
   const filteredItems = activeCategory ? menuItems.filter((i) => i.category === activeCategory) : menuItems;
@@ -140,6 +145,16 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Parallax scroll listener
+  useEffect(() => {
+    const handleScroll = () => {
+      // Only track scroll for parallax if near top
+      if (window.scrollY < 1000) setScrollY(window.scrollY);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   // Body scroll lock
@@ -339,16 +354,21 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
     <div className="min-h-screen bg-white text-gray-900 pb-24">
 
       {/* ── HERO ──────────────────────────────────────────────────────────────── */}
-      <section className="relative h-[70vh] min-h-[480px] max-h-[760px] overflow-hidden group">
-        <img
-          src={
-            restaurant.coverImage && restaurant.coverImage.startsWith("http")
-              ? restaurant.coverImage
-              : "https://images.unsplash.com/photo-1544025162-d76694265947?w=1600&auto=format"
-          }
-          alt={restaurant.name}
-          className="w-full h-full object-cover transition-transform duration-[8000ms] group-hover:scale-110"
-        />
+      <section className="relative h-[70vh] min-h-[480px] max-h-[760px] overflow-hidden group bg-gray-900">
+        <div 
+          className="absolute inset-0 w-full h-full"
+          style={{ transform: `translateY(${scrollY * 0.4}px)` }}
+        >
+          <img
+            src={
+              restaurant.coverImage && restaurant.coverImage.startsWith("http")
+                ? restaurant.coverImage
+                : "https://images.unsplash.com/photo-1544025162-d76694265947?w=1600&auto=format"
+            }
+            alt={restaurant.name}
+            className="w-full h-full object-cover transition-transform duration-[8000ms] group-hover:scale-110"
+          />
+        </div>
         <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-transparent" />
 
         {/* Open / Closed badge */}
@@ -385,12 +405,16 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
           )}
           {/* Stats pills */}
           <div className="flex items-center gap-2 flex-wrap justify-center mb-6">
-            <span className="bg-white/15 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full border border-white/20">
-              ⭐ {rating}
-            </span>
-            <span className="bg-white/15 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full border border-white/20">
-              ⏱ 20–35 min
-            </span>
+            {rating && (
+              <span className="bg-white/15 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full border border-white/20">
+                ⭐ {rating}
+              </span>
+            )}
+            {deliveryTime && (
+              <span className="bg-white/15 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full border border-white/20">
+                ⏱ {deliveryTime}
+              </span>
+            )}
             {restaurant.deliveryEnabled && (
               <span className="bg-white/15 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full border border-white/20">
                 🚚 {restaurant.deliveryFee > 0 ? `${fmt(restaurant.deliveryFee)} delivery` : "Free delivery"}
@@ -465,11 +489,19 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
       <div className="bg-gray-950 text-white py-3 overflow-x-auto">
         <div className="max-w-4xl mx-auto px-4">
           <div className="flex items-center gap-5 text-xs font-bold min-w-max mx-auto justify-center">
-            <span className="text-orange-400">🔥 {ordersToday}+ orders today</span>
-            <span className="text-white/20">|</span>
-            <span className="text-yellow-300">⭐ Rated {rating} by customers</span>
-            <span className="text-white/20">|</span>
-            <span className="text-green-400">⚡ Fast delivery in 20–30 mins</span>
+            {ordersToday && (
+              <>
+                <span className="text-orange-400" style={{ color: accent }}>🔥 {ordersToday}+ orders today</span>
+                <span className="text-white/20">|</span>
+              </>
+            )}
+            {rating && (
+              <>
+                <span className="text-yellow-300">⭐ Rated {rating} by customers</span>
+                <span className="text-white/20">|</span>
+              </>
+            )}
+            <span className="text-green-400">⚡ Fast delivery in {deliveryTime}</span>
           </div>
         </div>
       </div>
@@ -530,12 +562,20 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
                 )}
               </div>
             </div>
-            <button
-              onClick={() => scrollTo("menu")}
-              className="flex-shrink-0 bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-4 py-2 rounded-xl border border-white/20 transition-all"
-            >
-              Browse Menu →
-            </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => scrollTo("menu")}
+                  className="flex-shrink-0 bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-4 py-2 rounded-xl border border-white/20 transition-all"
+                >
+                  Browse Menu →
+                </button>
+                <button
+                  onClick={() => alert("Scheduled ordering coming soon!")}
+                  className="flex-shrink-0 bg-white/5 hover:bg-white/10 text-white text-xs font-bold px-4 py-2 rounded-xl border border-white/10 transition-all"
+                >
+                  Schedule Order
+                </button>
+              </div>
           </div>
         </div>
       )}
@@ -547,7 +587,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
           <div className="max-w-4xl mx-auto">
             <div ref={categoryTabsRef} className="flex gap-2 overflow-x-auto px-4 py-3 scrollbar-hide">
               <button
-                onClick={() => setActiveCategory(null)}
+                onClick={() => { setActiveCategory(null); scrollTo("menu"); }}
                 style={activeCategory === null ? { backgroundColor: "#111827" } : {}}
                 className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all duration-200 ${
                   activeCategory === null
@@ -560,7 +600,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
               {categories.map((cat) => (
                 <button
                   key={cat}
-                  onClick={() => setActiveCategory(cat)}
+                  onClick={() => { setActiveCategory(cat); scrollTo("menu"); }}
                   style={activeCategory === cat ? { backgroundColor: "#111827" } : {}}
                   className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all duration-200 ${
                     activeCategory === cat
