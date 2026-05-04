@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useCart } from "./CartContext";
 
 type DeliveryType = "delivery" | "pickup";
@@ -31,6 +31,10 @@ interface RestaurantClientProps {
     deliveryEnabled: boolean;
     pickupEnabled: boolean;
     todayHoursLabel: string | null;
+    primaryColor?: string;
+    promoBanner?: string;
+    rating?: number;
+    ordersToday?: number;
   };
   menuItems: MenuItemData[];
   seo?: {
@@ -69,12 +73,19 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [activeSection, setActiveSection] = useState("menu");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
+  const [promoDismissed, setPromoDismissed] = useState(false);
 
   const categoryTabsRef = useRef<HTMLDivElement>(null);
   const menuSectionRef = useRef<HTMLElement>(null);
   const aboutSectionRef = useRef<HTMLElement>(null);
   const popularSectionRef = useRef<HTMLElement>(null);
   const faqSectionRef = useRef<HTMLElement>(null);
+
+  // Brand colors
+  const primary = restaurant.primaryColor || "#ea580c";
+  const rating = restaurant.rating ?? 4.5;
+  const ordersToday = restaurant.ordersToday ?? 120;
 
   const categories = [...new Set(menuItems.map((i) => i.category))].filter(Boolean);
   const filteredItems = activeCategory ? menuItems.filter((i) => i.category === activeCategory) : menuItems;
@@ -122,6 +133,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
     ),
   ];
 
+  // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") { setCartOpen(false); setCheckoutOpen(false); }
@@ -130,11 +142,13 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Body scroll lock
   useEffect(() => {
     document.body.style.overflow = cartOpen || checkoutOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [cartOpen, checkoutOpen]);
 
+  // Active section tracking (sticky nav highlight)
   useEffect(() => {
     const refs = [
       { id: "menu", ref: menuSectionRef },
@@ -153,6 +167,32 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
     refs.forEach(({ ref }) => { if (ref.current) observer.observe(ref.current); });
     return () => observer.disconnect();
   }, []);
+
+  // Section fade-in on scroll
+  useEffect(() => {
+    const els = document.querySelectorAll("[data-fade]");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const id = (entry.target as HTMLElement).dataset.fade;
+            if (id) setVisibleSections((prev) => new Set([...prev, id]));
+          }
+        });
+      },
+      { threshold: 0.06 }
+    );
+    els.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+
+  const fade = useCallback(
+    (id: string) =>
+      `transition-all duration-700 ease-out ${
+        visibleSections.has(id) ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+      }`,
+    [visibleSections]
+  );
 
   const scrollTo = (id: string) => {
     const el = document.getElementById(id);
@@ -270,7 +310,8 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
             <p className="font-mono text-sm text-gray-700 mb-4 break-all">{orderId}</p>
             <a
               href={`/track/${orderId}`}
-              className="w-full bg-orange-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-orange-500 transition-colors"
+              style={{ backgroundColor: primary }}
+              className="w-full text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-opacity hover:opacity-90"
             >
               Track My Order →
             </a>
@@ -295,7 +336,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
 
   // ── Main page ───────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className="min-h-screen bg-white text-gray-900 pb-24">
 
       {/* ── HERO ──────────────────────────────────────────────────────────────── */}
       <section className="relative h-[70vh] min-h-[480px] max-h-[760px] overflow-hidden group">
@@ -319,13 +360,13 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 bg-red-500/90 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg">
-              <span className="w-1.5 h-1.5 bg-white rounded-full" />
+              <span className="w-1.5 h-1.5 bg-white/60 rounded-full" />
               Closed
             </span>
           )}
         </div>
 
-        {/* Hero content — centered, bottom-anchored */}
+        {/* Hero content */}
         <div className="absolute inset-0 flex flex-col items-center justify-end pb-10 px-6 text-center">
           {restaurant.logo && (
             <div className="w-20 h-20 rounded-2xl border-2 border-white/30 shadow-2xl overflow-hidden mb-4 bg-white/10 backdrop-blur-sm flex-shrink-0">
@@ -337,13 +378,15 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
           </h1>
           {restaurant.description && (
             <p className="text-white/70 text-sm md:text-base mb-4 max-w-md leading-relaxed">
-              {restaurant.description.length > 100 ? restaurant.description.slice(0, 100) + "…" : restaurant.description}
+              {restaurant.description.length > 100
+                ? restaurant.description.slice(0, 100) + "…"
+                : restaurant.description}
             </p>
           )}
-          {/* Stats row */}
+          {/* Stats pills */}
           <div className="flex items-center gap-2 flex-wrap justify-center mb-6">
             <span className="bg-white/15 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full border border-white/20">
-              ⭐ 4.5
+              ⭐ {rating}
             </span>
             <span className="bg-white/15 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full border border-white/20">
               ⏱ 20–35 min
@@ -357,7 +400,8 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
           <div className="flex items-center gap-3">
             <button
               onClick={() => scrollTo("menu")}
-              className="bg-orange-600 hover:bg-orange-500 hover:scale-105 text-white font-bold px-8 py-4 rounded-2xl shadow-lg shadow-orange-600/50 transition-all duration-200 active:scale-95 hover:shadow-xl hover:shadow-orange-600/40"
+              style={{ backgroundColor: primary }}
+              className="text-white font-bold px-8 py-4 rounded-2xl shadow-lg transition-all duration-200 active:scale-95 hover:opacity-90 hover:scale-105 hover:shadow-xl"
             >
               Start Order
             </button>
@@ -372,7 +416,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
       </section>
 
       {/* ── QUICK INFO BAR ────────────────────────────────────────────────────── */}
-      <div className="bg-orange-600 px-4 py-3">
+      <div style={{ backgroundColor: primary }} className="px-4 py-3">
         <div className="max-w-4xl mx-auto flex flex-wrap gap-x-5 gap-y-2 text-sm justify-center sm:justify-start">
           {restaurant.deliveryEnabled && (
             <span className="flex items-center gap-1.5 text-white font-semibold">
@@ -421,14 +465,29 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
       <div className="bg-gray-950 text-white py-3 overflow-x-auto">
         <div className="max-w-4xl mx-auto px-4">
           <div className="flex items-center gap-5 text-xs font-bold min-w-max mx-auto justify-center">
-            <span className="text-orange-400">🔥 120+ orders today</span>
+            <span className="text-orange-400">🔥 {ordersToday}+ orders today</span>
             <span className="text-white/20">|</span>
-            <span className="text-yellow-300">⭐ Rated 4.6 by customers</span>
+            <span className="text-yellow-300">⭐ Rated {rating} by customers</span>
             <span className="text-white/20">|</span>
             <span className="text-green-400">⚡ Fast delivery in 20–30 mins</span>
           </div>
         </div>
       </div>
+
+      {/* ── PROMO BANNER ──────────────────────────────────────────────────────── */}
+      {restaurant.promoBanner && !promoDismissed && (
+        <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-3">
+          <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+            <p className="text-sm font-bold">🎉 {restaurant.promoBanner}</p>
+            <button
+              onClick={() => setPromoDismissed(true)}
+              className="text-white/70 hover:text-white flex-shrink-0 text-xl leading-none font-bold transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── STICKY PAGE NAV ───────────────────────────────────────────────────── */}
       <nav className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm">
@@ -438,9 +497,10 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
               <button
                 key={s.id}
                 onClick={() => scrollTo(s.id)}
+                style={activeSection === s.id ? { backgroundColor: primary } : {}}
                 className={`flex-shrink-0 px-5 py-2 rounded-full text-sm font-bold transition-all duration-200 ${
                   activeSection === s.id
-                    ? "bg-orange-600 text-white shadow-md shadow-orange-600/25 scale-105"
+                    ? "text-white shadow-md scale-105"
                     : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
                 }`}
               >
@@ -453,10 +513,30 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
 
       {/* ── CLOSED BANNER ─────────────────────────────────────────────────────── */}
       {!restaurant.isOpen && (
-        <div className="bg-amber-50 border-b border-amber-200 px-4 py-3 text-center">
-          <p className="text-sm font-medium text-amber-700">
-            We&apos;re currently closed — browse the menu and come back when we open!
-          </p>
+        <div className="bg-gradient-to-r from-slate-900 to-gray-800 px-4 py-4">
+          <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl flex-shrink-0">🌙</span>
+              <div>
+                <p className="text-white font-black text-sm">We&apos;re closed right now</p>
+                {restaurant.todayHoursLabel ? (
+                  <p className="text-white/60 text-xs mt-0.5">
+                    Hours today: {restaurant.todayHoursLabel} — browse the menu and order when we open!
+                  </p>
+                ) : (
+                  <p className="text-white/60 text-xs mt-0.5">
+                    Browse the menu and place your order when we open.
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => scrollTo("menu")}
+              className="flex-shrink-0 bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-4 py-2 rounded-xl border border-white/20 transition-all"
+            >
+              Browse Menu →
+            </button>
+          </div>
         </div>
       )}
 
@@ -468,9 +548,10 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
             <div ref={categoryTabsRef} className="flex gap-2 overflow-x-auto px-4 py-3 scrollbar-hide">
               <button
                 onClick={() => setActiveCategory(null)}
+                style={activeCategory === null ? { backgroundColor: "#111827" } : {}}
                 className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all duration-200 ${
                   activeCategory === null
-                    ? "bg-gray-900 text-white shadow-md scale-105"
+                    ? "text-white shadow-md scale-105"
                     : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
                 }`}
               >
@@ -480,9 +561,10 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
+                  style={activeCategory === cat ? { backgroundColor: "#111827" } : {}}
                   className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all duration-200 ${
                     activeCategory === cat
-                      ? "bg-gray-900 text-white shadow-md scale-105"
+                      ? "text-white shadow-md scale-105"
                       : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
                   }`}
                 >
@@ -500,7 +582,10 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
               <p className="text-gray-400 text-lg font-medium">No items here yet.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div
+              data-fade="menu-grid"
+              className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 ${fade("menu-grid")}`}
+            >
               {filteredItems.map((item, idx) => {
                 const cartItem = items.find((i) => i.id === item.id);
                 const qty = cartItem?.quantity ?? 0;
@@ -509,13 +594,16 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
                     key={item.id}
                     className={`group bg-white rounded-3xl border overflow-hidden flex flex-col transition-all duration-300 ${
                       item.available
-                        ? "border-gray-100 hover:border-orange-200 hover:shadow-2xl hover:-translate-y-1"
+                        ? "border-gray-100 hover:border-gray-200 hover:shadow-2xl hover:-translate-y-1"
                         : "border-gray-100 opacity-60"
                     }`}
                   >
                     <div className="relative h-48 overflow-hidden bg-gray-100 flex-shrink-0">
                       {idx < 3 && item.available && (
-                        <div className="absolute top-3 left-3 z-10 bg-orange-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-md tracking-wide">
+                        <div
+                          style={{ backgroundColor: primary }}
+                          className="absolute top-3 left-3 z-10 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-md tracking-wide"
+                        >
                           🔥 Popular
                         </div>
                       )}
@@ -535,7 +623,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
                     <div className="p-4 flex flex-col flex-1">
                       <div className="flex justify-between items-start gap-2 mb-1">
                         <h3 className="font-black text-[15px] text-gray-900 leading-snug">{item.name}</h3>
-                        <span className="font-black text-orange-600 text-base flex-shrink-0">{fmt(item.price)}</span>
+                        <span className="font-black text-base flex-shrink-0" style={{ color: primary }}>{fmt(item.price)}</span>
                       </div>
                       {item.description && (
                         <p className="text-xs text-gray-400 mb-3 leading-relaxed line-clamp-2">{item.description}</p>
@@ -545,26 +633,32 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
                           <button
                             disabled={!item.available || !restaurant.isOpen}
                             onClick={() => addToCart({ id: item.id, name: item.name, price: item.price })}
+                            style={item.available && restaurant.isOpen ? { backgroundColor: primary } : {}}
                             className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all ${
                               item.available && restaurant.isOpen
-                                ? "bg-orange-600 text-white hover:bg-orange-500 active:scale-95"
+                                ? "text-white hover:opacity-90 active:scale-95"
                                 : "bg-gray-100 text-gray-400 cursor-not-allowed"
                             }`}
                           >
-                            {!restaurant.isOpen ? "Closed" : !item.available ? "Sold Out" : "Add to Cart"}
+                            {!restaurant.isOpen ? "Closed" : !item.available ? "Sold Out" : "+ Add"}
                           </button>
                         ) : (
-                          <div className="flex items-center justify-between bg-orange-50 rounded-xl p-1">
+                          <div className="flex items-center justify-between bg-gray-50 rounded-xl p-1">
                             <button
                               onClick={() => updateQuantity(item.id, qty - 1)}
-                              className="w-9 h-9 bg-white rounded-lg shadow-sm flex items-center justify-center font-bold text-gray-700 hover:bg-orange-600 hover:text-white transition-colors"
+                              className="w-9 h-9 bg-white rounded-lg shadow-sm flex items-center justify-center font-bold text-gray-700 hover:text-white transition-all"
+                              style={{ ["--hover-bg" as string]: primary }}
+                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = primary)}
+                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "")}
                             >
                               −
                             </button>
-                            <span className="font-bold text-orange-600 text-sm">{qty}</span>
+                            <span className="font-bold text-sm" style={{ color: primary }}>{qty}</span>
                             <button
                               onClick={() => updateQuantity(item.id, qty + 1)}
-                              className="w-9 h-9 bg-white rounded-lg shadow-sm flex items-center justify-center font-bold text-gray-700 hover:bg-orange-600 hover:text-white transition-colors"
+                              className="w-9 h-9 bg-white rounded-lg shadow-sm flex items-center justify-center font-bold text-gray-700 transition-all"
+                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = primary; e.currentTarget.style.color = "white"; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = ""; e.currentTarget.style.color = ""; }}
                             >
                               +
                             </button>
@@ -583,10 +677,13 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
       {/* ── ABOUT SECTION ─────────────────────────────────────────────────────── */}
       <section id="about" ref={aboutSectionRef} className="scroll-mt-11 bg-gray-50 border-t border-gray-100">
         <div className="max-w-4xl mx-auto px-4 py-14">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-            {/* LEFT: description + chips */}
+          <div
+            data-fade="about"
+            className={`grid grid-cols-1 md:grid-cols-2 gap-10 ${fade("about")}`}
+          >
+            {/* LEFT */}
             <div>
-              <p className="text-xs font-black text-orange-600 uppercase tracking-widest mb-2">About</p>
+              <p className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: primary }}>About</p>
               <h2 className="text-2xl font-black text-gray-900 mb-4">About {restaurant.name}</h2>
               {restaurant.description && (
                 <p className="text-gray-600 leading-relaxed mb-6">{restaurant.description}</p>
@@ -594,7 +691,11 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
               {keywords.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {keywords.map((k) => (
-                    <span key={k} className="bg-orange-50 text-orange-700 text-sm font-bold px-3 py-1.5 rounded-full border border-orange-100">
+                    <span
+                      key={k}
+                      className="text-sm font-bold px-3 py-1.5 rounded-full border"
+                      style={{ backgroundColor: primary + "15", color: primary, borderColor: primary + "30" }}
+                    >
                       {k}
                     </span>
                   ))}
@@ -655,59 +756,66 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
       {popularItems.length > 0 && (
         <section id="popular" ref={popularSectionRef} className="scroll-mt-11 border-t border-gray-100 bg-orange-50/40">
           <div className="max-w-4xl mx-auto px-4 py-14">
-            <p className="text-xs font-black text-orange-600 uppercase tracking-widest mb-2">Most Loved</p>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-black text-gray-900">Popular Items</h2>
-              <button
-                onClick={() => scrollTo("menu")}
-                className="text-sm font-bold text-orange-600 hover:text-orange-500 transition-colors"
-              >
-                View all →
-              </button>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              {popularItems.slice(0, 4).map((item) => {
-                const cartItem = items.find((i) => i.id === item.id);
-                const qty = cartItem?.quantity ?? 0;
-                return (
-                  <div key={item.id} className="group bg-white rounded-3xl border border-gray-100 overflow-hidden hover:border-orange-200 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300">
-                    <div className="relative h-40 overflow-hidden bg-gray-50">
-                      <div className="absolute top-2.5 left-2.5 z-10 bg-orange-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-md tracking-wide">
-                        Most Ordered
-                      </div>
-                      <img
-                        src={getItemImage(item)}
-                        alt={item.name}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                        loading="lazy"
-                      />
-                    </div>
-                    <div className="p-3">
-                      <p className="font-black text-gray-900 text-sm leading-snug mb-0.5">{item.name}</p>
-                      <p className="text-orange-600 font-black text-sm mb-2">{fmt(item.price)}</p>
-                      {qty === 0 ? (
-                        <button
-                          disabled={!restaurant.isOpen}
-                          onClick={() => addToCart({ id: item.id, name: item.name, price: item.price })}
-                          className={`w-full py-1.5 rounded-lg text-xs font-bold transition-all ${
-                            restaurant.isOpen
-                              ? "bg-orange-600 text-white hover:bg-orange-500 active:scale-95"
-                              : "bg-gray-100 text-gray-400 cursor-not-allowed"
-                          }`}
+            <div data-fade="popular" className={fade("popular")}>
+              <p className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: primary }}>Most Loved</p>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-black text-gray-900">Popular Items</h2>
+                <button
+                  onClick={() => scrollTo("menu")}
+                  className="text-sm font-bold transition-colors hover:opacity-70"
+                  style={{ color: primary }}
+                >
+                  View all →
+                </button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                {popularItems.slice(0, 4).map((item) => {
+                  const cartItem = items.find((i) => i.id === item.id);
+                  const qty = cartItem?.quantity ?? 0;
+                  return (
+                    <div key={item.id} className="group bg-white rounded-3xl border border-gray-100 overflow-hidden hover:border-gray-200 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300">
+                      <div className="relative h-40 overflow-hidden bg-gray-50">
+                        <div
+                          style={{ backgroundColor: primary }}
+                          className="absolute top-2.5 left-2.5 z-10 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-md tracking-wide"
                         >
-                          {restaurant.isOpen ? "Add to Cart" : "Closed"}
-                        </button>
-                      ) : (
-                        <div className="flex items-center justify-between bg-orange-50 rounded-lg px-1 py-0.5">
-                          <button onClick={() => updateQuantity(item.id, qty - 1)} className="w-7 h-7 flex items-center justify-center font-bold text-gray-600 hover:text-orange-600 transition-colors">−</button>
-                          <span className="font-bold text-orange-600 text-xs">{qty}</span>
-                          <button onClick={() => updateQuantity(item.id, qty + 1)} className="w-7 h-7 flex items-center justify-center font-bold text-gray-600 hover:text-orange-600 transition-colors">+</button>
+                          Most Ordered
                         </div>
-                      )}
+                        <img
+                          src={getItemImage(item)}
+                          alt={item.name}
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                          loading="lazy"
+                        />
+                      </div>
+                      <div className="p-3">
+                        <p className="font-black text-gray-900 text-sm leading-snug mb-0.5">{item.name}</p>
+                        <p className="font-black text-sm mb-2" style={{ color: primary }}>{fmt(item.price)}</p>
+                        {qty === 0 ? (
+                          <button
+                            disabled={!restaurant.isOpen}
+                            onClick={() => addToCart({ id: item.id, name: item.name, price: item.price })}
+                            style={restaurant.isOpen ? { backgroundColor: primary } : {}}
+                            className={`w-full py-1.5 rounded-lg text-xs font-bold transition-all ${
+                              restaurant.isOpen
+                                ? "text-white hover:opacity-90 active:scale-95"
+                                : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                            }`}
+                          >
+                            {restaurant.isOpen ? "+ Add" : "Closed"}
+                          </button>
+                        ) : (
+                          <div className="flex items-center justify-between bg-gray-50 rounded-lg px-1 py-0.5">
+                            <button onClick={() => updateQuantity(item.id, qty - 1)} className="w-7 h-7 flex items-center justify-center font-bold text-gray-600 hover:text-gray-900 transition-colors">−</button>
+                            <span className="font-bold text-xs" style={{ color: primary }}>{qty}</span>
+                            <button onClick={() => updateQuantity(item.id, qty + 1)} className="w-7 h-7 flex items-center justify-center font-bold text-gray-600 hover:text-gray-900 transition-colors">+</button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         </section>
@@ -716,34 +824,39 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
       {/* ── FAQ SECTION ───────────────────────────────────────────────────────── */}
       <section id="faq" ref={faqSectionRef} className="scroll-mt-11 bg-gray-50 border-t border-gray-100">
         <div className="max-w-4xl mx-auto px-4 py-14">
-          <p className="text-xs font-black text-orange-600 uppercase tracking-widest mb-2">Help</p>
-          <h2 className="text-2xl font-black text-gray-900 mb-6">Frequently Asked Questions</h2>
-          <div className="space-y-2.5">
-            {faqs.map((faq, i) => (
-              <div key={i} className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
-                <button
-                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors"
-                >
-                  <span className="font-bold text-gray-900 text-sm pr-4">{faq.q}</span>
-                  <span className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 ${openFaq === i ? "bg-orange-600 text-white" : "bg-gray-100 text-gray-500"}`}>
-                    <svg
-                      className={`w-3.5 h-3.5 transition-transform duration-200 ${openFaq === i ? "rotate-180" : ""}`}
-                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          <div data-fade="faq" className={fade("faq")}>
+            <p className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: primary }}>Help</p>
+            <h2 className="text-2xl font-black text-gray-900 mb-6">Frequently Asked Questions</h2>
+            <div className="space-y-2.5">
+              {faqs.map((faq, i) => (
+                <div key={i} className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+                  <button
+                    onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                    className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors"
+                  >
+                    <span className="font-bold text-gray-900 text-sm pr-4">{faq.q}</span>
+                    <span
+                      className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200"
+                      style={openFaq === i ? { backgroundColor: primary } : { backgroundColor: "#f3f4f6", color: "#6b7280" }}
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </span>
-                </button>
-                <div className={`grid transition-all duration-300 ease-in-out ${openFaq === i ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
-                  <div className="overflow-hidden">
-                    <div className="px-5 pb-4 border-t border-gray-50">
-                      <p className="text-gray-500 text-sm leading-relaxed pt-3">{faq.a}</p>
+                      <svg
+                        className={`w-3.5 h-3.5 transition-transform duration-200 ${openFaq === i ? "rotate-180 text-white" : ""}`}
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </span>
+                  </button>
+                  <div className={`grid transition-all duration-300 ease-in-out ${openFaq === i ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                    <div className="overflow-hidden">
+                      <div className="px-5 pb-4 border-t border-gray-50">
+                        <p className="text-gray-500 text-sm leading-relaxed pt-3">{faq.a}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -766,7 +879,8 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
             <div className="flex flex-col items-start sm:items-end gap-3">
               <button
                 onClick={() => scrollTo("menu")}
-                className="bg-orange-600 hover:bg-orange-500 text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-all active:scale-95 hover:shadow-lg hover:shadow-orange-600/25"
+                style={{ backgroundColor: primary }}
+                className="text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-all active:scale-95 hover:opacity-90 hover:shadow-lg"
               >
                 Order Online →
               </button>
@@ -774,24 +888,24 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
                 <div className="flex flex-wrap gap-2">
                   {seo.googleBusinessUrl && (
                     <a href={seo.googleBusinessUrl} target="_blank" rel="noopener noreferrer"
-                      className="w-10 h-10 bg-gray-50 rounded-xl border border-gray-100 hover:border-orange-200 hover:bg-orange-50 flex items-center justify-center transition-all group" title="Google Business">
-                      <svg className="w-5 h-5 text-gray-500 group-hover:text-orange-600 transition-colors" viewBox="0 0 24 24" fill="currentColor">
+                      className="w-10 h-10 bg-gray-50 rounded-xl border border-gray-100 hover:border-gray-200 hover:bg-gray-100 flex items-center justify-center transition-all group" title="Google Business">
+                      <svg className="w-5 h-5 text-gray-500 group-hover:text-gray-700 transition-colors" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 11h8.533c.044.385.067.773.067 1.167C20.6 17.48 16.956 21 11.8 21 6.928 21 3 17.07 3 12.2S6.928 3.4 11.8 3.4c2.418 0 4.444.897 5.995 2.362l-2.43 2.43c-.678-.647-1.854-1.406-3.565-1.406-3.065 0-5.567 2.527-5.567 5.614 0 3.086 2.502 5.613 5.567 5.613 3.559 0 4.892-2.548 5.098-3.875H12V11z"/>
                       </svg>
                     </a>
                   )}
                   {seo.instagramUrl && (
                     <a href={seo.instagramUrl} target="_blank" rel="noopener noreferrer"
-                      className="w-10 h-10 bg-gray-50 rounded-xl border border-gray-100 hover:border-orange-200 hover:bg-orange-50 flex items-center justify-center transition-all group" title="Instagram">
-                      <svg className="w-5 h-5 text-gray-500 group-hover:text-orange-600 transition-colors" viewBox="0 0 24 24" fill="currentColor">
+                      className="w-10 h-10 bg-gray-50 rounded-xl border border-gray-100 hover:border-gray-200 hover:bg-gray-100 flex items-center justify-center transition-all group" title="Instagram">
+                      <svg className="w-5 h-5 text-gray-500 group-hover:text-gray-700 transition-colors" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
                       </svg>
                     </a>
                   )}
                   {seo.tiktokUrl && (
                     <a href={seo.tiktokUrl} target="_blank" rel="noopener noreferrer"
-                      className="w-10 h-10 bg-gray-50 rounded-xl border border-gray-100 hover:border-orange-200 hover:bg-orange-50 flex items-center justify-center transition-all group" title="TikTok">
-                      <svg className="w-5 h-5 text-gray-500 group-hover:text-orange-600 transition-colors" viewBox="0 0 24 24" fill="currentColor">
+                      className="w-10 h-10 bg-gray-50 rounded-xl border border-gray-100 hover:border-gray-200 hover:bg-gray-100 flex items-center justify-center transition-all group" title="TikTok">
+                      <svg className="w-5 h-5 text-gray-500 group-hover:text-gray-700 transition-colors" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.31 6.31 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.19 8.19 0 004.79 1.52V6.75a4.85 4.85 0 01-1.02-.06z"/>
                       </svg>
                     </a>
@@ -806,20 +920,34 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
         </div>
       </footer>
 
-      {/* ── STICKY CART BAR ───────────────────────────────────────────────────── */}
-      {totalItems > 0 && !cartOpen && !checkoutOpen && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 p-4 bg-white border-t border-gray-100 shadow-2xl">
+      {/* ── STICKY BOTTOM BAR (always visible) ───────────────────────────────── */}
+      {!cartOpen && !checkoutOpen && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 px-4 py-3 bg-white/95 backdrop-blur-sm border-t border-gray-100 shadow-2xl">
           <div className="max-w-4xl mx-auto">
-            <button
-              onClick={() => setCartOpen(true)}
-              className="w-full bg-orange-600 text-white font-bold py-4 rounded-2xl flex items-center justify-between px-5 hover:bg-orange-500 transition-colors shadow-lg shadow-orange-600/20 active:scale-[0.99]"
-            >
-              <span className="bg-orange-500 text-white text-sm font-black w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0">
-                {totalItems}
-              </span>
-              <span className="font-bold text-base">View Cart</span>
-              <span className="font-bold">{fmt(orderTotal)}</span>
-            </button>
+            {totalItems === 0 ? (
+              <button
+                onClick={() => scrollTo("menu")}
+                style={{ backgroundColor: primary }}
+                className="w-full text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2.5 transition-all hover:opacity-90 hover:scale-[1.01] active:scale-[0.99] shadow-lg"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <span>Browse Menu &amp; Start Order</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setCartOpen(true)}
+                style={{ backgroundColor: primary }}
+                className="w-full text-white font-bold py-4 rounded-2xl flex items-center justify-between px-5 transition-all hover:opacity-90 active:scale-[0.99] shadow-lg"
+              >
+                <span className="bg-white/20 text-white text-sm font-black w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0">
+                  {totalItems}
+                </span>
+                <span className="font-bold text-base">View Cart</span>
+                <span className="font-bold">{fmt(orderTotal)}</span>
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -847,21 +975,21 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
                 <div key={item.id} className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-sm text-gray-900 truncate">{item.name}</p>
-                    <p className="text-sm text-orange-600 font-bold">
+                    <p className="text-sm font-bold" style={{ color: primary }}>
                       {fmt(item.price * item.quantity)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 bg-gray-50 rounded-xl p-1 flex-shrink-0">
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                      className="w-8 h-8 bg-white rounded-lg shadow-sm flex items-center justify-center font-bold text-gray-600 hover:bg-orange-600 hover:text-white transition-colors text-sm"
+                      className="w-8 h-8 bg-white rounded-lg shadow-sm flex items-center justify-center font-bold text-gray-600 transition-colors text-sm hover:bg-gray-100"
                     >
                       −
                     </button>
                     <span className="font-bold text-sm w-5 text-center">{item.quantity}</span>
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                      className="w-8 h-8 bg-white rounded-lg shadow-sm flex items-center justify-center font-bold text-gray-600 hover:bg-orange-600 hover:text-white transition-colors text-sm"
+                      className="w-8 h-8 bg-white rounded-lg shadow-sm flex items-center justify-center font-bold text-gray-600 transition-colors text-sm hover:bg-gray-100"
                     >
                       +
                     </button>
@@ -884,7 +1012,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
                 )}
                 <div className="flex justify-between font-black text-base pt-2 border-t border-gray-200">
                   <span>Total</span>
-                  <span className="text-orange-600">{fmt(orderTotal)}</span>
+                  <span style={{ color: primary }}>{fmt(orderTotal)}</span>
                 </div>
               </div>
 
@@ -897,7 +1025,8 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
               <button
                 disabled={!restaurant.isOpen || !meetsMinimum}
                 onClick={openCheckout}
-                className="w-full bg-orange-600 text-white font-bold py-3.5 rounded-xl hover:bg-orange-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
+                style={restaurant.isOpen && meetsMinimum ? { backgroundColor: primary } : {}}
+                className="w-full text-white font-bold py-3.5 rounded-xl transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400 active:scale-[0.99]"
               >
                 {!restaurant.isOpen
                   ? "Restaurant is closed"
@@ -937,16 +1066,18 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
                     <button
                       onClick={() => setDeliveryType("delivery")}
                       className={`py-2.5 rounded-lg text-sm font-bold transition-all ${
-                        deliveryType === "delivery" ? "bg-white text-orange-600 shadow" : "text-gray-500"
+                        deliveryType === "delivery" ? "bg-white shadow" : "text-gray-500"
                       }`}
+                      style={deliveryType === "delivery" ? { color: primary } : {}}
                     >
                       Delivery
                     </button>
                     <button
                       onClick={() => setDeliveryType("pickup")}
                       className={`py-2.5 rounded-lg text-sm font-bold transition-all ${
-                        deliveryType === "pickup" ? "bg-white text-orange-600 shadow" : "text-gray-500"
+                        deliveryType === "pickup" ? "bg-white shadow" : "text-gray-500"
                       }`}
+                      style={deliveryType === "pickup" ? { color: primary } : {}}
                     >
                       Pickup
                     </button>
@@ -962,14 +1093,19 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
                   placeholder="Full name *"
                   value={formData.customerName}
                   onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 text-gray-900 placeholder-gray-400"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 text-gray-900 placeholder-gray-400 transition-all"
+                  style={{ ["--tw-ring-color" as string]: primary + "40" } as React.CSSProperties}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
                 />
                 <input
                   type="tel"
                   placeholder="Phone number *"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 text-gray-900 placeholder-gray-400"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none text-gray-900 placeholder-gray-400 transition-all"
+                  onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
                 />
               </div>
 
@@ -982,16 +1118,18 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     rows={2}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 text-gray-900 placeholder-gray-400 resize-none"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none text-gray-900 placeholder-gray-400 resize-none transition-all"
+                    onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
                   />
                 </div>
               )}
 
               {/* Pickup location */}
               {deliveryType === "pickup" && restaurant.address && (
-                <div className="bg-orange-50 border border-orange-100 rounded-xl px-4 py-3">
-                  <p className="text-xs font-bold text-orange-600 mb-1">Pickup location</p>
-                  <p className="text-sm text-orange-700">{restaurant.address}</p>
+                <div className="rounded-xl px-4 py-3 border" style={{ backgroundColor: primary + "10", borderColor: primary + "30" }}>
+                  <p className="text-xs font-bold mb-1" style={{ color: primary }}>Pickup location</p>
+                  <p className="text-sm font-medium text-gray-800">{restaurant.address}</p>
                 </div>
               )}
 
@@ -1001,7 +1139,9 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
                 value={formData.note}
                 onChange={(e) => setFormData({ ...formData, note: e.target.value })}
                 rows={2}
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 text-gray-900 placeholder-gray-400 resize-none"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none text-gray-900 placeholder-gray-400 resize-none transition-all"
+                onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
               />
 
               {/* Order summary */}
@@ -1034,7 +1174,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
                   )}
                   <div className="flex justify-between font-black text-base pt-1.5 border-t border-gray-200">
                     <span>Total</span>
-                    <span className="text-orange-600">{fmt(orderTotal)}</span>
+                    <span style={{ color: primary }}>{fmt(orderTotal)}</span>
                   </div>
                 </div>
               </div>
@@ -1052,7 +1192,8 @@ export default function RestaurantClient({ restaurant, menuItems, seo }: Restaur
                   <button
                     onClick={handleOnlinePayment}
                     disabled={isSubmitting}
-                    className="w-full bg-orange-600 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2.5 hover:bg-orange-500 transition-colors disabled:opacity-60 active:scale-[0.99]"
+                    style={{ backgroundColor: primary }}
+                    className="w-full text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2.5 transition-all hover:opacity-90 disabled:opacity-60 active:scale-[0.99]"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
