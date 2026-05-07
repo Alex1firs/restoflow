@@ -526,7 +526,7 @@ export default function SettingsClient({ restaurant }: Props) {
                 className={inputCls}
               />
               <p className="text-xs text-gray-400 mt-1">
-                You'll receive an SMS when a new order arrives.
+                You&apos;ll receive an SMS when a new order arrives.
               </p>
             </Field>
           )}

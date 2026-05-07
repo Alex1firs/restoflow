@@ -287,8 +287,8 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
       setIsScheduledOrder(true);
       setOrderSuccess(true);
       clearCart();
-    } catch (e: any) {
-      setOrderError(e.message || "Something went wrong.");
+    } catch (e: unknown) {
+      setOrderError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
       setIsSubmitting(false);
     }

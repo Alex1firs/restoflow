@@ -350,7 +350,7 @@ export default function DomainClient({ slug }: { slug: string }) {
           <div className="bg-green-50 border border-green-100 rounded-2xl p-5 flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-black text-gray-800">Not sure how to do this?</p>
-              <p className="text-xs text-gray-500 mt-0.5">Message us on WhatsApp — we'll set it up for you.</p>
+              <p className="text-xs text-gray-500 mt-0.5">Message us on WhatsApp — we&apos;ll set it up for you.</p>
             </div>
             <a
               href={`https://wa.me/${WHATSAPP_NUMBER}?text=${whatsappMsg}`}

@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     }
 
     let orderId = await createOrderFromPaymentReference(reference.trim());
-    let isNew = !!orderId;
+    const isNew = !!orderId;
 
     if (!orderId) {
       orderId = await getOrderByReference(reference.trim());

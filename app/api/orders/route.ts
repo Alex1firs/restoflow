@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
 
       // Check if scheduled time is within opening hours for that day
       const dayStr = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"][date.getDay()];
-      const hours = (rData.openingHours as any)?.[dayStr];
+      const hours = (rData.openingHours as Record<string, {open: boolean, from: string, to: string}>)?.[dayStr];
       if (!hours || !hours.open) {
         return NextResponse.json({ error: "The restaurant is closed on the selected day" }, { status: 422 });
       }

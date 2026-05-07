@@ -464,7 +464,7 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
         {/* Today's order history */}
         {todayOrders.length > 0 && (
           <div>
-            <h2 className="text-lg font-black text-gray-900 tracking-tight mb-4">Today's History</h2>
+            <h2 className="text-lg font-black text-gray-900 tracking-tight mb-4">Today&apos;s History</h2>
             <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
               <table className="w-full text-sm">
                 <thead>

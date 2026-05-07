@@ -22,8 +22,10 @@ export default function OnboardingCallbackClient() {
 
   useEffect(() => {
     if (!reference) {
-      setState("error");
-      setErrorMsg("No payment reference found.");
+      setTimeout(() => {
+        setState("error");
+        setErrorMsg("No payment reference found.");
+      }, 0);
       return;
     }
 
