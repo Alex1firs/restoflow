@@ -18,30 +18,43 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const project = (event.data?.metadata?.project ?? "rest").toUpperCase();
-  const targetUrl = process.env[`WEBHOOK_URL_${project}`];
+  const project = event.data?.metadata?.project;
 
-  if (!targetUrl) {
-    console.error(`Relay: no WEBHOOK_URL_${project} configured — event dropped`);
-    // Still return 200 so Paystack doesn't retry indefinitely
+  // Collect all registered webhook targets from env (WEBHOOK_URL_*)
+  const allTargets = Object.entries(process.env)
+    .filter(([key, val]) => key.startsWith("WEBHOOK_URL_") && val)
+    .map(([, url]) => url as string);
+
+  // If project is specified, route only to that target; otherwise broadcast to all
+  const targets = project
+    ? (() => {
+        const url = process.env[`WEBHOOK_URL_${project.toUpperCase()}`];
+        if (!url) console.error(`Relay: no WEBHOOK_URL_${project.toUpperCase()} configured`);
+        return url ? [url] : [];
+      })()
+    : allTargets;
+
+  if (targets.length === 0) {
+    console.error("Relay: no targets to forward to — event dropped");
     return NextResponse.json({ received: true });
   }
 
-  try {
-    const res = await fetch(targetUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-paystack-signature": signature,
-      },
-      body: rawBody,
-    });
-    if (!res.ok) {
-      console.error(`Relay: ${targetUrl} responded ${res.status}`);
-    }
-  } catch (err) {
-    console.error(`Relay: failed to forward to ${targetUrl}:`, err);
-  }
+  await Promise.allSettled(
+    targets.map((url) =>
+      fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-paystack-signature": signature,
+        },
+        body: rawBody,
+      }).then((res) => {
+        if (!res.ok) console.error(`Relay: ${url} responded ${res.status}`);
+      }).catch((err) => {
+        console.error(`Relay: failed to forward to ${url}:`, err);
+      })
+    )
+  );
 
   return NextResponse.json({ received: true });
 }
