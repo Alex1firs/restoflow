@@ -117,6 +117,7 @@ export async function processOnboarding(
 
   // Create owner user document
   batch.set(db.collection("users").doc(uid), {
+    role: "owner",
     restaurantSlug: slug,
     email,
     createdAt: FieldValue.serverTimestamp(),

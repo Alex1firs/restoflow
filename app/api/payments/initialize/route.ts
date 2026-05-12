@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
       currency: "NGN",
       callback_url: callbackUrl,
       metadata: {
+        project: "rest",
         restaurantId,
         planId,
         paymentType,

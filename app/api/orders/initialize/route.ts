@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
         subaccount: subaccountCode,
         bearer: "subaccount",
         callback_url: callbackUrl,
-        metadata: { paymentType: "order", restaurantId: restaurantId.trim() },
+        metadata: { project: "rest", paymentType: "order", restaurantId: restaurantId.trim() },
       }),
     });
 
