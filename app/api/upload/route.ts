@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { getAdminStorage } from "@/lib/firebase-admin";
+import { randomUUID } from "crypto";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_SIZE = 5 * 1024 * 1024;
@@ -22,7 +23,6 @@ export async function POST(req: NextRequest) {
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
   if (!path) return NextResponse.json({ error: "No path provided" }, { status: 400 });
 
-  // Only allow uploads under the authenticated user's restaurant
   const allowedPrefix = `restaurants/${user.restaurantSlug}/`;
   if (!path.startsWith(allowedPrefix)) {
     return NextResponse.json({ error: "Forbidden path" }, { status: 403 });
@@ -35,13 +35,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Image must be under 5MB" }, { status: 400 });
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const bucket = getAdminStorage().bucket();
-  const fileRef = bucket.file(path);
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const bucket = getAdminStorage().bucket();
+    const fileRef = bucket.file(path);
 
-  await fileRef.save(buffer, { contentType: file.type, resumable: false });
-  await fileRef.makePublic();
+    // Upload with a download token so we get a permanent Firebase-style URL
+    const token = randomUUID();
+    await fileRef.save(buffer, {
+      contentType: file.type,
+      resumable: false,
+      metadata: { metadata: { firebaseStorageDownloadTokens: token } },
+    });
 
-  const publicUrl = `https://storage.googleapis.com/${bucket.name}/${path}`;
-  return NextResponse.json({ url: publicUrl });
+    const bucketName = bucket.name;
+    const encodedPath = encodeURIComponent(path);
+    const url = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media&token=${token}`;
+
+    return NextResponse.json({ url });
+  } catch (err) {
+    console.error("Upload error:", err);
+    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+  }
 }
