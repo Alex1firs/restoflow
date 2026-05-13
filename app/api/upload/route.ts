@@ -37,7 +37,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
-    const bucket = getAdminStorage().bucket();
+    const bucketName = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!;
+    const bucket = getAdminStorage().bucket(bucketName);
     const fileRef = bucket.file(path);
 
     // Upload with a download token so we get a permanent Firebase-style URL
@@ -48,13 +49,13 @@ export async function POST(req: NextRequest) {
       metadata: { metadata: { firebaseStorageDownloadTokens: token } },
     });
 
-    const bucketName = bucket.name;
     const encodedPath = encodeURIComponent(path);
     const url = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media&token=${token}`;
 
     return NextResponse.json({ url });
   } catch (err) {
-    console.error("Upload error:", err);
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("Upload error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

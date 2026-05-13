@@ -32,10 +32,10 @@ export default function ImageUpload({ value, onChange, storagePath, label, aspec
       URL.revokeObjectURL(objectUrl);
       setPreview(url);
       onChange(url);
-    } catch {
+    } catch (err) {
       URL.revokeObjectURL(objectUrl);
       setPreview(value);
-      setError("Upload failed. Please try again.");
+      setError(err instanceof Error ? err.message : "Upload failed. Please try again.");
     } finally {
       setProgress(null);
     }
