@@ -1,6 +1,3 @@
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { storage } from "./firebase";
-
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_SIZE = 5 * 1024 * 1024;
 
@@ -10,25 +7,29 @@ export function validateImageFile(file: File): string | null {
   return null;
 }
 
-export function uploadImage(
+export async function uploadImage(
   file: File,
   path: string,
   onProgress?: (pct: number) => void
 ): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const task = uploadBytesResumable(ref(storage, path), file, { contentType: file.type });
+  onProgress?.(10);
 
-    task.on(
-      "state_changed",
-      (snap) => onProgress?.(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
-      reject,
-      async () => {
-        try {
-          resolve(await getDownloadURL(task.snapshot.ref));
-        } catch (e) {
-          reject(e);
-        }
-      }
-    );
-  });
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("path", path);
+
+  onProgress?.(30);
+
+  const res = await fetch("/api/upload", { method: "POST", body: formData });
+
+  onProgress?.(90);
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? "Upload failed");
+  }
+
+  const { url } = await res.json();
+  onProgress?.(100);
+  return url;
 }
