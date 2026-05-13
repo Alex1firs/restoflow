@@ -512,18 +512,6 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
             </h1>
           </div>
 
-          {/* Circular food image — overlaid on top of name */}
-          <div className="relative z-10 w-64 h-64 sm:w-80 sm:h-80 md:w-[420px] md:h-[420px] rounded-full overflow-hidden shadow-[0_20px_80px_rgba(0,0,0,0.9)] border border-white/5 my-8">
-            <img
-              src={
-                restaurant.coverImage && restaurant.coverImage.startsWith("http")
-                  ? restaurant.coverImage
-                  : "https://images.unsplash.com/photo-1544025162-d76694265947?w=1600&auto=format"
-              }
-              alt={restaurant.name}
-              className="w-full h-full object-cover"
-            />
-          </div>
 
           {/* Left circle CTA — desktop */}
           <button
