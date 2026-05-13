@@ -416,7 +416,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
 
   // ── Main page ───────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#0d0802] text-[#f5e6c8] pb-24 relative">
+    <div className="min-h-screen bg-[#0f0f0f] text-[#f5e6c8] pb-24 relative">
       {isPreview && (
         <div className="bg-amber-500 text-white font-black text-xs tracking-widest uppercase text-center py-2.5 px-4 sticky top-0 z-[100] shadow-md flex items-center justify-center gap-2">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
@@ -425,88 +425,157 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
       )}
 
       {/* ── HERO ──────────────────────────────────────────────────────────────── */}
-      <section className="relative h-[70vh] min-h-[480px] max-h-[760px] overflow-hidden group bg-[#0d0802]">
-        <div
-          className="absolute inset-0 w-full h-full"
-          style={{ transform: `translateY(${scrollY * 0.4}px)` }}
-        >
-          <img
-            src={
-              restaurant.coverImage && restaurant.coverImage.startsWith("http")
-                ? restaurant.coverImage
-                : "https://images.unsplash.com/photo-1544025162-d76694265947?w=1600&auto=format"
-            }
-            alt={restaurant.name}
-            className="w-full h-full object-cover transition-transform duration-[8000ms] group-hover:scale-110 blur-[2px] scale-105"
-          />
-        </div>
-        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-transparent" />
+      <section className="relative min-h-[92vh] flex flex-col bg-[#0f0f0f] overflow-hidden">
 
-        {/* Open / Closed badge */}
-        <div className="absolute top-5 right-5">
-          {restaurant.isOpen ? (
-            <span className="inline-flex items-center gap-1.5 bg-green-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg">
-              <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-              Open Now
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 bg-red-500/90 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg">
-              <span className="w-1.5 h-1.5 bg-white/60 rounded-full" />
-              Closed
-            </span>
-          )}
-        </div>
-
-        {/* Hero content */}
-        <div className="absolute inset-0 flex flex-col items-center justify-end pb-10 px-6 text-center">
-          {restaurant.logo && (
-            <div className="w-20 h-20 rounded-2xl border-2 border-white/30 shadow-2xl overflow-hidden mb-4 bg-white/10 backdrop-blur-sm flex-shrink-0">
-              <img src={restaurant.logo} alt="logo" className="w-full h-full object-cover" />
-            </div>
-          )}
-          <h1 className="text-4xl md:text-6xl font-black text-white leading-tight mb-2 drop-shadow-2xl tracking-tight">
-            {restaurant.name}
-          </h1>
-          {restaurant.description && (
-            <p className="text-white/70 text-sm md:text-base mb-4 max-w-md leading-relaxed">
-              {restaurant.description.length > 100
-                ? restaurant.description.slice(0, 100) + "…"
-                : restaurant.description}
-            </p>
-          )}
-          {/* Stats pills */}
-          <div className="flex items-center gap-2 flex-wrap justify-center mb-6">
-            {rating && (
-              <span className="bg-white/15 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full border border-white/20">
-                ⭐ {rating}
-              </span>
-            )}
-            {deliveryTime && (
-              <span className="bg-white/15 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full border border-white/20">
-                ⏱ {deliveryTime}
-              </span>
-            )}
-            {restaurant.deliveryEnabled && (
-              <span className="bg-white/15 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full border border-white/20">
-                🚚 {restaurant.deliveryFee > 0 ? `${fmt(restaurant.deliveryFee)} delivery` : "Free delivery"}
-              </span>
-            )}
-          </div>
+        {/* Top nav bar */}
+        <div className="flex items-center justify-between px-6 py-5 z-20 relative">
+          {/* Logo / name */}
           <div className="flex items-center gap-3">
+            {restaurant.logo ? (
+              <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/10">
+                <img src={restaurant.logo} alt="logo" className="w-full h-full object-cover" />
+              </div>
+            ) : (
+              <span className="text-white font-black text-xl tracking-tight">
+                {restaurant.name.slice(0, 2).toUpperCase()}
+              </span>
+            )}
+          </div>
+
+          {/* Center nav links — desktop */}
+          <div className="hidden md:flex items-center gap-8">
+            {navSections.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => scrollTo(s.id)}
+                className="text-white/60 hover:text-white text-xs font-bold uppercase tracking-[0.2em] transition-colors"
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Right: status + cart */}
+          <div className="flex items-center gap-4">
+            {restaurant.isOpen ? (
+              <span className="hidden sm:flex items-center gap-1.5 text-green-400 text-xs font-bold">
+                <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+                Open Now
+              </span>
+            ) : (
+              <span className="hidden sm:flex items-center gap-1.5 text-red-400 text-xs font-bold">
+                <span className="w-1.5 h-1.5 bg-red-400/60 rounded-full" />
+                Closed
+              </span>
+            )}
             <button
-              onClick={() => scrollTo("menu")}
-              style={{ backgroundColor: primary }}
-              className="text-white font-bold px-8 py-4 rounded-2xl shadow-lg transition-all duration-200 active:scale-95 hover:opacity-90 hover:scale-105 hover:shadow-xl"
+              onClick={() => setCartOpen(true)}
+              className="relative w-10 h-10 flex items-center justify-center rounded-full border border-white/20 hover:border-white/40 transition-all"
             >
-              Start Order
-            </button>
-            <button
-              onClick={() => scrollTo("menu")}
-              className="bg-white/10 hover:bg-white/25 hover:scale-105 text-white font-bold px-8 py-4 rounded-2xl backdrop-blur-sm border border-white/30 transition-all duration-200 active:scale-95"
-            >
-              View Menu
+              {totalItems > 0 && (
+                <span
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black text-white"
+                  style={{ backgroundColor: primary }}
+                >
+                  {totalItems}
+                </span>
+              )}
+              <svg className="w-5 h-5 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              </svg>
             </button>
           </div>
+        </div>
+
+        {/* Hero body */}
+        <div className="flex-1 relative flex flex-col items-center justify-center">
+
+          {/* Category label */}
+          <p className="text-white/40 text-[10px] md:text-xs font-black uppercase tracking-[0.5em] mb-4 z-10 relative">
+            {restaurant.todayHoursLabel
+              ? `Today · ${restaurant.todayHoursLabel}`
+              : restaurant.isOpen ? "Open Now · Order Online" : "Browse Menu"}
+          </p>
+
+          {/* Huge restaurant name — behind the image */}
+          <div className="absolute inset-0 flex items-center justify-center px-4 overflow-hidden pointer-events-none select-none">
+            <h1
+              className="font-black uppercase text-center leading-none"
+              style={{
+                fontSize: "clamp(3.5rem, 16vw, 14rem)",
+                color: primary,
+                lineHeight: 0.85,
+                letterSpacing: "-0.02em",
+              }}
+            >
+              {restaurant.name}
+            </h1>
+          </div>
+
+          {/* Circular food image — overlaid on top of name */}
+          <div className="relative z-10 w-64 h-64 sm:w-80 sm:h-80 md:w-[420px] md:h-[420px] rounded-full overflow-hidden shadow-[0_20px_80px_rgba(0,0,0,0.9)] border border-white/5 my-8">
+            <img
+              src={
+                restaurant.coverImage && restaurant.coverImage.startsWith("http")
+                  ? restaurant.coverImage
+                  : "https://images.unsplash.com/photo-1544025162-d76694265947?w=1600&auto=format"
+              }
+              alt={restaurant.name}
+              className="w-full h-full object-cover"
+            />
+          </div>
+
+          {/* Left circle CTA — desktop */}
+          <button
+            onClick={() => scrollTo("menu")}
+            className="absolute left-8 md:left-20 top-1/2 -translate-y-1/2 z-20 hidden md:flex items-center justify-center w-28 h-28 rounded-full border-2 border-white/20 hover:border-white/50 transition-all hover:scale-105 group"
+          >
+            <span className="text-white/70 group-hover:text-white text-[11px] font-black uppercase tracking-widest text-center leading-tight transition-colors">
+              Order<br />Now
+            </span>
+          </button>
+
+          {/* Right circle CTA — desktop */}
+          <button
+            onClick={() => scrollTo("menu")}
+            className="absolute right-8 md:right-20 top-1/2 -translate-y-1/2 z-20 hidden md:flex items-center justify-center w-28 h-28 rounded-full border-2 transition-all hover:scale-105 group"
+            style={{ borderColor: primary + "60" }}
+          >
+            <span
+              className="text-[11px] font-black uppercase tracking-widest text-center leading-tight transition-colors group-hover:opacity-100 opacity-70"
+              style={{ color: primary }}
+            >
+              View<br />Menu
+            </span>
+          </button>
+        </div>
+
+        {/* Mobile CTAs */}
+        <div className="flex gap-3 justify-center px-6 pb-6 md:hidden relative z-20">
+          <button
+            onClick={() => scrollTo("menu")}
+            style={{ backgroundColor: primary }}
+            className="flex-1 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-widest active:scale-95 transition-transform"
+          >
+            Order Now
+          </button>
+          <button
+            onClick={() => scrollTo("menu")}
+            className="flex-1 border border-white/20 text-white/80 font-black py-4 rounded-2xl text-xs uppercase tracking-widest active:scale-95 transition-transform"
+          >
+            View Menu
+          </button>
+        </div>
+
+        {/* Stats strip */}
+        <div className="flex justify-center gap-6 pb-6 relative z-10 flex-wrap px-4">
+          {rating && <span className="text-white/40 text-xs font-bold">⭐ {rating}</span>}
+          <span className="text-white/40 text-xs font-bold">⏱ {deliveryTime}</span>
+          {restaurant.deliveryEnabled && (
+            <span className="text-white/40 text-xs font-bold">
+              🚚 {restaurant.deliveryFee > 0 ? fmt(restaurant.deliveryFee) : "Free delivery"}
+            </span>
+          )}
         </div>
       </section>
 
