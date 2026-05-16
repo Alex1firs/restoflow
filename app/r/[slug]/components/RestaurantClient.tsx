@@ -426,6 +426,20 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
 
       {/* ── HERO ──────────────────────────────────────────────────────────────── */}
       <section className="relative min-h-[92vh] flex flex-col bg-[#0f0f0f] overflow-hidden">
+        {restaurant.coverImage && (
+          <div 
+            className="absolute inset-0 z-0 pointer-events-none"
+            style={{ transform: `translateY(${scrollY * 0.4}px)` }}
+          >
+            <img 
+              src={restaurant.coverImage} 
+              alt="" 
+              className="w-full h-full object-cover opacity-60"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-[#0f0f0f]" />
+            <div className="absolute inset-0 bg-black/20" />
+          </div>
+        )}
 
         {/* Top nav bar */}
         <div className="flex items-center justify-between px-6 py-5 z-20 relative">
