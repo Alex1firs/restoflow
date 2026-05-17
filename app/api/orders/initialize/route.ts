@@ -48,6 +48,25 @@ export async function POST(req: NextRequest) {
 
     const rData = restaurantDoc.data()!;
 
+    // Subscription guard — inline to reuse the already-fetched restaurant doc
+    const GRACE_DAYS = 3;
+    const subEndRaw = rData.subscriptionEndDate as { toDate?: () => Date; seconds?: number } | undefined;
+    if (subEndRaw) {
+      const subEnd = subEndRaw.toDate ? subEndRaw.toDate() : new Date((subEndRaw.seconds ?? 0) * 1000);
+      const graceEndsAt = new Date(subEnd.getTime() + GRACE_DAYS * 86_400_000);
+      if (graceEndsAt < new Date()) {
+        return NextResponse.json(
+          { error: "This restaurant is not currently accepting online orders." },
+          { status: 503 }
+        );
+      }
+    } else if (rData.subscriptionStatus === "expired") {
+      return NextResponse.json(
+        { error: "This restaurant is not currently accepting online orders." },
+        { status: 503 }
+      );
+    }
+
     if (!checkIsOpen(rData.openingHours as Parameters<typeof checkIsOpen>[0])) {
       return NextResponse.json({ error: "The restaurant is currently closed." }, { status: 422 });
     }

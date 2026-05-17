@@ -54,6 +54,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Restaurant is not currently accepting orders." }, { status: 403 });
     }
 
+    // Subscription guard — inline to reuse the already-fetched restaurant doc
+    const GRACE_DAYS = 3;
+    const subEndRaw = rData.subscriptionEndDate as { toDate?: () => Date; seconds?: number } | undefined;
+    if (subEndRaw) {
+      const subEnd = subEndRaw.toDate ? subEndRaw.toDate() : new Date((subEndRaw.seconds ?? 0) * 1000);
+      const graceEndsAt = new Date(subEnd.getTime() + GRACE_DAYS * 86_400_000);
+      if (graceEndsAt < new Date()) {
+        return NextResponse.json(
+          { error: "This restaurant is not currently accepting online orders." },
+          { status: 503 }
+        );
+      }
+    } else if (rData.subscriptionStatus === "expired") {
+      return NextResponse.json(
+        { error: "This restaurant is not currently accepting online orders." },
+        { status: 503 }
+      );
+    }
+
     const isScheduled = orderType === "scheduled";
 
     // Check opening hours
