@@ -15,6 +15,8 @@ type Summary = {
   unpaidTotal: number;
   onlineOrdersCount: number;
   counterOrdersCount: number;
+  avgPrepMinutes: number | null;
+  avgReadyMinutes: number | null;
 };
 
 type Order = {
@@ -195,6 +197,26 @@ export default function ReportsClient({ slug }: { slug: string }) {
               </div>
             ))}
           </div>
+
+          {/* Kitchen performance */}
+          {(summary.avgPrepMinutes !== null || summary.avgReadyMinutes !== null) && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {summary.avgPrepMinutes !== null && (
+                <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Avg. Accept Time</p>
+                  <p className="text-xl font-black text-blue-600">{summary.avgPrepMinutes}m</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">received → preparing</p>
+                </div>
+              )}
+              {summary.avgReadyMinutes !== null && (
+                <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Avg. Prep Time</p>
+                  <p className="text-xl font-black text-green-600">{summary.avgReadyMinutes}m</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">received → ready</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Best sellers */}
           {bestSellers.length > 0 && (

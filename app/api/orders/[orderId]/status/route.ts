@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { getAdminDb } from "@/lib/firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 import { sendCustomerNotification, type CustomerEventType } from "@/lib/customer-notifications";
 
 type ValidStatus = "preparing" | "ready" | "completed" | "rejected";
@@ -61,7 +62,19 @@ export async function PATCH(
       return NextResponse.json({ success: true });
     }
 
-    await orderRef.update({ status });
+    // Timestamp each stage for future kitchen performance metrics
+    const timestampField: Record<string, string> = {
+      preparing: "preparingAt",
+      ready: "readyAt",
+      completed: "completedAt",
+      rejected: "rejectedAt",
+    };
+    const extraFields: Record<string, unknown> = { status };
+    if (timestampField[status as ValidStatus]) {
+      extraFields[timestampField[status as ValidStatus]] = FieldValue.serverTimestamp();
+    }
+
+    await orderRef.update(extraFields);
 
     // Fire customer notification (non-blocking)
     const restaurantSnap = await db.collection("restaurants").doc(order.restaurantId as string).get();

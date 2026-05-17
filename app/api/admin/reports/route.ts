@@ -110,6 +110,13 @@ export async function GET(req: NextRequest) {
   const counterOrdersCount = orders.filter((o) => o.orderSource === "counter").length;
 
   const itemCounts: Record<string, { name: string; count: number; revenue: number }> = {};
+
+  // Kitchen performance: average prep time (createdAt → preparingAt → readyAt)
+  let totalPrepMs = 0;
+  let prepSampleCount = 0;
+  let totalReadyMs = 0;
+  let readySampleCount = 0;
+
   for (const order of snap.docs) {
     const d = order.data();
     if (Array.isArray(d.items)) {
@@ -119,9 +126,27 @@ export async function GET(req: NextRequest) {
         itemCounts[item.name].revenue += item.price * item.quantity;
       }
     }
+    // Avg time from received → preparing
+    if (d.createdAt && d.preparingAt) {
+      const ms = (d.preparingAt.toMillis() - d.createdAt.toMillis());
+      if (ms > 0) { totalPrepMs += ms; prepSampleCount++; }
+    }
+    // Avg time from received → ready
+    if (d.createdAt && d.readyAt) {
+      const ms = (d.readyAt.toMillis() - d.createdAt.toMillis());
+      if (ms > 0) { totalReadyMs += ms; readySampleCount++; }
+    }
   }
 
   const bestSellers = Object.values(itemCounts).sort((a, b) => b.count - a.count).slice(0, 10);
+
+  // Average prep time in minutes (null if no data)
+  const avgPrepMinutes = prepSampleCount > 0
+    ? Math.round(totalPrepMs / prepSampleCount / 60000)
+    : null;
+  const avgReadyMinutes = readySampleCount > 0
+    ? Math.round(totalReadyMs / readySampleCount / 60000)
+    : null;
 
   return NextResponse.json({
     summary: {
@@ -137,6 +162,8 @@ export async function GET(req: NextRequest) {
       unpaidTotal,
       onlineOrdersCount,
       counterOrdersCount,
+      avgPrepMinutes,
+      avgReadyMinutes,
     },
     orders: orders.map(({ createdAt: _, ...rest }) => rest),
     bestSellers,
