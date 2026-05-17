@@ -28,14 +28,17 @@ interface RestaurantData extends DocumentData {
   status?: string;
 }
 
+const GRACE_DAYS = 3;
+
 function isExpired(restaurant: RestaurantData): boolean {
-  if (restaurant.subscriptionStatus === "expired") return true;
   if (restaurant.subscriptionEndDate) {
     const raw = restaurant.subscriptionEndDate;
     const end = raw.toDate ? raw.toDate() : new Date((raw.seconds ?? 0) * 1000);
-    return end < new Date();
+    const graceEndsAt = new Date(end.getTime() + GRACE_DAYS * 86_400_000);
+    return graceEndsAt < new Date();
   }
-  return false;
+  // Fall back to stored status only if no end date exists
+  return restaurant.subscriptionStatus === "expired";
 }
 
 interface MenuItemData extends DocumentData {

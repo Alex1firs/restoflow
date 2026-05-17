@@ -51,11 +51,16 @@ export async function processSuccessfulPayment(
   if (!existing.empty) return false;
 
   const now = new Date();
-  const endDate = new Date(now);
-  endDate.setDate(endDate.getDate() + 30);
+  const subscriptionEndsAt = new Date(now);
+  subscriptionEndsAt.setDate(subscriptionEndsAt.getDate() + 30);
 
   const paymentRef = db.collection("payments").doc();
   const restaurantRef = db.collection("restaurants").doc(restaurantId);
+
+  // Preserve subscriptionStartedAt if this is a renewal (not the first payment)
+  const restaurantSnap = await restaurantRef.get();
+  const existingData = restaurantSnap.exists ? restaurantSnap.data()! : {};
+  const subscriptionStartedAt = existingData.subscriptionStartedAt ?? now;
 
   const batch = db.batch();
 
@@ -73,8 +78,12 @@ export async function processSuccessfulPayment(
 
   batch.update(restaurantRef, {
     subscriptionStatus: "active",
-    subscriptionStartDate: now,
-    subscriptionEndDate: endDate,
+    subscriptionStartDate: now,          // backward compat
+    subscriptionEndDate: subscriptionEndsAt, // backward compat + used by getSubscriptionInfo
+    subscriptionStartedAt,               // first activation date (preserved on renewal)
+    subscriptionEndsAt,                  // alias matching new naming convention
+    lastPaymentAt: now,
+    nextBillingAt: subscriptionEndsAt,
     planId,
     updatedAt: FieldValue.serverTimestamp(),
   });

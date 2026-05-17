@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from "@/lib/auth-server";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { sendCustomerNotification, type CustomerEventType } from "@/lib/customer-notifications";
+import { checkSubscriptionAccess } from "@/lib/subscription-guard";
 
 type ValidStatus = "preparing" | "ready" | "completed" | "rejected";
 
@@ -28,6 +29,9 @@ export async function PATCH(
   }
 
   const { orderId } = await params;
+
+  const subscriptionBlock = await checkSubscriptionAccess(user.restaurantSlug);
+  if (subscriptionBlock) return subscriptionBlock;
 
   let body: unknown;
   try {

@@ -82,7 +82,7 @@ export async function processOnboarding(
   const plan = getPlan(planId);
   const now = new Date();
   const trialEnd = new Date(now);
-  trialEnd.setDate(trialEnd.getDate() + 14);
+  trialEnd.setDate(trialEnd.getDate() + 7);
 
   // Create Firebase Auth user
   let uid: string;
@@ -109,7 +109,9 @@ export async function processOnboarding(
     ownerUid: uid,
     subscriptionStatus: "trialing",
     subscriptionStartDate: now,
-    subscriptionEndDate: trialEnd,
+    subscriptionEndDate: trialEnd,   // used by getSubscriptionInfo
+    trialStartedAt: now,
+    trialEndsAt: trialEnd,
     coverImage: "",
     description: "",
     createdAt: FieldValue.serverTimestamp(),

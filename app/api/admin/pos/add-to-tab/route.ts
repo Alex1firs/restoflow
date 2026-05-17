@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { checkSubscriptionAccess } from "@/lib/subscription-guard";
 
 export async function POST(request: NextRequest) {
   let user: Awaited<ReturnType<typeof getAuthenticatedUser>>;
@@ -10,6 +11,9 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const subscriptionBlock = await checkSubscriptionAccess(user.restaurantSlug);
+  if (subscriptionBlock) return subscriptionBlock;
 
   let body: unknown;
   try {

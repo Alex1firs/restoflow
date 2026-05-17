@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { checkSubscriptionAccess } from "@/lib/subscription-guard";
 
 const VALID_PAYMENT_METHODS = ["cash", "bank_transfer", "card", "unpaid"] as const;
 const VALID_PAYMENT_STATUSES = ["paid", "unpaid", "part_paid", "cancelled"] as const;
@@ -18,6 +19,9 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const subscriptionBlock = await checkSubscriptionAccess(user.restaurantSlug);
+  if (subscriptionBlock) return subscriptionBlock;
 
   let body: unknown;
   try {

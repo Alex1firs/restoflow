@@ -51,7 +51,14 @@ export default function BillingSection({
     }
   }
 
-  const isExpired = subscriptionStatus === "expired";
+  const badgeConfig = {
+    expired: { bg: "bg-red-100", text: "text-red-700", label: "Expired" },
+    grace_period: { bg: "bg-orange-100", text: "text-orange-700", label: "Grace Period" },
+    trialing: { bg: "bg-amber-100", text: "text-amber-700", label: "Free Trial" },
+    active: { bg: "bg-green-100", text: "text-green-700", label: "Active" },
+  }[subscriptionStatus];
+
+  const isExpiredOrGrace = subscriptionStatus === "expired" || subscriptionStatus === "grace_period";
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-6">
@@ -67,15 +74,9 @@ export default function BillingSection({
           </p>
         </div>
         <span
-          className={`text-[10px] font-black uppercase px-2 py-1 rounded ${
-            isExpired
-              ? "bg-red-100 text-red-700"
-              : subscriptionStatus === "trialing"
-              ? "bg-amber-100 text-amber-700"
-              : "bg-green-100 text-green-700"
-          }`}
+          className={`text-[10px] font-black uppercase px-2 py-1 rounded ${badgeConfig.bg} ${badgeConfig.text}`}
         >
-          {subscriptionStatus}
+          {badgeConfig.label}
         </span>
       </div>
 
@@ -88,7 +89,13 @@ export default function BillingSection({
         disabled={loading}
         className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-black text-sm py-3 rounded-xl transition"
       >
-        {loading ? "Redirecting…" : isExpired ? "Renew Subscription" : "Extend Subscription"}
+        {loading
+          ? "Redirecting…"
+          : isExpiredOrGrace
+          ? "Renew Subscription"
+          : subscriptionStatus === "trialing"
+          ? "Subscribe Now"
+          : "Extend Subscription"}
       </button>
     </div>
   );
