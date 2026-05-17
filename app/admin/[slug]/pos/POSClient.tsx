@@ -58,8 +58,21 @@ type TodayOrder = {
   tableLabel?: string;
   staffName?: string;
   deliveryType?: string;
+  orderType?: string;
+  parentTabId?: string;
+  itemBatches?: { batchIndex: number; addedAt: string; staffId: string; staffName: string; items: { id: string; name: string; price: number; quantity: number }[]; addOnTotal: number }[];
   status: string;
   createdAt: Timestamp;
+};
+
+type AddOnReceipt = {
+  tabId: string;
+  kitchenTicketId: string;
+  tableLabel: string;
+  addedItems: { id: string; name: string; price: number; quantity: number }[];
+  addOnTotal: number;
+  newTotal: number;
+  batchIndex: number;
 };
 
 type SettlementResult = {
@@ -256,6 +269,74 @@ function openReprintWindow(
   }
 }
 
+// ── Add-on receipt popup ──────────────────────────────────────────────────────
+
+function openAddOnReprintWindow(receipt: AddOnReceipt, restaurantName: string, staffName: string) {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-NG", { weekday: "short", year: "numeric", month: "short", day: "numeric" });
+  const timeStr = now.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" });
+
+  const itemsHtml = receipt.addedItems
+    .map((i) => `<div class="row"><span class="qty">${i.quantity}×</span><span class="name">${i.name}</span><span class="price">₦${(i.price * i.quantity).toLocaleString("en-NG")}</span></div>`)
+    .join("");
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Add-On · ${receipt.tableLabel} · #${receipt.kitchenTicketId.slice(-8).toUpperCase()}</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,system-ui,sans-serif;font-size:13px;max-width:300px;margin:0 auto;padding:20px 10px}
+    .center{text-align:center}
+    .lbl{font-size:9px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#999;margin-bottom:4px}
+    h1{font-size:18px;font-weight:900;margin-bottom:4px}
+    .badge{display:inline-block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;padding:3px 10px;border-radius:20px;margin-bottom:4px;background:#e0f2f1;color:#00796b}
+    .addon-badge{display:inline-block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;padding:3px 10px;border-radius:20px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
+    .table-lbl{font-size:18px;font-weight:900;color:#00796b;margin:4px 0}
+    .meta{font-size:11px;color:#777}
+    .div{border-top:1px dashed #ddd;margin:10px 0}
+    .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:4px 0}
+    .qty{font-weight:900;color:#777;flex-shrink:0}
+    .name{font-weight:600;flex:1}
+    .price{font-weight:700;flex-shrink:0}
+    .kv{display:flex;justify-content:space-between;font-size:12px;margin:3px 0}
+    .kl{color:#777;font-weight:600}
+    .kv-v{font-weight:700}
+    .total{display:flex;justify-content:space-between;font-size:14px;font-weight:900;margin-top:4px}
+    .running{display:flex;justify-content:space-between;font-size:12px;margin-top:6px;color:#555}
+    .footer{text-align:center;color:#bbb;font-size:10px;margin-top:16px}
+    @media print{body{margin:0;padding:8px}}
+  </style>
+</head>
+<body>
+  <div class="center">
+    <div class="lbl">Restaflow POS · Add-On Receipt</div>
+    <h1>${restaurantName}</h1>
+    <div class="badge">Dine-In</div><br/>
+    <div class="addon-badge">Add-On Order ${receipt.batchIndex > 0 ? `#${receipt.batchIndex}` : ""}</div>
+    <div class="table-lbl">${receipt.tableLabel}</div>
+    <div class="meta">${dateStr} · ${timeStr}</div>
+  </div>
+  <div class="div"></div>
+  <div class="kv"><span class="kl">Ticket #</span><span class="kv-v" style="font-family:monospace">${receipt.kitchenTicketId.slice(-8).toUpperCase()}</span></div>
+  <div class="kv"><span class="kl">Tab #</span><span class="kv-v" style="font-family:monospace">${receipt.tabId.slice(-8).toUpperCase()}</span></div>
+  <div class="kv"><span class="kl">Added by</span><span class="kv-v">${staffName}</span></div>
+  <div class="div"></div>
+  <div class="kl" style="margin-bottom:6px">Items Added</div>
+  ${itemsHtml}
+  <div class="div"></div>
+  <div class="total"><span>Added This Round</span><span>₦${receipt.addOnTotal.toLocaleString("en-NG")}</span></div>
+  <div class="running"><span>Running Tab Total</span><span>₦${receipt.newTotal.toLocaleString("en-NG")}</span></div>
+  <div class="footer"><div>Items sent to kitchen</div><div>Powered by Restaflow</div></div>
+  <script>window.onload=function(){setTimeout(function(){window.print();},80)};</script>
+</body>
+</html>`;
+
+  const w = window.open("", "_blank", "width=380,height=640,menubar=no,toolbar=no,scrollbars=yes");
+  if (w) { w.document.write(html); w.document.close(); }
+}
+
 // ── Settled-bill receipt popup ────────────────────────────────────────────────
 
 function openSettledBillWindow(order: TodayOrder, result: SettlementResult, restaurantName: string) {
@@ -362,6 +443,12 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
   const [settleBillId, setSettleBillId] = useState<string | null>(null);
   const [settlementResult, setSettlementResult] = useState<SettlementResult | null>(null);
 
+  // Tab continuation state
+  const [tabMode, setTabMode] = useState<"new" | "continue">("new");
+  const [activeTab, setActiveTab] = useState<TodayOrder | null>(null);
+  const [openTabPromptDismissed, setOpenTabPromptDismissed] = useState(false);
+  const [addOnReceipt, setAddOnReceipt] = useState<AddOnReceipt | null>(null);
+
   const prevReadyIds = useRef<Set<string>>(new Set());
   const firstReadyLoad = useRef(true);
   const mutedRef = useRef(alertMuted);
@@ -374,6 +461,9 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
     setServiceMode(mode);
     setTableLabel("");
     setTableLabelInput("");
+    setTabMode("new");
+    setActiveTab(null);
+    setOpenTabPromptDismissed(false);
     if (mode === "dine_in") {
       setPaymentStatus("unpaid");
     } else {
@@ -406,12 +496,13 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
         );
         setReadyOrders(ready);
 
-        // Open dine-in bills: unpaid, not cancelled
+        // Open dine-in bills: unpaid, not cancelled, not add-on kitchen tickets
         const bills = data.filter(
           (o) =>
             (o.serviceMode === "dine_in" || o.deliveryType === "dine_in") &&
             (o.paymentStatus === "unpaid" || o.paymentStatus === "part_paid") &&
-            o.status !== "rejected"
+            o.status !== "rejected" &&
+            o.orderType !== "addon"
         );
         setOpenBills(bills);
 
@@ -492,6 +583,13 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
     [cart]
   );
 
+  // Detect an existing open tab for the currently selected dine-in table
+  const openTabForTable = useMemo(() => {
+    const resolved = (tableLabelInput.trim() || tableLabel).trim();
+    if (!resolved || serviceMode !== "dine_in") return null;
+    return openBills.find((o) => (o.tableLabel ?? "").trim() === resolved) ?? null;
+  }, [tableLabelInput, tableLabel, serviceMode, openBills]);
+
   const addToCart = useCallback((item: MenuItem) => {
     setCart((prev) => {
       const existing = prev.find((c) => c.id === item.id);
@@ -516,6 +614,41 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
     setCart((prev) => prev.filter((c) => c.id !== id));
   }, []);
 
+  const handleAddToTab = async () => {
+    if (!activeTab || cart.length === 0 || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/pos/add-to-tab", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tabId: activeTab.id,
+          items: cart.map((c) => ({ id: c.id, quantity: c.quantity })),
+          staffName,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Failed to add items to tab");
+        return;
+      }
+      setAddOnReceipt({
+        tabId: data.tabId,
+        kitchenTicketId: data.kitchenTicketId,
+        tableLabel: activeTab.tableLabel ?? "",
+        addedItems: data.addedItems,
+        addOnTotal: data.addOnTotal,
+        newTotal: data.newTotal,
+        batchIndex: data.batchIndex,
+      });
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const resetPOS = () => {
     setCart([]);
     setServiceMode("counter");
@@ -529,10 +662,19 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
     setCompletedOrder(null);
     setSearch("");
     setActiveCategory("All");
+    setTabMode("new");
+    setActiveTab(null);
+    setOpenTabPromptDismissed(false);
+    setAddOnReceipt(null);
   };
 
   const handleSubmit = async () => {
     if (cart.length === 0 || submitting) return;
+
+    // Route to add-to-tab when continuing an existing open tab
+    if (tabMode === "continue" && activeTab) {
+      return handleAddToTab();
+    }
 
     // Resolve final table label: free-text input overrides quick-tap selection
     const finalTableLabel = tableLabelInput.trim() || tableLabel;
@@ -583,6 +725,37 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
       setSubmitting(false);
     }
   };
+
+  // ── Add-on receipt view ───────────────────────────────────────────────────
+
+  if (addOnReceipt) {
+    return (
+      <AddOnReceiptView
+        receipt={addOnReceipt}
+        restaurantName={restaurant.name}
+        staffName={staffName}
+        onAddMore={() => {
+          setCart([]);
+          setAddOnReceipt(null);
+          // Update activeTab total optimistically so the running total stays accurate
+          if (activeTab) {
+            setActiveTab((prev) =>
+              prev ? { ...prev, total: addOnReceipt.newTotal, itemsTotal: addOnReceipt.newTotal } : prev
+            );
+          }
+        }}
+        onViewBills={() => {
+          setAddOnReceipt(null);
+          setRightTab("bills");
+          setTabMode("new");
+          setActiveTab(null);
+          setCart([]);
+        }}
+        onPrint={() => openAddOnReprintWindow(addOnReceipt, restaurant.name, staffName)}
+        onNewOrder={resetPOS}
+      />
+    );
+  }
 
   // ── Receipt view ──────────────────────────────────────────────────────────
 
@@ -852,6 +1025,11 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
                         onClick={() => {
                           setTableLabel(label);
                           setTableLabelInput("");
+                          setOpenTabPromptDismissed(false);
+                          if (tabMode === "continue" && activeTab?.tableLabel !== label) {
+                            setTabMode("new");
+                            setActiveTab(null);
+                          }
                         }}
                         className={`w-9 h-9 rounded-xl text-xs font-black transition-colors ${
                           isActive
@@ -869,7 +1047,11 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
                   type="text"
                   placeholder="Custom: VIP 1, Outdoor A, Bar…"
                   value={tableLabelInput}
-                  onChange={(e) => setTableLabelInput(e.target.value)}
+                  onChange={(e) => {
+                    setTableLabelInput(e.target.value);
+                    setOpenTabPromptDismissed(false);
+                    if (tabMode === "continue") { setTabMode("new"); setActiveTab(null); }
+                  }}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-teal-500 bg-gray-50"
                 />
               </div>
@@ -897,12 +1079,68 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
             )}
           </div>
 
+          {/* ── Open tab prompt ─────────────────────────────────────── */}
+          {serviceMode === "dine_in" && resolvedTable && tabMode !== "continue" && openTabForTable && !openTabPromptDismissed && (
+            <div className="mx-3 mt-3 rounded-2xl border-2 border-teal-300 bg-teal-50 overflow-hidden flex-shrink-0">
+              <div className="bg-teal-600 px-3 py-1.5 flex items-center gap-1.5">
+                <span className="w-2 h-2 bg-white rounded-full animate-pulse flex-shrink-0" />
+                <span className="text-white font-black text-[11px] uppercase tracking-widest">
+                  Open Tab Found
+                </span>
+              </div>
+              <div className="px-3 py-2.5">
+                <p className="font-black text-teal-800 text-sm">{resolvedTable}</p>
+                <p className="text-teal-700 text-xs font-bold mt-0.5">
+                  {fmt(openTabForTable.total)} · {openTabForTable.items.length} item{openTabForTable.items.length !== 1 ? "s" : ""}
+                  {" · "}{openTabForTable.items.slice(0, 2).map(i => i.name).join(", ")}{openTabForTable.items.length > 2 ? "…" : ""}
+                </p>
+                <div className="flex gap-2 mt-2.5">
+                  <button
+                    onClick={() => {
+                      setActiveTab(openTabForTable);
+                      setTabMode("continue");
+                    }}
+                    className="flex-[2] bg-teal-600 hover:bg-teal-500 text-white font-black text-xs py-2 rounded-xl transition-colors"
+                  >
+                    Continue Tab
+                  </button>
+                  <button
+                    onClick={() => setOpenTabPromptDismissed(true)}
+                    className="flex-1 bg-white hover:bg-gray-50 text-gray-600 font-black text-xs py-2 rounded-xl border border-gray-200 transition-colors"
+                  >
+                    New Tab
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Active tab banner ────────────────────────────────────── */}
+          {tabMode === "continue" && activeTab && (
+            <div className="mx-3 mt-3 rounded-xl bg-teal-700 px-3 py-2 flex items-center justify-between flex-shrink-0">
+              <div>
+                <p className="text-white font-black text-sm leading-tight">{activeTab.tableLabel}</p>
+                <p className="text-teal-200 text-[11px] font-bold">
+                  Running tab · {fmt(activeTab.total)} · Adding on
+                </p>
+              </div>
+              <button
+                onClick={() => { setTabMode("new"); setActiveTab(null); setOpenTabPromptDismissed(true); }}
+                className="text-teal-300 hover:text-white text-xs font-bold underline transition-colors flex-shrink-0 ml-2"
+              >
+                New Tab
+              </button>
+            </div>
+          )}
+
           {/* Cart items */}
           <div className="flex-1 overflow-y-auto divide-y divide-gray-50 min-h-0">
             {cart.length === 0 ? (
               <div className="py-12 text-center text-gray-400 text-sm px-6">
                 <p className="text-2xl mb-2">🛒</p>
-                Tap items from the menu to add them here.
+                {tabMode === "continue" && activeTab
+                  ? `Add new items to ${activeTab.tableLabel}`
+                  : "Tap items from the menu to add them here."}
               </div>
             ) : (
               cart.map((item) => (
@@ -947,87 +1185,97 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
 
           {/* Payment panel */}
           <div className="border-t border-gray-100 p-4 space-y-3 flex-shrink-0">
-            <div className="flex justify-between items-center pb-1">
-              <span className="text-sm font-bold text-gray-500">Total</span>
-              <span className="text-2xl font-black text-gray-900 tabular-nums">
-                {fmt(cartTotal)}
-              </span>
-            </div>
-
-            {/* Customer name — label adapts to service mode */}
-            <input
-              type="text"
-              placeholder={
-                serviceMode === "dine_in"
-                  ? "Customer name (optional)"
-                  : "Customer name (optional)"
-              }
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-orange-500 bg-gray-50 transition-colors"
-            />
-
-            {/* Payment method */}
-            <div>
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
-                Payment Method
-              </p>
-              <div className="grid grid-cols-2 gap-1.5">
-                {(
-                  ["cash", "bank_transfer", "card", "unpaid"] as PaymentMethod[]
-                ).map((pm) => (
-                  <button
-                    key={pm}
-                    onClick={() => setPaymentMethod(pm)}
-                    className={`py-2 px-2 rounded-xl text-xs font-bold transition-colors text-center leading-tight ${
-                      paymentMethod === pm
-                        ? "bg-gray-900 text-white"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
-                  >
-                    {PAYMENT_METHOD_LABELS[pm]}
-                  </button>
-                ))}
+            {/* Total / running total */}
+            <div className="space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-bold text-gray-500">
+                  {tabMode === "continue" ? "Adding" : "Total"}
+                </span>
+                <span className="text-2xl font-black text-gray-900 tabular-nums">
+                  {fmt(cartTotal)}
+                </span>
               </div>
+              {tabMode === "continue" && activeTab && cartTotal > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-teal-700">Running Total</span>
+                  <span className="text-base font-black text-teal-700 tabular-nums">
+                    {fmt(activeTab.total + cartTotal)}
+                  </span>
+                </div>
+              )}
             </div>
 
-            {/* Payment status */}
-            <div>
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
-                Payment Status
-              </p>
-              <div className="grid grid-cols-4 gap-1">
-                {(
-                  [
-                    "paid",
-                    "unpaid",
-                    "part_paid",
-                    "cancelled",
-                  ] as PaymentStatus[]
-                ).map((ps) => (
-                  <button
-                    key={ps}
-                    onClick={() => setPaymentStatus(ps)}
-                    className={`py-1.5 rounded-lg text-[10px] font-bold transition-colors text-center ${
-                      paymentStatus === ps
-                        ? ps === "paid"
-                          ? "bg-green-600 text-white"
-                          : ps === "cancelled"
-                          ? "bg-red-600 text-white"
-                          : "bg-yellow-500 text-white"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
-                  >
-                    {PAYMENT_STATUS_LABELS[ps]}
-                  </button>
-                ))}
+            {/* Customer name — hidden in continue mode (tab already has one) */}
+            {tabMode !== "continue" && (
+              <input
+                type="text"
+                placeholder="Customer name (optional)"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-orange-500 bg-gray-50 transition-colors"
+              />
+            )}
+
+            {/* Payment method — hidden in continue mode (payment settled at bill close) */}
+            {tabMode !== "continue" && (
+              <div>
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                  Payment Method
+                </p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {(
+                    ["cash", "bank_transfer", "card", "unpaid"] as PaymentMethod[]
+                  ).map((pm) => (
+                    <button
+                      key={pm}
+                      onClick={() => setPaymentMethod(pm)}
+                      className={`py-2 px-2 rounded-xl text-xs font-bold transition-colors text-center leading-tight ${
+                        paymentMethod === pm
+                          ? "bg-gray-900 text-white"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      {PAYMENT_METHOD_LABELS[pm]}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Payment status — hidden in continue mode */}
+            {tabMode !== "continue" && (
+              <div>
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                  Payment Status
+                </p>
+                <div className="grid grid-cols-4 gap-1">
+                  {(
+                    ["paid", "unpaid", "part_paid", "cancelled"] as PaymentStatus[]
+                  ).map((ps) => (
+                    <button
+                      key={ps}
+                      onClick={() => setPaymentStatus(ps)}
+                      className={`py-1.5 rounded-lg text-[10px] font-bold transition-colors text-center ${
+                        paymentStatus === ps
+                          ? ps === "paid"
+                            ? "bg-green-600 text-white"
+                            : ps === "cancelled"
+                            ? "bg-red-600 text-white"
+                            : "bg-yellow-500 text-white"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      {PAYMENT_STATUS_LABELS[ps]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Note */}
             <input
               type="text"
-              placeholder="Order note (optional)"
+              placeholder={tabMode === "continue" ? "Add-on note (optional)" : "Order note (optional)"}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-orange-500 bg-gray-50 transition-colors"
@@ -1039,20 +1287,24 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
               </div>
             )}
 
-            {/* Confirm button — label adapts */}
+            {/* Confirm / Add-to-tab button */}
             <button
               onClick={handleSubmit}
-              disabled={cart.length === 0 || submitting}
+              disabled={cart.length === 0 || submitting || (serviceMode === "dine_in" && tabMode === "new" && !resolvedTable)}
               className={`w-full disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-3.5 rounded-xl transition-colors text-sm ${
-                serviceMode === "dine_in"
+                tabMode === "continue"
+                  ? "bg-teal-700 hover:bg-teal-600 active:bg-teal-800"
+                  : serviceMode === "dine_in"
                   ? "bg-teal-600 hover:bg-teal-500 active:bg-teal-700"
                   : "bg-orange-600 hover:bg-orange-500 active:bg-orange-700"
               }`}
             >
               {submitting
-                ? "Creating Order…"
+                ? tabMode === "continue" ? "Adding to Tab…" : "Creating Order…"
                 : cart.length === 0
-                ? "Add items to confirm"
+                ? tabMode === "continue" ? "Add items to continue" : "Add items to confirm"
+                : tabMode === "continue" && activeTab
+                ? `Add to ${activeTab.tableLabel ?? "Tab"} · ${fmt(cartTotal)}`
                 : serviceMode === "dine_in"
                 ? resolvedTable
                   ? `Confirm · ${resolvedTable} · ${fmt(cartTotal)}`
@@ -1069,6 +1321,134 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Add-on receipt view ───────────────────────────────────────────────────────
+
+function AddOnReceiptView({
+  receipt,
+  restaurantName,
+  staffName,
+  onAddMore,
+  onViewBills,
+  onPrint,
+  onNewOrder,
+}: {
+  receipt: AddOnReceipt;
+  restaurantName: string;
+  staffName: string;
+  onAddMore: () => void;
+  onViewBills: () => void;
+  onPrint: () => void;
+  onNewOrder: () => void;
+}) {
+  return (
+    <>
+      <style>{`@media print { .pos-no-print { display: none !important; } }`}</style>
+      <div className="max-w-md mx-auto px-4 py-8">
+        <div className="pos-no-print flex items-center justify-between mb-6">
+          <button
+            onClick={onNewOrder}
+            className="flex items-center gap-1.5 text-sm font-bold text-gray-600 hover:text-gray-900 bg-white border border-gray-200 px-4 py-2.5 rounded-xl transition-colors"
+          >
+            ← New Order
+          </button>
+          <button
+            onClick={onPrint}
+            className="flex items-center gap-1.5 text-sm font-bold bg-teal-700 text-white px-4 py-2.5 rounded-xl hover:bg-teal-600 transition-colors"
+          >
+            Print Add-On Receipt
+          </button>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="text-center px-6 pt-8 pb-5 border-b border-dashed border-gray-200">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+              Restaflow POS · Add-On
+            </p>
+            <h1 className="text-xl font-black text-gray-900">{restaurantName}</h1>
+            <div className="mt-2 flex justify-center gap-2">
+              <span className="text-[10px] font-black uppercase px-3 py-1 rounded-full bg-teal-100 text-teal-800">
+                Dine-In
+              </span>
+              <span className="text-[10px] font-black uppercase px-3 py-1 rounded-full bg-green-100 text-green-800">
+                Added to Tab
+              </span>
+            </div>
+            <p className="text-lg font-black text-teal-700 mt-1">{receipt.tableLabel}</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {new Date().toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}
+            </p>
+          </div>
+
+          <div className="px-6 py-4 border-b border-dashed border-gray-200 space-y-1.5 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-500 font-bold">Ticket #</span>
+              <span className="font-mono text-xs font-bold text-gray-900">{receipt.kitchenTicketId.slice(-8).toUpperCase()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500 font-bold">Tab #</span>
+              <span className="font-mono text-xs font-bold text-gray-900">{receipt.tabId.slice(-8).toUpperCase()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500 font-bold">Added by</span>
+              <span className="font-bold text-gray-900">{staffName}</span>
+            </div>
+          </div>
+
+          <div className="px-6 py-4 border-b border-dashed border-gray-200 space-y-2">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Items Added</p>
+            {receipt.addedItems.map((item, i) => (
+              <div key={i} className="flex items-baseline justify-between gap-2">
+                <div className="flex items-baseline gap-1.5 min-w-0">
+                  <span className="text-gray-400 font-bold text-sm flex-shrink-0">{item.quantity}×</span>
+                  <span className="font-bold text-gray-900 text-sm truncate">{item.name}</span>
+                </div>
+                <span className="font-bold text-gray-900 text-sm flex-shrink-0 tabular-nums">
+                  {fmt(item.price * item.quantity)}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="px-6 py-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500 font-bold">Added This Round</span>
+              <span className="font-bold text-gray-900 tabular-nums">{fmt(receipt.addOnTotal)}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="font-black text-teal-700 text-base">Running Tab Total</span>
+              <span className="font-black text-teal-700 text-xl tabular-nums">{fmt(receipt.newTotal)}</span>
+            </div>
+            <p className="text-[10px] text-gray-400 text-center pt-1">
+              Items sent to kitchen · Bill stays open until settled
+            </p>
+          </div>
+        </div>
+
+        <div className="pos-no-print mt-6 grid grid-cols-3 gap-2">
+          <button
+            onClick={onAddMore}
+            className="bg-teal-700 hover:bg-teal-600 text-white font-black py-3 rounded-xl transition-colors text-xs"
+          >
+            Add More
+          </button>
+          <button
+            onClick={onViewBills}
+            className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-black py-3 rounded-xl transition-colors text-xs"
+          >
+            Open Bills
+          </button>
+          <button
+            onClick={onNewOrder}
+            className="bg-gray-900 hover:bg-gray-700 text-white font-black py-3 rounded-xl transition-colors text-xs"
+          >
+            New Order
+          </button>
+        </div>
+      </div>
+    </>
   );
 }
 

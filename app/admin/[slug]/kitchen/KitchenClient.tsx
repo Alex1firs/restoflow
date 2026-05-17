@@ -35,6 +35,7 @@ type KitchenOrder = {
   orderSource?: string;
   deliveryType?: string;
   orderType?: string;
+  parentTabId?: string;
   scheduledFor?: string | Timestamp;
   serviceMode?: string;
   tableLabel?: string;
@@ -418,6 +419,7 @@ function KitchenCard({
 }) {
   const isCounter = order.orderSource === "counter";
   const isDineIn = order.serviceMode === "dine_in" || order.deliveryType === "dine_in";
+  const isAddon = order.orderType === "addon";
   const shortId = order.id.slice(-6).toUpperCase();
   const isScheduled = order.orderType === "scheduled" || order.status === "scheduled";
 
@@ -466,8 +468,14 @@ function KitchenCard({
           New Order!
         </div>
       )}
-      {/* Dine-in banner */}
-      {!isNew && isDineIn && (
+      {/* Add-on banner (takes priority over dine-in banner) */}
+      {!isNew && isAddon && (
+        <div className="bg-teal-500 text-white text-[10px] font-black uppercase tracking-widest text-center py-1 animate-pulse">
+          Add-On Order
+        </div>
+      )}
+      {/* Dine-in banner — only for non-add-on dine-in orders */}
+      {!isNew && isDineIn && !isAddon && (
         <div className="bg-teal-700/60 text-teal-200 text-[10px] font-black uppercase tracking-widest text-center py-1">
           Dine-In
         </div>
@@ -483,9 +491,9 @@ function KitchenCard({
         {/* Header: identity + source + elapsed */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            {isDineIn && order.tableLabel ? (
+            {(isDineIn || isAddon) && order.tableLabel ? (
               <>
-                <p className="font-black text-teal-300 text-lg leading-tight truncate">
+                <p className={`font-black text-lg leading-tight truncate ${isAddon ? "text-teal-200" : "text-teal-300"}`}>
                   {order.tableLabel}
                 </p>
                 <p className="font-mono text-white/30 text-[10px] leading-none mt-0.5">
@@ -498,7 +506,11 @@ function KitchenCard({
               </p>
             )}
             <div className="flex items-center gap-1 mt-1 flex-wrap">
-              {isDineIn ? (
+              {isAddon ? (
+                <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full border bg-teal-400/20 text-teal-200 border-teal-400/30">
+                  Add-On
+                </span>
+              ) : isDineIn ? (
                 <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full border bg-teal-500/15 text-teal-300 border-teal-500/25">
                   Dine-In
                 </span>
@@ -533,14 +545,21 @@ function KitchenCard({
           </div>
         </div>
 
-        {/* Customer name — only show for non-dine-in or when not the table label */}
-        {(!isDineIn || order.customerName) && (
+        {/* Customer / context label */}
+        {(!isDineIn || order.customerName) && !isAddon && (
           <div>
             <p className="text-[10px] text-white/25 font-bold uppercase tracking-widest leading-none mb-0.5">
               {isDineIn ? "Guest" : "Customer"}
             </p>
             <p className="text-white font-bold text-sm leading-tight">
               {order.customerName || "Walk-in"}
+            </p>
+          </div>
+        )}
+        {isAddon && (
+          <div className="bg-teal-500/10 border border-teal-500/20 rounded-lg px-2 py-1.5">
+            <p className="text-[10px] font-black text-teal-400 uppercase tracking-widest leading-none">
+              Add-On to existing tab
             </p>
           </div>
         )}
