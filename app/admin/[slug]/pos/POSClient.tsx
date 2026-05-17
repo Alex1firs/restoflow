@@ -43,7 +43,7 @@ type CompletedOrder = {
   createdAt: Date;
 };
 
-// Full order snapshot from Firestore (used for ready-order tracking)
+// Full order snapshot from Firestore (used for ready-order tracking + open bills)
 type TodayOrder = {
   id: string;
   customerName: string;
@@ -56,8 +56,19 @@ type TodayOrder = {
   orderSource: string;
   serviceMode?: string;
   tableLabel?: string;
+  staffName?: string;
+  deliveryType?: string;
   status: string;
   createdAt: Timestamp;
+};
+
+type SettlementResult = {
+  orderId: string;
+  tableLabel: string;
+  total: number;
+  paymentMethod: string;
+  paidAt: Date;
+  staffName: string;
 };
 
 type Props = {
@@ -245,6 +256,79 @@ function openReprintWindow(
   }
 }
 
+// ── Settled-bill receipt popup ────────────────────────────────────────────────
+
+function openSettledBillWindow(order: TodayOrder, result: SettlementResult, restaurantName: string) {
+  const paidAt = result.paidAt;
+  const dateStr = paidAt.toLocaleDateString("en-NG", { weekday: "short", year: "numeric", month: "short", day: "numeric" });
+  const timeStr = paidAt.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" });
+
+  const pmLabels: Record<string, string> = {
+    cash: "Cash", bank_transfer: "Bank Transfer", card: "Card / POS Machine",
+  };
+
+  const itemsHtml = order.items
+    .map((i) => `<div class="row"><span class="qty">${i.quantity}×</span><span class="name">${i.name}</span><span class="price">₦${(i.price * i.quantity).toLocaleString("en-NG")}</span></div>`)
+    .join("");
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Receipt · ${result.tableLabel} · #${order.id.slice(-8).toUpperCase()}</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,system-ui,sans-serif;font-size:13px;max-width:300px;margin:0 auto;padding:20px 10px}
+    .center{text-align:center}
+    .lbl{font-size:9px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#999;margin-bottom:4px}
+    h1{font-size:18px;font-weight:900;margin-bottom:4px}
+    .badge{display:inline-block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;padding:3px 10px;border-radius:20px;margin-bottom:4px;background:#e0f2f1;color:#00796b}
+    .paid-badge{display:inline-block;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:1px;padding:4px 14px;border-radius:20px;background:#dcfce7;color:#15803d;margin-top:6px}
+    .table-lbl{font-size:18px;font-weight:900;color:#00796b;margin:4px 0}
+    .meta{font-size:11px;color:#777}
+    .div{border-top:1px dashed #ddd;margin:10px 0}
+    .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:4px 0}
+    .qty{font-weight:900;color:#777;flex-shrink:0}
+    .name{font-weight:600;flex:1}
+    .price{font-weight:700;flex-shrink:0}
+    .kv{display:flex;justify-content:space-between;font-size:12px;margin:3px 0}
+    .kl{color:#777;font-weight:600}
+    .kv-v{font-weight:700}
+    .total{display:flex;justify-content:space-between;font-size:15px;font-weight:900;margin-top:6px}
+    .footer{text-align:center;color:#bbb;font-size:10px;margin-top:16px}
+    @media print{body{margin:0;padding:8px}}
+  </style>
+</head>
+<body>
+  <div class="center">
+    <div class="lbl">Restaflow POS · Bill Settlement</div>
+    <h1>${restaurantName}</h1>
+    <div class="badge">Dine-In</div>
+    <div class="table-lbl">${result.tableLabel}</div>
+    <div class="paid-badge">✓ PAID</div>
+    <div class="meta" style="margin-top:6px">${dateStr} · ${timeStr}</div>
+  </div>
+  <div class="div"></div>
+  <div class="kv"><span class="kl">Order #</span><span class="kv-v" style="font-family:monospace">${order.id.slice(-8).toUpperCase()}</span></div>
+  ${order.customerName && order.customerName !== order.tableLabel ? `<div class="kv"><span class="kl">Guest</span><span class="kv-v">${order.customerName}</span></div>` : ""}
+  <div class="kv"><span class="kl">Settled by</span><span class="kv-v">${result.staffName}</span></div>
+  <div class="div"></div>
+  ${itemsHtml}
+  <div class="div"></div>
+  <div class="kv"><span class="kl">Subtotal</span><span class="kv-v">₦${(order.itemsTotal ?? order.total).toLocaleString("en-NG")}</span></div>
+  <div class="total"><span>Total</span><span>₦${order.total.toLocaleString("en-NG")}</span></div>
+  <div class="div"></div>
+  <div class="kv"><span class="kl">Payment</span><span class="kv-v">${pmLabels[result.paymentMethod] ?? result.paymentMethod}</span></div>
+  <div class="kv"><span class="kl">Status</span><span class="kv-v" style="color:#15803d;font-weight:900">PAID</span></div>
+  <div class="footer"><div>Thank you for dining with us!</div><div>Powered by Restaflow</div></div>
+  <script>window.onload=function(){setTimeout(function(){window.print();},80)};</script>
+</body>
+</html>`;
+
+  const w = window.open("", "_blank", "width=380,height=720,menubar=no,toolbar=no,scrollbars=yes");
+  if (w) { w.document.write(html); w.document.close(); }
+}
+
 // ── POSClient ─────────────────────────────────────────────────────────────────
 
 export default function POSClient({ restaurant, menuItems, staffName }: Props) {
@@ -271,6 +355,12 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
   });
   const [servingId, setServingId] = useState<string | null>(null);
   const [alertCollapsed, setAlertCollapsed] = useState(false);
+
+  // Open bills state
+  const [openBills, setOpenBills] = useState<TodayOrder[]>([]);
+  const [rightTab, setRightTab] = useState<"order" | "bills">("order");
+  const [settleBillId, setSettleBillId] = useState<string | null>(null);
+  const [settlementResult, setSettlementResult] = useState<SettlementResult | null>(null);
 
   const prevReadyIds = useRef<Set<string>>(new Set());
   const firstReadyLoad = useRef(true);
@@ -315,6 +405,15 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
           (o) => o.orderSource === "counter" && o.status === "ready"
         );
         setReadyOrders(ready);
+
+        // Open dine-in bills: unpaid, not cancelled
+        const bills = data.filter(
+          (o) =>
+            (o.serviceMode === "dine_in" || o.deliveryType === "dine_in") &&
+            (o.paymentStatus === "unpaid" || o.paymentStatus === "part_paid") &&
+            o.status !== "rejected"
+        );
+        setOpenBills(bills);
 
         const currentReadyIds = new Set(ready.map((o) => o.id));
 
@@ -501,13 +600,47 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
   // Resolved table label used in confirm button
   const resolvedTable = tableLabelInput.trim() || tableLabel;
 
+  const settleOrder = openBills.find((o) => o.id === settleBillId) ?? null;
+
   // ── POS main UI ───────────────────────────────────────────────────────────
 
   return (
     <div
-      className="flex flex-col overflow-hidden"
+      className="flex flex-col overflow-hidden relative"
       style={{ height: "calc(100vh - 56px)" }}
     >
+      {/* ── Settle Bill Modal overlay ─────────────────────────────── */}
+      {settleOrder && !settlementResult && (
+        <SettleBillModal
+          order={settleOrder}
+          restaurant={restaurant}
+          staffName={staffName}
+          onClose={() => setSettleBillId(null)}
+          onSettled={(result) => {
+            setSettlementResult(result);
+            // Remove from open bills immediately (optimistic)
+            setOpenBills((prev) => prev.filter((o) => o.id !== result.orderId));
+          }}
+        />
+      )}
+      {settleBillId && settlementResult && (
+        <SettlementSuccessModal
+          order={openBills.find((o) => o.id === settleBillId) ?? settleOrder!}
+          result={settlementResult}
+          restaurantName={restaurant.name}
+          onClose={() => {
+            setSettleBillId(null);
+            setSettlementResult(null);
+          }}
+          onPrint={() =>
+            openSettledBillWindow(
+              openBills.find((o) => o.id === settleBillId) ?? settleOrder!,
+              settlementResult,
+              restaurant.name
+            )
+          }
+        />
+      )}
       {/* ── Ready-order alert banner ──────────────────────────────── */}
       {readyOrders.length > 0 && (
         <ReadyOrdersPanel
@@ -626,7 +759,50 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
         {/* RIGHT: Cart + Payment */}
         <div className="w-full lg:w-[360px] xl:w-[400px] bg-white border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col flex-shrink-0">
 
+          {/* ── Right-panel tab switcher ──────────────────────────── */}
+          <div className="flex border-b border-gray-200 flex-shrink-0">
+            <button
+              onClick={() => setRightTab("order")}
+              className={`flex-1 py-2.5 text-xs font-black transition-colors ${
+                rightTab === "order"
+                  ? "border-b-2 border-orange-600 text-orange-700 bg-orange-50/60"
+                  : "text-gray-500 hover:text-gray-800"
+              }`}
+            >
+              New Order
+            </button>
+            <button
+              onClick={() => setRightTab("bills")}
+              className={`flex-1 py-2.5 text-xs font-black transition-colors relative ${
+                rightTab === "bills"
+                  ? "border-b-2 border-teal-600 text-teal-700 bg-teal-50/60"
+                  : "text-gray-500 hover:text-gray-800"
+              }`}
+            >
+              Open Bills
+              {openBills.length > 0 && (
+                <span className={`ml-1.5 text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                  rightTab === "bills" ? "bg-teal-600 text-white" : "bg-teal-100 text-teal-700"
+                }`}>
+                  {openBills.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* ── Open Bills panel ──────────────────────────────────── */}
+          {rightTab === "bills" && (
+            <OpenBillsPanel
+              bills={openBills}
+              onSettle={(id) => {
+                setSettleBillId(id);
+                setSettlementResult(null);
+              }}
+            />
+          )}
+
           {/* ── Service mode selector ─────────────────────────────── */}
+          {rightTab === "order" && (<>
           <div className="px-4 pt-3 pb-2 border-b border-gray-100 flex-shrink-0">
             <div className="flex rounded-xl overflow-hidden border border-gray-200">
               <button
@@ -888,6 +1064,371 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
               Cashier:{" "}
               <span className="font-bold text-gray-600">{staffName}</span>
             </p>
+          </div>
+          </>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Open Bills Panel ──────────────────────────────────────────────────────────
+
+function OpenBillsPanel({
+  bills,
+  onSettle,
+}: {
+  bills: TodayOrder[];
+  onSettle: (orderId: string) => void;
+}) {
+  if (bills.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-12">
+        <p className="text-3xl mb-3">🍽</p>
+        <p className="text-sm font-bold text-gray-400">No open bills</p>
+        <p className="text-xs text-gray-300 mt-1">
+          Unpaid dine-in orders will appear here.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto divide-y divide-gray-50 min-h-0">
+      {bills.map((bill) => {
+        const shortId = bill.id.slice(-6).toUpperCase();
+        const age = bill.createdAt?.toDate
+          ? (() => {
+              const mins = Math.floor((Date.now() - bill.createdAt.toDate().getTime()) / 60000);
+              if (mins < 1) return "Just now";
+              if (mins < 60) return `${mins}m ago`;
+              const h = Math.floor(mins / 60);
+              const m = mins % 60;
+              return `${h}h${m > 0 ? ` ${m}m` : ""}`;
+            })()
+          : "";
+        const itemSummary = bill.items
+          .slice(0, 3)
+          .map((i) => `${i.quantity}× ${i.name}`)
+          .join(", ") + (bill.items.length > 3 ? ` +${bill.items.length - 3}` : "");
+
+        return (
+          <div key={bill.id} className="px-4 py-3.5 hover:bg-teal-50/40 transition-colors">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="min-w-0">
+                <p className="font-black text-teal-700 text-base leading-tight truncate">
+                  {bill.tableLabel || `#${shortId}`}
+                </p>
+                <p className="font-mono text-gray-400 text-[11px] leading-tight">
+                  #{shortId} · {age}
+                </p>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className="font-black text-gray-900 text-base tabular-nums">
+                  {fmt(bill.total)}
+                </p>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                  {bill.paymentStatus === "part_paid" ? "Part Paid" : "Unpaid"}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-500 mb-2.5 truncate">{itemSummary}</p>
+
+            {bill.status === "completed" && (
+              <p className="text-[10px] font-bold text-green-600 mb-2">✓ Food served</p>
+            )}
+            {bill.status === "ready" && (
+              <p className="text-[10px] font-bold text-purple-600 mb-2">Ready to serve</p>
+            )}
+
+            <button
+              onClick={() => onSettle(bill.id)}
+              className="w-full bg-teal-600 hover:bg-teal-500 active:bg-teal-700 text-white font-black text-xs py-2.5 rounded-xl transition-colors"
+            >
+              Settle Bill
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Settle Bill Modal ─────────────────────────────────────────────────────────
+
+function SettleBillModal({
+  order,
+  restaurant,
+  staffName,
+  onClose,
+  onSettled,
+}: {
+  order: TodayOrder;
+  restaurant: { name: string; slug: string };
+  staffName: string;
+  onClose: () => void;
+  onSettled: (result: SettlementResult) => void;
+}) {
+  const [method, setMethod] = useState<"cash" | "bank_transfer" | "card">("cash");
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const shortId = order.id.slice(-6).toUpperCase();
+  const createdAt = order.createdAt?.toDate?.() ?? new Date();
+
+  const settle = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/pos/settle-bill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: order.id,
+          paymentMethod: method,
+          settlementNote: note.trim(),
+          staffName,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Failed to settle bill");
+        return;
+      }
+      onSettled({
+        orderId: order.id,
+        tableLabel: order.tableLabel ?? `#${shortId}`,
+        total: order.total,
+        paymentMethod: method,
+        paidAt: new Date(),
+        staffName,
+      });
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const methodLabels: Record<string, string> = {
+    cash: "Cash",
+    bank_transfer: "Bank Transfer",
+    card: "Card / POS Machine",
+  };
+
+  return (
+    <div className="absolute inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-white w-full sm:max-w-md sm:rounded-2xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+        {/* Modal header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              Settle Bill · {restaurant.name}
+            </p>
+            <h2 className="font-black text-teal-700 text-lg leading-tight">
+              {order.tableLabel || `#${shortId}`}
+            </h2>
+            <p className="font-mono text-gray-400 text-xs">#{shortId}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-2xl leading-none w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Order meta */}
+          <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-500 font-bold">Status</span>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                order.status === "completed" ? "bg-green-100 text-green-700"
+                : order.status === "ready" ? "bg-purple-100 text-purple-700"
+                : order.status === "preparing" ? "bg-blue-100 text-blue-700"
+                : "bg-yellow-100 text-yellow-700"
+              }`}>{order.status}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500 font-bold">Ordered</span>
+              <span className="font-bold text-gray-900">
+                {createdAt.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}
+                {" · "}
+                {createdAt.toLocaleDateString("en-NG", { day: "numeric", month: "short" })}
+              </span>
+            </div>
+            {order.staffName && (
+              <div className="flex justify-between">
+                <span className="text-gray-500 font-bold">Waiter</span>
+                <span className="font-bold text-gray-900">{order.staffName}</span>
+              </div>
+            )}
+            {order.note && (
+              <div className="flex justify-between gap-4">
+                <span className="text-gray-500 font-bold flex-shrink-0">Note</span>
+                <span className="font-bold text-gray-900 text-right">{order.note}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Items */}
+          <div className="px-5 py-3 border-b border-gray-100 space-y-2">
+            {order.items.map((item, i) => (
+              <div key={i} className="flex items-baseline justify-between gap-2">
+                <div className="flex items-baseline gap-1.5 min-w-0">
+                  <span className="text-gray-400 font-bold text-sm flex-shrink-0">{item.quantity}×</span>
+                  <span className="font-bold text-gray-900 text-sm truncate">{item.name}</span>
+                </div>
+                <span className="font-bold text-gray-900 text-sm flex-shrink-0 tabular-nums">
+                  {fmt(item.price * item.quantity)}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Total */}
+          <div className="px-5 py-3 border-b border-gray-100">
+            <div className="flex justify-between items-center">
+              <span className="font-black text-gray-900 text-base">Total</span>
+              <span className="font-black text-gray-900 text-2xl tabular-nums">{fmt(order.total)}</span>
+            </div>
+            {order.paymentStatus === "part_paid" && (
+              <p className="text-xs text-yellow-700 font-bold mt-1">Part payment previously recorded</p>
+            )}
+          </div>
+
+          {/* Payment controls */}
+          <div className="px-5 py-4 space-y-3">
+            <div>
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                Payment Method
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {(["cash", "bank_transfer", "card"] as const).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setMethod(m)}
+                    className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-colors text-center leading-tight ${
+                      method === m
+                        ? "bg-teal-600 text-white shadow-sm"
+                        : "bg-gray-100 text-gray-600 hover:bg-teal-50 hover:text-teal-700"
+                    }`}
+                  >
+                    {methodLabels[m]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <input
+              type="text"
+              placeholder={
+                method === "bank_transfer"
+                  ? "Transfer reference / narration (optional)"
+                  : "Note or reference (optional)"
+              }
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-teal-500 bg-gray-50"
+            />
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 text-sm text-red-700 font-medium">
+                {error}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer actions */}
+        <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="flex-1 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-black text-sm hover:border-gray-300 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={settle}
+            disabled={submitting}
+            className="flex-2 flex-grow-[2] py-3 rounded-xl bg-teal-600 hover:bg-teal-500 active:bg-teal-700 text-white font-black text-sm transition-colors disabled:opacity-50"
+          >
+            {submitting ? "Settling…" : `Mark as Paid · ${fmt(order.total)}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Settlement success modal ───────────────────────────────────────────────────
+
+function SettlementSuccessModal({
+  order,
+  result,
+  restaurantName,
+  onClose,
+  onPrint,
+}: {
+  order: TodayOrder | null;
+  result: SettlementResult;
+  restaurantName: string;
+  onClose: () => void;
+  onPrint: () => void;
+}) {
+  void restaurantName;
+  const shortId = result.orderId.slice(-6).toUpperCase();
+
+  return (
+    <div className="absolute inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-white w-full sm:max-w-md sm:rounded-2xl shadow-2xl overflow-hidden">
+        <div className="px-6 pt-8 pb-6 text-center">
+          <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-2xl">✓</span>
+          </div>
+          <h2 className="font-black text-gray-900 text-xl mb-1">Bill Settled!</h2>
+          <p className="text-teal-700 font-black text-lg">{result.tableLabel}</p>
+          <p className="font-mono text-gray-400 text-xs mb-3">#{shortId}</p>
+          <div className="bg-gray-50 rounded-xl px-4 py-3 text-left space-y-1.5 mb-4">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500 font-bold">Total Paid</span>
+              <span className="font-black text-gray-900">{fmt(result.total)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500 font-bold">Method</span>
+              <span className="font-bold text-gray-900">
+                {{ cash: "Cash", bank_transfer: "Bank Transfer", card: "Card / POS Machine" }[result.paymentMethod] ?? result.paymentMethod}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500 font-bold">Settled by</span>
+              <span className="font-bold text-gray-900">{result.staffName}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500 font-bold">Time</span>
+              <span className="font-bold text-gray-900">
+                {result.paidAt.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={onPrint}
+              className="flex-1 border-2 border-teal-600 text-teal-700 hover:bg-teal-50 font-black py-3 rounded-xl transition-colors text-sm"
+            >
+              Print Receipt
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 bg-gray-900 hover:bg-gray-700 text-white font-black py-3 rounded-xl transition-colors text-sm"
+            >
+              Done
+            </button>
           </div>
         </div>
       </div>

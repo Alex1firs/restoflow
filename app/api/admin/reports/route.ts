@@ -6,13 +6,13 @@ function startOfDay(d: Date) { const r = new Date(d); r.setHours(0, 0, 0, 0); re
 function endOfDay(d: Date) { const r = new Date(d); r.setHours(23, 59, 59, 999); return r; }
 
 function toCSV(orders: ReturnType<typeof formatOrders>): string {
-  const cols = ["Order ID", "Date", "Customer Name", "Phone", "Items", "Subtotal", "Delivery Fee", "Total", "Payment Method", "Payment Status", "Order Status", "Delivery Type", "Order Source", "Service Mode", "Table Label"];
+  const cols = ["Order ID", "Date", "Customer Name", "Phone", "Items", "Subtotal", "Delivery Fee", "Total", "Payment Method", "Payment Status", "Paid At", "Order Status", "Delivery Type", "Order Source", "Service Mode", "Table Label", "Settled By"];
   const rows = orders.map((o) => [
     o.orderId, o.date, o.customerName, o.phone,
     `"${o.items}"`,
     o.itemsTotal, o.deliveryFee, o.total,
-    o.paymentMethod, o.paymentStatus, o.status, o.deliveryType, o.orderSource,
-    o.serviceMode, o.tableLabel,
+    o.paymentMethod, o.paymentStatus, o.paidAt, o.status, o.deliveryType, o.orderSource,
+    o.serviceMode, o.tableLabel, o.settledByStaffName,
   ].join(","));
   return [cols.join(","), ...rows].join("\n");
 }
@@ -39,6 +39,11 @@ function formatOrders(docs: FirebaseFirestore.QueryDocumentSnapshot[]) {
       orderSource: (d.orderSource as string) ?? "online",
       serviceMode: (d.serviceMode as string) ?? "",
       tableLabel: (d.tableLabel as string) ?? "",
+      settledByStaffName: (d.settledByStaffName as string) ?? "",
+      paidAt: d.paidAt
+        ? (d.paidAt.toDate ? d.paidAt.toDate() : new Date((d.paidAt.seconds ?? 0) * 1000))
+            .toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+        : "",
       createdAt: date,
     };
   });
