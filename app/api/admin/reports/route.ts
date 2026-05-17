@@ -6,12 +6,13 @@ function startOfDay(d: Date) { const r = new Date(d); r.setHours(0, 0, 0, 0); re
 function endOfDay(d: Date) { const r = new Date(d); r.setHours(23, 59, 59, 999); return r; }
 
 function toCSV(orders: ReturnType<typeof formatOrders>): string {
-  const cols = ["Order ID", "Date", "Customer Name", "Phone", "Items", "Subtotal", "Delivery Fee", "Total", "Payment Method", "Payment Status", "Order Status", "Delivery Type", "Order Source"];
+  const cols = ["Order ID", "Date", "Customer Name", "Phone", "Items", "Subtotal", "Delivery Fee", "Total", "Payment Method", "Payment Status", "Order Status", "Delivery Type", "Order Source", "Service Mode", "Table Label"];
   const rows = orders.map((o) => [
     o.orderId, o.date, o.customerName, o.phone,
     `"${o.items}"`,
     o.itemsTotal, o.deliveryFee, o.total,
     o.paymentMethod, o.paymentStatus, o.status, o.deliveryType, o.orderSource,
+    o.serviceMode, o.tableLabel,
   ].join(","));
   return [cols.join(","), ...rows].join("\n");
 }
@@ -36,6 +37,8 @@ function formatOrders(docs: FirebaseFirestore.QueryDocumentSnapshot[]) {
       status: (d.status as string) ?? "",
       deliveryType: (d.deliveryType as string) ?? "",
       orderSource: (d.orderSource as string) ?? "online",
+      serviceMode: (d.serviceMode as string) ?? "",
+      tableLabel: (d.tableLabel as string) ?? "",
       createdAt: date,
     };
   });
@@ -108,6 +111,8 @@ export async function GET(req: NextRequest) {
   const unpaidTotal = orders.filter((o) => o.paymentStatus === "unpaid" || o.paymentStatus === "part_paid").reduce((s, o) => s + o.total, 0);
   const onlineOrdersCount = orders.filter((o) => o.orderSource !== "counter").length;
   const counterOrdersCount = orders.filter((o) => o.orderSource === "counter").length;
+  const dineInOrdersCount = orders.filter((o) => o.serviceMode === "dine_in").length;
+  const dineInTotal = orders.filter((o) => o.serviceMode === "dine_in").reduce((s, o) => s + o.total, 0);
 
   const itemCounts: Record<string, { name: string; count: number; revenue: number }> = {};
 
@@ -162,6 +167,8 @@ export async function GET(req: NextRequest) {
       unpaidTotal,
       onlineOrdersCount,
       counterOrdersCount,
+      dineInOrdersCount,
+      dineInTotal,
       avgPrepMinutes,
       avgReadyMinutes,
     },

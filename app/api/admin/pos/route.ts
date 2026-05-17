@@ -5,9 +5,11 @@ import { FieldValue } from "firebase-admin/firestore";
 
 const VALID_PAYMENT_METHODS = ["cash", "bank_transfer", "card", "unpaid"] as const;
 const VALID_PAYMENT_STATUSES = ["paid", "unpaid", "part_paid", "cancelled"] as const;
+const VALID_SERVICE_MODES = ["counter", "dine_in"] as const;
 
 type PaymentMethod = (typeof VALID_PAYMENT_METHODS)[number];
 type PaymentStatus = (typeof VALID_PAYMENT_STATUSES)[number];
+type ServiceMode = (typeof VALID_SERVICE_MODES)[number];
 
 export async function POST(request: NextRequest) {
   let user: Awaited<ReturnType<typeof getAuthenticatedUser>>;
@@ -24,8 +26,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { items, paymentMethod, paymentStatus, customerName, note, staffName } =
-    body as Record<string, unknown>;
+  const {
+    items,
+    paymentMethod,
+    paymentStatus,
+    customerName,
+    note,
+    staffName,
+    serviceMode,
+    tableLabel,
+  } = body as Record<string, unknown>;
 
   if (!Array.isArray(items) || items.length === 0) {
     return NextResponse.json({ error: "Order must contain at least one item" }, { status: 400 });
@@ -37,6 +47,22 @@ export async function POST(request: NextRequest) {
 
   if (!VALID_PAYMENT_STATUSES.includes(paymentStatus as PaymentStatus)) {
     return NextResponse.json({ error: "Invalid payment status" }, { status: 400 });
+  }
+
+  const resolvedServiceMode: ServiceMode = VALID_SERVICE_MODES.includes(serviceMode as ServiceMode)
+    ? (serviceMode as ServiceMode)
+    : "counter";
+
+  const resolvedTableLabel =
+    resolvedServiceMode === "dine_in" && typeof tableLabel === "string"
+      ? tableLabel.trim()
+      : "";
+
+  if (resolvedServiceMode === "dine_in" && !resolvedTableLabel) {
+    return NextResponse.json(
+      { error: "Table number is required for dine-in orders" },
+      { status: 400 }
+    );
   }
 
   try {
@@ -73,20 +99,37 @@ export async function POST(request: NextRequest) {
       }
       const menuItem = menuMap.get(item.id);
       if (!menuItem) {
-        return NextResponse.json({ error: "Item not found or does not belong to this restaurant" }, { status: 400 });
+        return NextResponse.json(
+          { error: "Item not found or does not belong to this restaurant" },
+          { status: 400 }
+        );
       }
       if (!menuItem.available) {
-        return NextResponse.json({ error: `"${menuItem.name}" is currently unavailable` }, { status: 400 });
+        return NextResponse.json(
+          { error: `"${menuItem.name}" is currently unavailable` },
+          { status: 400 }
+        );
       }
-      validatedItems.push({ id: item.id, name: menuItem.name, price: menuItem.price, quantity: item.quantity });
+      validatedItems.push({
+        id: item.id,
+        name: menuItem.name,
+        price: menuItem.price,
+        quantity: item.quantity,
+      });
       itemsTotal += menuItem.price * item.quantity;
     }
 
     const total = itemsTotal;
+    const isDineIn = resolvedServiceMode === "dine_in";
 
     const orderRef = await db.collection("orders").add({
       restaurantId: restaurantSlug,
-      customerName: typeof customerName === "string" && customerName.trim() ? customerName.trim() : "Walk-in Customer",
+      customerName:
+        typeof customerName === "string" && customerName.trim()
+          ? customerName.trim()
+          : isDineIn
+          ? resolvedTableLabel
+          : "Walk-in Customer",
       phone: "",
       address: "",
       note: typeof note === "string" ? note.trim() : "",
@@ -97,16 +140,25 @@ export async function POST(request: NextRequest) {
       paymentMethod,
       paymentStatus,
       status: "pending",
-      deliveryType: "counter",
+      deliveryType: isDineIn ? "dine_in" : "counter",
       orderType: "normal",
       orderSource: "counter",
+      serviceMode: resolvedServiceMode,
+      ...(isDineIn ? { tableLabel: resolvedTableLabel } : {}),
       staffId: user.uid,
       staffName: typeof staffName === "string" ? staffName.trim() : "",
       createdAt: FieldValue.serverTimestamp(),
     });
 
     return NextResponse.json(
-      { orderId: orderRef.id, items: validatedItems, itemsTotal, total },
+      {
+        orderId: orderRef.id,
+        items: validatedItems,
+        itemsTotal,
+        total,
+        serviceMode: resolvedServiceMode,
+        tableLabel: resolvedTableLabel,
+      },
       { status: 201 }
     );
   } catch (error) {

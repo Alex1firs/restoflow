@@ -15,6 +15,8 @@ type Summary = {
   unpaidTotal: number;
   onlineOrdersCount: number;
   counterOrdersCount: number;
+  dineInOrdersCount: number;
+  dineInTotal: number;
   avgPrepMinutes: number | null;
   avgReadyMinutes: number | null;
 };
@@ -33,6 +35,8 @@ type Order = {
   status: string;
   deliveryType: string;
   orderSource: string;
+  serviceMode: string;
+  tableLabel: string;
 };
 
 type BestSeller = { name: string; count: number; revenue: number };
@@ -198,6 +202,20 @@ export default function ReportsClient({ slug }: { slug: string }) {
             ))}
           </div>
 
+          {/* Dine-in breakdown */}
+          {summary.dineInOrdersCount > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Dine-In Orders</p>
+                <p className="text-xl font-black text-teal-600">{summary.dineInOrdersCount}</p>
+              </div>
+              <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Dine-In Revenue</p>
+                <p className="text-xl font-black text-teal-600">{fmt(summary.dineInTotal)}</p>
+              </div>
+            </div>
+          )}
+
           {/* Kitchen performance */}
           {(summary.avgPrepMinutes !== null || summary.avgReadyMinutes !== null) && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -251,7 +269,7 @@ export default function ReportsClient({ slug }: { slug: string }) {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b border-gray-100">
                     <tr>
-                      {["Date", "Customer", "Items", "Total", "Payment", "Status", "Type", "Source"].map((h) => (
+                      {["Date", "Customer", "Items", "Total", "Payment", "Status", "Type", "Source", "Table"].map((h) => (
                         <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-widest whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -286,6 +304,15 @@ export default function ReportsClient({ slug }: { slug: string }) {
                           <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${o.orderSource === "counter" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"}`}>
                             {o.orderSource === "counter" ? "Counter" : "Online"}
                           </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {o.serviceMode === "dine_in" && o.tableLabel ? (
+                            <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-teal-100 text-teal-700">
+                              {o.tableLabel}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-300">—</span>
+                          )}
                         </td>
                       </tr>
                     ))}
