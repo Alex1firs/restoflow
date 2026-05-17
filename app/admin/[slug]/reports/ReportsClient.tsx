@@ -9,6 +9,12 @@ type Summary = {
   cancelled: number;
   onlineTotal: number;
   cashTotal: number;
+  counterTotal: number;
+  bankTransferTotal: number;
+  cardTotal: number;
+  unpaidTotal: number;
+  onlineOrdersCount: number;
+  counterOrdersCount: number;
 };
 
 type Order = {
@@ -24,6 +30,7 @@ type Order = {
   paymentStatus: string;
   status: string;
   deliveryType: string;
+  orderSource: string;
 };
 
 type BestSeller = { name: string; count: number; revenue: number };
@@ -155,15 +162,32 @@ export default function ReportsClient({ slug }: { slug: string }) {
         <div className="py-24 text-center text-gray-400 text-sm">Loading…</div>
       ) : summary ? (
         <>
-          {/* Summary cards */}
+          {/* Summary cards — top row */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {[
               { label: "Revenue", value: fmt(summary.totalRevenue), accent: "text-green-600" },
               { label: "Orders", value: summary.totalOrders.toString(), accent: "text-gray-900" },
               { label: "Completed", value: summary.completed.toString(), accent: "text-green-600" },
               { label: "Cancelled", value: summary.cancelled.toString(), accent: "text-red-600" },
+              { label: "Online Orders", value: summary.onlineOrdersCount.toString(), accent: "text-blue-600" },
+              { label: "Counter / POS", value: summary.counterOrdersCount.toString(), accent: "text-orange-600" },
+            ].map((card) => (
+              <div key={card.label} className="bg-white rounded-2xl border border-gray-100 p-4">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">{card.label}</p>
+                <p className={`text-xl font-black ${card.accent}`}>{card.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Summary cards — payment breakdown */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {[
               { label: "Online Paid", value: fmt(summary.onlineTotal), accent: "text-blue-600" },
-              { label: "Cash", value: fmt(summary.cashTotal), accent: "text-orange-600" },
+              { label: "Cash Sales", value: fmt(summary.cashTotal), accent: "text-green-600" },
+              { label: "Counter Total", value: fmt(summary.counterTotal), accent: "text-orange-600" },
+              { label: "Bank Transfer", value: fmt(summary.bankTransferTotal), accent: "text-purple-600" },
+              { label: "Card / POS", value: fmt(summary.cardTotal), accent: "text-indigo-600" },
+              { label: "Unpaid", value: fmt(summary.unpaidTotal), accent: "text-red-500" },
             ].map((card) => (
               <div key={card.label} className="bg-white rounded-2xl border border-gray-100 p-4">
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">{card.label}</p>
@@ -205,7 +229,7 @@ export default function ReportsClient({ slug }: { slug: string }) {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b border-gray-100">
                     <tr>
-                      {["Date", "Customer", "Items", "Total", "Payment", "Status", "Type"].map((h) => (
+                      {["Date", "Customer", "Items", "Total", "Payment", "Status", "Type", "Source"].map((h) => (
                         <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-widest whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -236,6 +260,11 @@ export default function ReportsClient({ slug }: { slug: string }) {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-500 capitalize">{o.deliveryType || "—"}</td>
+                        <td className="px-4 py-3">
+                          <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${o.orderSource === "counter" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"}`}>
+                            {o.orderSource === "counter" ? "Counter" : "Online"}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

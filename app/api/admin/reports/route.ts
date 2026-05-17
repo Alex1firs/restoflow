@@ -6,12 +6,12 @@ function startOfDay(d: Date) { const r = new Date(d); r.setHours(0, 0, 0, 0); re
 function endOfDay(d: Date) { const r = new Date(d); r.setHours(23, 59, 59, 999); return r; }
 
 function toCSV(orders: ReturnType<typeof formatOrders>): string {
-  const cols = ["Order ID", "Date", "Customer Name", "Phone", "Items", "Subtotal", "Delivery Fee", "Total", "Payment Method", "Payment Status", "Order Status", "Delivery Type"];
+  const cols = ["Order ID", "Date", "Customer Name", "Phone", "Items", "Subtotal", "Delivery Fee", "Total", "Payment Method", "Payment Status", "Order Status", "Delivery Type", "Order Source"];
   const rows = orders.map((o) => [
     o.orderId, o.date, o.customerName, o.phone,
     `"${o.items}"`,
     o.itemsTotal, o.deliveryFee, o.total,
-    o.paymentMethod, o.paymentStatus, o.status, o.deliveryType,
+    o.paymentMethod, o.paymentStatus, o.status, o.deliveryType, o.orderSource,
   ].join(","));
   return [cols.join(","), ...rows].join("\n");
 }
@@ -35,6 +35,7 @@ function formatOrders(docs: FirebaseFirestore.QueryDocumentSnapshot[]) {
       paymentStatus: (d.paymentStatus as string) ?? "",
       status: (d.status as string) ?? "",
       deliveryType: (d.deliveryType as string) ?? "",
+      orderSource: (d.orderSource as string) ?? "online",
       createdAt: date,
     };
   });
@@ -101,6 +102,12 @@ export async function GET(req: NextRequest) {
   const cancelled = orders.filter((o) => o.status === "rejected").length;
   const onlineTotal = orders.filter((o) => o.paymentMethod === "online" && o.paymentStatus === "paid").reduce((s, o) => s + o.total, 0);
   const cashTotal = orders.filter((o) => o.paymentMethod === "cash").reduce((s, o) => s + o.total, 0);
+  const counterTotal = orders.filter((o) => o.orderSource === "counter").reduce((s, o) => s + o.total, 0);
+  const bankTransferTotal = orders.filter((o) => o.paymentMethod === "bank_transfer").reduce((s, o) => s + o.total, 0);
+  const cardTotal = orders.filter((o) => o.paymentMethod === "card").reduce((s, o) => s + o.total, 0);
+  const unpaidTotal = orders.filter((o) => o.paymentStatus === "unpaid" || o.paymentStatus === "part_paid").reduce((s, o) => s + o.total, 0);
+  const onlineOrdersCount = orders.filter((o) => o.orderSource !== "counter").length;
+  const counterOrdersCount = orders.filter((o) => o.orderSource === "counter").length;
 
   const itemCounts: Record<string, { name: string; count: number; revenue: number }> = {};
   for (const order of snap.docs) {
@@ -117,7 +124,20 @@ export async function GET(req: NextRequest) {
   const bestSellers = Object.values(itemCounts).sort((a, b) => b.count - a.count).slice(0, 10);
 
   return NextResponse.json({
-    summary: { totalRevenue, totalOrders, completed, cancelled, onlineTotal, cashTotal },
+    summary: {
+      totalRevenue,
+      totalOrders,
+      completed,
+      cancelled,
+      onlineTotal,
+      cashTotal,
+      counterTotal,
+      bankTransferTotal,
+      cardTotal,
+      unpaidTotal,
+      onlineOrdersCount,
+      counterOrdersCount,
+    },
     orders: orders.map(({ createdAt: _, ...rest }) => rest),
     bestSellers,
   });
