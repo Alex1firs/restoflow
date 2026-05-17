@@ -1603,19 +1603,19 @@ function SettleBillModal({
     <div className="absolute inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="bg-white w-full sm:max-w-md sm:rounded-2xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
         {/* Modal header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 flex-shrink-0">
           <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+            <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">
               Settle Bill · {restaurant.name}
             </p>
             <h2 className="font-black text-teal-700 text-lg leading-tight">
               {order.tableLabel || `#${shortId}`}
             </h2>
-            <p className="font-mono text-gray-400 text-xs">#{shortId}</p>
+            <p className="font-mono text-gray-500 text-xs">#{shortId}</p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl leading-none w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors"
+            className="text-gray-500 hover:text-gray-800 text-2xl leading-none w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors"
           >
             ×
           </button>
@@ -1624,18 +1624,18 @@ function SettleBillModal({
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto">
           {/* Order meta */}
-          <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 space-y-1 text-sm">
+          <div className="px-5 py-3 bg-gray-50 border-b border-gray-200 space-y-1.5 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-500 font-bold">Status</span>
+              <span className="text-gray-700 font-bold">Status</span>
               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                order.status === "completed" ? "bg-green-100 text-green-700"
-                : order.status === "ready" ? "bg-purple-100 text-purple-700"
-                : order.status === "preparing" ? "bg-blue-100 text-blue-700"
-                : "bg-yellow-100 text-yellow-700"
+                order.status === "completed" ? "bg-green-100 text-green-800"
+                : order.status === "ready" ? "bg-purple-100 text-purple-800"
+                : order.status === "preparing" ? "bg-blue-100 text-blue-800"
+                : "bg-yellow-100 text-yellow-800"
               }`}>{order.status}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500 font-bold">Ordered</span>
+              <span className="text-gray-700 font-bold">Ordered</span>
               <span className="font-bold text-gray-900">
                 {createdAt.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}
                 {" · "}
@@ -1644,24 +1644,24 @@ function SettleBillModal({
             </div>
             {order.staffName && (
               <div className="flex justify-between">
-                <span className="text-gray-500 font-bold">Waiter</span>
+                <span className="text-gray-700 font-bold">Waiter</span>
                 <span className="font-bold text-gray-900">{order.staffName}</span>
               </div>
             )}
             {order.note && (
               <div className="flex justify-between gap-4">
-                <span className="text-gray-500 font-bold flex-shrink-0">Note</span>
+                <span className="text-gray-700 font-bold flex-shrink-0">Note</span>
                 <span className="font-bold text-gray-900 text-right">{order.note}</span>
               </div>
             )}
           </div>
 
           {/* Items */}
-          <div className="px-5 py-3 border-b border-gray-100 space-y-2">
+          <div className="px-5 py-4 border-b border-gray-200 space-y-2.5">
             {order.items.map((item, i) => (
               <div key={i} className="flex items-baseline justify-between gap-2">
                 <div className="flex items-baseline gap-1.5 min-w-0">
-                  <span className="text-gray-400 font-bold text-sm flex-shrink-0">{item.quantity}×</span>
+                  <span className="text-gray-600 font-black text-sm flex-shrink-0">{item.quantity}×</span>
                   <span className="font-bold text-gray-900 text-sm truncate">{item.name}</span>
                 </div>
                 <span className="font-bold text-gray-900 text-sm flex-shrink-0 tabular-nums">
@@ -1672,20 +1672,20 @@ function SettleBillModal({
           </div>
 
           {/* Total */}
-          <div className="px-5 py-3 border-b border-gray-100">
+          <div className="px-5 py-4 border-b border-gray-200">
             <div className="flex justify-between items-center">
               <span className="font-black text-gray-900 text-base">Total</span>
               <span className="font-black text-gray-900 text-2xl tabular-nums">{fmt(order.total)}</span>
             </div>
             {order.paymentStatus === "part_paid" && (
-              <p className="text-xs text-yellow-700 font-bold mt-1">Part payment previously recorded</p>
+              <p className="text-xs text-yellow-800 font-bold mt-1">Part payment previously recorded</p>
             )}
           </div>
 
           {/* Payment controls */}
           <div className="px-5 py-4 space-y-3">
             <div>
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+              <p className="text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-2">
                 Payment Method
               </p>
               <div className="grid grid-cols-3 gap-2">
@@ -1693,10 +1693,10 @@ function SettleBillModal({
                   <button
                     key={m}
                     onClick={() => setMethod(m)}
-                    className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-colors text-center leading-tight ${
+                    className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-colors text-center leading-tight border ${
                       method === m
-                        ? "bg-teal-600 text-white shadow-sm"
-                        : "bg-gray-100 text-gray-600 hover:bg-teal-50 hover:text-teal-700"
+                        ? "bg-teal-600 text-white border-teal-600 shadow-sm"
+                        : "bg-white text-gray-800 border-gray-300 hover:border-teal-400 hover:text-teal-700 hover:bg-teal-50"
                     }`}
                   >
                     {methodLabels[m]}
@@ -1714,7 +1714,7 @@ function SettleBillModal({
               }
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-teal-500 bg-gray-50"
+              className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal-500 bg-white placeholder:text-gray-400"
             />
 
             {error && (
@@ -1726,10 +1726,10 @@ function SettleBillModal({
         </div>
 
         {/* Footer actions */}
-        <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+        <div className="px-5 py-4 border-t border-gray-200 flex gap-3 flex-shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-black text-sm hover:border-gray-300 transition-colors"
+            className="flex-1 py-3 rounded-xl border-2 border-gray-300 text-gray-700 font-black text-sm hover:border-gray-400 hover:bg-gray-50 transition-colors"
           >
             Cancel
           </button>
