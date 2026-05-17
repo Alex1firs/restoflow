@@ -197,9 +197,7 @@ export default function RestaurantsClient({ restaurants }: { restaurants: Restau
                           className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white outline-none text-xs font-bold"
                         >
                           <option value="" disabled>Change plan…</option>
-                          <option value="starter">Starter</option>
-                          <option value="growth">Growth</option>
-                          <option value="premium">Premium</option>
+                          <option value="pro">Restaflow Pro</option>
                         </select>
                       </div>
                     </td>

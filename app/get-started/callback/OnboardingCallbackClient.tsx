@@ -14,6 +14,7 @@ type SuccessData = {
 
 export default function OnboardingCallbackClient() {
   const searchParams = useSearchParams();
+  const direct = searchParams.get("direct");
   const reference = searchParams.get("reference") ?? searchParams.get("trxref") ?? "";
 
   const [state, setState] = useState<State>("verifying");
@@ -21,6 +22,21 @@ export default function OnboardingCallbackClient() {
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
+    // Direct activation path — free trial, no Paystack reference needed
+    if (direct === "1") {
+      const slug = searchParams.get("slug") ?? "";
+      const email = searchParams.get("email") ?? "";
+      const resetLink = searchParams.get("resetLink") ?? "";
+      if (slug && email && resetLink) {
+        setResult({ slug, email, resetLink });
+        setState("success");
+      } else {
+        setState("error");
+        setErrorMsg("Missing account details. Please contact support.");
+      }
+      return;
+    }
+
     if (!reference) {
       setTimeout(() => {
         setState("error");
@@ -48,7 +64,7 @@ export default function OnboardingCallbackClient() {
         setState("error");
         setErrorMsg("Network error. Please contact support.");
       });
-  }, [reference]);
+  }, [direct, reference, searchParams]);
 
   if (state === "verifying") {
     return (
@@ -75,7 +91,7 @@ export default function OnboardingCallbackClient() {
             Your restaurant is <span className="text-orange-500">live!</span>
           </h1>
           <p className="text-gray-400 text-sm mb-8">
-            Payment confirmed. Your account is ready.
+            {direct === "1" ? "Your 7-day free trial has started." : "Payment confirmed."} Your account is ready.
           </p>
 
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6 text-left mb-6 space-y-4">

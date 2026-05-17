@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { PLANS } from "@/lib/plans";
+import { CheckCircle2 } from "lucide-react";
 
-export default function GetStartedClient({ defaultPlanId }: { defaultPlanId: string }) {
-  const [planId, setPlanId] = useState(defaultPlanId || "growth");
+const PLAN = PLANS[0];
+
+export default function GetStartedClient() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const selectedPlan = PLANS.find((p) => p.id === planId) ?? PLANS[1];
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -21,7 +21,7 @@ export default function GetStartedClient({ defaultPlanId }: { defaultPlanId: str
       email: (form.elements.namedItem("email") as HTMLInputElement).value.trim(),
       phone: (form.elements.namedItem("phone") as HTMLInputElement).value.trim(),
       address: (form.elements.namedItem("address") as HTMLInputElement).value.trim(),
-      planId,
+      planId: PLAN.id,
     };
 
     try {
@@ -33,13 +33,32 @@ export default function GetStartedClient({ defaultPlanId }: { defaultPlanId: str
 
       const json = await res.json().catch(() => ({ error: `Server error (${res.status})` }));
 
-      if (!res.ok || !json.authorizationUrl) {
+      if (!res.ok) {
         setError(json.error ?? "Something went wrong. Please try again.");
         setLoading(false);
         return;
       }
 
-      window.location.href = json.authorizationUrl;
+      // Free trial — direct activation (no payment required)
+      if (json.directActivation) {
+        const params = new URLSearchParams({
+          direct: "1",
+          slug: json.slug,
+          email: json.email,
+          resetLink: json.resetLink,
+        });
+        window.location.href = `/get-started/callback?${params.toString()}`;
+        return;
+      }
+
+      // Paid flow — redirect to Paystack
+      if (json.authorizationUrl) {
+        window.location.href = json.authorizationUrl;
+        return;
+      }
+
+      setError("Unexpected response. Please try again.");
+      setLoading(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error. Please try again.");
       setLoading(false);
@@ -51,52 +70,37 @@ export default function GetStartedClient({ defaultPlanId }: { defaultPlanId: str
       <div className="w-full max-w-lg">
         <div className="mb-8">
           <h1 className="text-4xl font-black italic uppercase tracking-tighter mb-2">
-            Set up your <span className="text-orange-500">restaurant</span>
+            Start your <span className="text-orange-500">free trial</span>
           </h1>
           <p className="text-gray-400 text-sm">
-            Fill in your details below. You&apos;ll pay the setup fee via Paystack to activate your account.
+            7 days free. No credit card required. Set up in minutes.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Plan selector */}
-          <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">
-              Select Plan
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {PLANS.map((plan) => (
-                <button
-                  key={plan.id}
-                  type="button"
-                  onClick={() => setPlanId(plan.id)}
-                  className={`relative rounded-xl border p-3 text-left transition ${
-                    planId === plan.id
-                      ? "border-orange-500 bg-orange-500/10"
-                      : "border-white/10 bg-white/5 hover:border-white/30"
-                  }`}
-                >
-                  {plan.popular && (
-                    <span className="absolute -top-2 left-2 bg-orange-500 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded">
-                      Popular
-                    </span>
-                  )}
-                  <p className="font-black text-sm text-white">{plan.name}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    ₦{plan.monthlyPrice.toLocaleString()}/mo
-                  </p>
-                </button>
-              ))}
+        {/* Plan summary */}
+        <div className="bg-orange-500/10 border border-orange-500/30 rounded-2xl p-5 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="font-black text-white text-base">{PLAN.name}</p>
+              <p className="text-orange-400 text-sm font-bold">
+                ₦{PLAN.monthlyPrice.toLocaleString()}/month after trial
+              </p>
             </div>
-            <p className="text-xs text-gray-500 mt-2">
-              Setup fee:{" "}
-              <span className="text-gray-300 font-bold">
-                ₦{selectedPlan.setupFee.toLocaleString()}
-              </span>{" "}
-              (charged today)
-            </p>
+            <span className="bg-orange-500 text-white text-[10px] font-black uppercase px-2 py-1 rounded-full">
+              7 days free
+            </span>
           </div>
+          <ul className="grid grid-cols-2 gap-1.5">
+            {PLAN.features.map((f) => (
+              <li key={f} className="flex items-center gap-1.5 text-xs text-gray-300">
+                <CheckCircle2 size={12} className="text-orange-500 shrink-0" />
+                {f}
+              </li>
+            ))}
+          </ul>
+        </div>
 
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label htmlFor="restaurantName" className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">
               Restaurant Name
@@ -164,13 +168,11 @@ export default function GetStartedClient({ defaultPlanId }: { defaultPlanId: str
             disabled={loading}
             className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-black text-base py-4 rounded-xl transition mt-2"
           >
-            {loading
-              ? "Redirecting to payment…"
-              : `Pay ₦${selectedPlan.setupFee.toLocaleString()} Setup Fee →`}
+            {loading ? "Setting up your account…" : "Start Free Trial →"}
           </button>
 
           <p className="text-center text-xs text-gray-600">
-            Secure payment via Paystack. You&apos;ll be redirected to complete payment.
+            No credit card required. Cancel anytime.
           </p>
         </form>
       </div>

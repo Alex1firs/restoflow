@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { getPlan } from "@/lib/plans";
-import { generateUniqueSlug } from "@/lib/onboarding";
+import { generateUniqueSlug, processOnboarding } from "@/lib/onboarding";
 
 export async function POST(req: NextRequest) {
   try {
@@ -34,7 +34,6 @@ export async function POST(req: NextRequest) {
     }
 
     const db = getAdminDb();
-
     const slug = await generateUniqueSlug(restaurantName);
 
     const onboardingRef = db.collection("onboardings").doc();
@@ -50,8 +49,22 @@ export async function POST(req: NextRequest) {
     });
 
     const onboardingId = onboardingRef.id;
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL
-      ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+
+    // Free trial path — no payment required, activate immediately
+    if (plan.setupFee === 0) {
+      const result = await processOnboarding(onboardingId, "free_trial");
+      return NextResponse.json({
+        directActivation: true,
+        slug: result.slug,
+        email: result.email,
+        resetLink: result.resetLink,
+      });
+    }
+
+    // Paid setup path — initialize Paystack transaction
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL ??
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
     const callbackUrl = `${appUrl}/get-started/callback`;
 
     const paystackRes = await fetch("https://api.paystack.co/transaction/initialize", {

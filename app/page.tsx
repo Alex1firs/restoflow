@@ -240,7 +240,7 @@ export default function LandingPage() {
 
       {/* 6. PRICING SECTION */}
       <section className="py-24 px-4 border-t border-white/5 bg-white/[0.01]">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-2xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-black italic uppercase tracking-tighter mb-4">
               Simple, transparent <span className="text-orange-500">pricing</span>
@@ -249,58 +249,41 @@ export default function LandingPage() {
               Recover lost orders. Reduce manual work. Increase repeat customers.
             </p>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {PLANS.map((plan, i) => (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                key={plan.id}
-                className={`relative rounded-3xl p-8 flex flex-col transition-transform duration-300 hover:-translate-y-2 ${
-                  plan.popular
-                    ? "bg-white/[0.05] border border-orange-500 glow-orange"
-                    : "glass border-white/10"
-                }`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-orange-500 text-white text-xs font-black uppercase tracking-wider px-4 py-1.5 rounded-full shadow-lg shadow-orange-500/20">
-                    Most Popular
-                  </div>
-                )}
-                
-                <h3 className="font-bold text-white/80 text-lg mb-2 uppercase tracking-wide">{plan.name}</h3>
-                <div className="flex items-end gap-1 mb-2">
-                  <span className="text-4xl font-black text-white">₦{plan.monthlyPrice.toLocaleString()}</span>
-                  <span className="text-sm font-medium text-white/40 mb-1">/mo</span>
-                </div>
-                <p className="text-sm text-orange-400/80 font-medium pb-6 border-b border-white/10 mb-6">
-                  + ₦{plan.setupFee.toLocaleString()} one-time setup fee
-                </p>
-                
-                <ul className="space-y-4 mb-8 flex-1">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-3 text-sm text-white/70 font-medium">
-                      <CheckCircle2 className="text-orange-500 shrink-0" size={18} />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                
-                <Link
-                  href={`/get-started?plan=${plan.id}`}
-                  className={`text-center font-bold text-sm py-4 rounded-xl transition-all ${
-                    plan.popular
-                      ? "bg-orange-500 hover:bg-orange-400 text-white shadow-lg shadow-orange-500/20"
-                      : "bg-white/5 hover:bg-white/10 text-white border border-white/10"
-                  }`}
-                >
-                  Choose {plan.name}
-                </Link>
-              </motion.div>
-            ))}
-          </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="relative rounded-3xl p-10 bg-white/[0.05] border border-orange-500 glow-orange"
+          >
+            <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-orange-500 text-white text-xs font-black uppercase tracking-wider px-5 py-1.5 rounded-full shadow-lg shadow-orange-500/20">
+              Restaflow Pro
+            </div>
+
+            <div className="text-center mb-8">
+              <div className="flex items-end justify-center gap-1 mb-1">
+                <span className="text-5xl font-black text-white">₦{PLANS[0].monthlyPrice.toLocaleString()}</span>
+                <span className="text-white/40 text-lg mb-1">/mo</span>
+              </div>
+              <p className="text-orange-400/80 text-sm font-medium">7-day free trial · No credit card required</p>
+            </div>
+
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
+              {PLANS[0].features.map((f) => (
+                <li key={f} className="flex items-start gap-3 text-sm text-white/70 font-medium">
+                  <CheckCircle2 className="text-orange-500 shrink-0 mt-0.5" size={16} />
+                  {f}
+                </li>
+              ))}
+            </ul>
+
+            <Link
+              href="/get-started"
+              className="block text-center font-bold text-base py-4 rounded-xl bg-orange-500 hover:bg-orange-400 text-white transition-all shadow-lg shadow-orange-500/20"
+            >
+              Start Free Trial →
+            </Link>
+          </motion.div>
         </div>
       </section>
 
@@ -321,7 +304,7 @@ export default function LandingPage() {
             Get Started For Free
             <ArrowRight size={20} />
           </Link>
-          <p className="text-white/40 text-sm mt-6">14-day free trial. No credit card required.</p>
+          <p className="text-white/40 text-sm mt-6">7-day free trial. No credit card required.</p>
         </div>
       </section>
 
