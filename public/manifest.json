@@ -1,0 +1,49 @@
+{
+  "name": "Restaflow",
+  "short_name": "Restaflow",
+  "description": "Restaurant ordering, POS, kitchen, and dine-in operations platform.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#050505",
+  "theme_color": "#f97316",
+  "categories": ["business", "food"],
+  "icons": [
+    {
+      "src": "/icons/icon-32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "url": "/admin/dashboard",
+      "description": "Open restaurant dashboard"
+    },
+    {
+      "name": "POS",
+      "url": "/admin/pos",
+      "description": "Open point of sale"
+    }
+  ]
+}
