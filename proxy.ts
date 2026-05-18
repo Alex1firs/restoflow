@@ -1,28 +1,46 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const MAIN_DOMAINS = [
+// All hostnames that belong to Restaflow itself (not restaurant custom domains)
+const MAIN_HOSTS = [
   "restoflow-nine.vercel.app",
+  "restaflow.com",
+  "www.restaflow.com",
   "localhost",
 ];
+
+function isMainHost(host: string): boolean {
+  const bare = host.replace(/^www\./, "").split(":")[0];
+  // Match exact names and any *.vercel.app preview/deployment URLs
+  return (
+    MAIN_HOSTS.includes(bare) ||
+    MAIN_HOSTS.includes(host) ||
+    bare.endsWith(".vercel.app")
+  );
+}
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const host = request.headers.get("host") ?? "";
-  const bareHost = host.replace(/^www\./, "").split(":")[0];
 
-  // Custom domain handling — runs before admin session check
-  const isMainDomain = MAIN_DOMAINS.some((d) => bareHost === d || bareHost.endsWith(`.${d}`));
-  const looksLikeCustomDomain = bareHost.includes(".") && !isMainDomain;
-
-  if (looksLikeCustomDomain) {
+  // ── Custom restaurant domain rewrite ────────────────────────────────────
+  // Restaurant owners can point their own domain (e.g. grills.com) at this app.
+  // Rewrite those requests to /r-domain so the storefront renders correctly.
+  if (!isMainHost(host) && host.includes(".")) {
+    const bare = host.replace(/^www\./, "").split(":")[0];
     const url = request.nextUrl.clone();
     url.pathname = "/r-domain";
-    url.searchParams.set("domain", bareHost);
+    url.searchParams.set("domain", bare);
     return NextResponse.rewrite(url);
   }
 
-  // Admin session gate
+  // ── Admin session gate ───────────────────────────────────────────────────
+  // Only protect /admin/* — public pages (/, /pricing, /r/*, etc.) are open.
+  if (!pathname.startsWith("/admin")) {
+    return NextResponse.next();
+  }
+
+  // The login page itself is always accessible
   if (pathname === "/admin/login") {
     return NextResponse.next();
   }
@@ -39,7 +57,7 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/admin/:path*",
-    "/((?!_next/static|_next/image|favicon.ico|api/).*)",
+    // Run on all routes except Next.js internals, static assets, and api routes
+    "/((?!_next/static|_next/image|favicon.ico|icons/|manifest\\.json|sw\\.js|offline\\.html|api/).*)",
   ],
 };
