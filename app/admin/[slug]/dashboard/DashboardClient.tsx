@@ -147,7 +147,7 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
 
       {/* Success toast */}
       {submitSuccess && (
@@ -179,6 +179,27 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
               timeZone: "Africa/Lagos",
             })}
           </p>
+        </div>
+
+        {/* ── Mobile quick actions (hidden md+) ──────────────────────────── */}
+        <div className="grid grid-cols-3 gap-3 md:hidden">
+          {[
+            { label: "Orders",     href: `/admin/${slug}/orders`,  emoji: "📋", bg: "bg-orange-50",  text: "text-orange-700", border: "border-orange-100" },
+            { label: "POS",        href: `/admin/${slug}/pos`,     emoji: "🛒", bg: "bg-blue-50",    text: "text-blue-700",   border: "border-blue-100" },
+            { label: "Kitchen",    href: `/admin/${slug}/kitchen`, emoji: "👨‍🍳", bg: "bg-green-50",   text: "text-green-700",  border: "border-green-100" },
+            { label: "Open Bills", href: `/admin/${slug}/pos`,     emoji: "📑", bg: "bg-teal-50",    text: "text-teal-700",   border: "border-teal-100" },
+            { label: "Menu",       href: `/admin/${slug}/menu`,    emoji: "🍽️", bg: "bg-purple-50",  text: "text-purple-700", border: "border-purple-100" },
+            { label: "Reports",    href: `/admin/${slug}/reports`, emoji: "📊", bg: "bg-gray-50",    text: "text-gray-700",   border: "border-gray-200" },
+          ].map(({ label, href, emoji, bg, text, border }) => (
+            <a
+              key={label}
+              href={href}
+              className={`flex flex-col items-center justify-center gap-2 py-4 rounded-2xl border ${bg} ${border} ${text} font-bold text-xs transition-all active:scale-95`}
+            >
+              <span className="text-2xl">{emoji}</span>
+              {label}
+            </a>
+          ))}
         </div>
 
         {/* Setup Status Banner */}

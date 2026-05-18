@@ -443,6 +443,9 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
   const [settleBillId, setSettleBillId] = useState<string | null>(null);
   const [settlementResult, setSettlementResult] = useState<SettlementResult | null>(null);
 
+  // Mobile cart toggle
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
+
   // Tab continuation state
   const [tabMode, setTabMode] = useState<"new" | "continue">("new");
   const [activeTab, setActiveTab] = useState<TodayOrder | null>(null);
@@ -832,8 +835,8 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
 
       {/* ── Two-column POS layout ─────────────────────────────────── */}
       <div className="flex flex-col lg:flex-row flex-1 overflow-hidden min-h-0">
-        {/* LEFT: Menu */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-gray-50">
+        {/* LEFT: Menu — hidden on mobile when cart is open */}
+        <div className={`flex-col min-w-0 overflow-hidden bg-gray-50 ${mobileCartOpen ? "hidden lg:flex" : "flex"} flex-1`}>
           {/* Top bar */}
           <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 flex-shrink-0">
             <h1 className="font-black text-gray-900 text-base whitespace-nowrap hidden sm:block">
@@ -927,10 +930,42 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
               </div>
             )}
           </div>
+          {/* Mobile sticky cart bar — appears when cart has items */}
+          {cartCount > 0 && (
+            <button
+              onClick={() => setMobileCartOpen(true)}
+              className="lg:hidden flex items-center justify-between px-5 py-4 bg-orange-600 text-white font-black text-sm flex-shrink-0 active:bg-orange-700 transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <span className="bg-white/20 rounded-full w-6 h-6 flex items-center justify-center text-xs font-black">
+                  {cartCount}
+                </span>
+                {cartCount} item{cartCount !== 1 ? "s" : ""}
+              </span>
+              <span className="flex items-center gap-2">
+                {fmt(cartTotal)}
+                <span className="text-orange-200 text-xs">View Cart →</span>
+              </span>
+            </button>
+          )}
         </div>
 
-        {/* RIGHT: Cart + Payment */}
-        <div className="w-full lg:w-[360px] xl:w-[400px] bg-white border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col flex-shrink-0">
+        {/* RIGHT: Cart + Payment — hidden on mobile when cart is closed */}
+        <div className={`bg-white border-gray-200 flex flex-col flex-shrink-0 ${
+          mobileCartOpen
+            ? "flex flex-1 lg:flex-none lg:w-[360px] xl:w-[400px] border-t lg:border-t-0 lg:border-l"
+            : "hidden lg:flex lg:w-[360px] xl:w-[400px] lg:border-l"
+        }`}>
+
+          {/* Mobile: back to menu button */}
+          {mobileCartOpen && (
+            <button
+              onClick={() => setMobileCartOpen(false)}
+              className="lg:hidden flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200 text-sm font-bold text-gray-600 hover:text-gray-900 flex-shrink-0 transition-colors"
+            >
+              ← Back to Menu
+            </button>
+          )}
 
           {/* ── Right-panel tab switcher ──────────────────────────── */}
           <div className="flex border-b border-gray-200 flex-shrink-0">
@@ -1474,7 +1509,7 @@ function OpenBillsPanel({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto divide-y divide-gray-50 min-h-0">
+    <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
       {bills.map((bill) => {
         const shortId = bill.id.slice(-6).toUpperCase();
         const age = bill.createdAt?.toDate
@@ -1487,44 +1522,47 @@ function OpenBillsPanel({
               return `${h}h${m > 0 ? ` ${m}m` : ""}`;
             })()
           : "";
-        const itemSummary = bill.items
-          .slice(0, 3)
-          .map((i) => `${i.quantity}× ${i.name}`)
-          .join(", ") + (bill.items.length > 3 ? ` +${bill.items.length - 3}` : "");
 
         return (
-          <div key={bill.id} className="px-4 py-3.5 hover:bg-teal-50/40 transition-colors">
-            <div className="flex items-start justify-between gap-2 mb-2">
+          <div
+            key={bill.id}
+            className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm"
+          >
+            {/* Table label + amount */}
+            <div className="flex items-start justify-between gap-3 mb-3">
               <div className="min-w-0">
-                <p className="font-black text-teal-700 text-base leading-tight truncate">
+                <p className="font-black text-teal-700 text-xl leading-tight truncate">
                   {bill.tableLabel || `#${shortId}`}
                 </p>
-                <p className="font-mono text-gray-400 text-[11px] leading-tight">
-                  #{shortId} · {age}
+                <p className="text-gray-400 text-xs font-medium mt-0.5">
+                  {bill.items.length} item{bill.items.length !== 1 ? "s" : ""} · {age}
                 </p>
               </div>
               <div className="text-right flex-shrink-0">
-                <p className="font-black text-gray-900 text-base tabular-nums">
+                <p className="font-black text-gray-900 text-xl tabular-nums">
                   {fmt(bill.total)}
                 </p>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  bill.paymentStatus === "part_paid"
+                    ? "bg-yellow-100 text-yellow-700"
+                    : "bg-red-100 text-red-600"
+                }`}>
                   {bill.paymentStatus === "part_paid" ? "Part Paid" : "Unpaid"}
                 </span>
               </div>
             </div>
 
-            <p className="text-xs text-gray-500 mb-2.5 truncate">{itemSummary}</p>
-
+            {/* Status indicators */}
             {bill.status === "completed" && (
-              <p className="text-[10px] font-bold text-green-600 mb-2">✓ Food served</p>
+              <p className="text-xs font-bold text-green-600 mb-2.5">✓ Food served</p>
             )}
             {bill.status === "ready" && (
-              <p className="text-[10px] font-bold text-purple-600 mb-2">Ready to serve</p>
+              <p className="text-xs font-bold text-purple-600 mb-2.5">🟣 Ready to serve</p>
             )}
 
             <button
               onClick={() => onSettle(bill.id)}
-              className="w-full bg-teal-600 hover:bg-teal-500 active:bg-teal-700 text-white font-black text-xs py-2.5 rounded-xl transition-colors"
+              className="w-full bg-teal-600 hover:bg-teal-500 active:bg-teal-700 text-white font-black text-sm py-3.5 rounded-xl transition-colors"
             >
               Settle Bill
             </button>

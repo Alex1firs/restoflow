@@ -179,7 +179,7 @@ export default function AdminOrdersClient({ restaurant }: Props) {
   const todayCash = todayOrders.filter((o) => o.paymentMethod === "cash" && o.status !== "rejected").length;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
+    <div className="max-w-5xl mx-auto px-4 py-6 pb-20 md:pb-6">
       {/* Toast */}
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 border border-orange-500/50 text-white px-6 py-3 rounded-2xl shadow-2xl font-bold text-sm flex items-center gap-3 animate-bounce">
@@ -211,12 +211,12 @@ export default function AdminOrdersClient({ restaurant }: Props) {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl mb-6 w-fit">
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl mb-6 w-full sm:w-fit">
         {(["active", "completed", "all"] as FilterTab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${tab === t ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
+            className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${tab === t ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
           >
             {t === "active" ? `Active (${activeOrders.length})` : t === "completed" ? "Done" : "All"}
           </button>
@@ -249,7 +249,7 @@ export default function AdminOrdersClient({ restaurant }: Props) {
                 )}
                 <div className="flex flex-col md:flex-row">
                   {/* Left */}
-                  <div className="p-5 md:w-[60%] border-b md:border-b-0 md:border-r border-gray-100">
+                  <div className="p-4 md:p-5 md:w-[60%] border-b md:border-b-0 md:border-r border-gray-100">
                     <div className="flex justify-between items-start mb-4">
                       <div>
                         <span className="font-mono text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded font-bold">{order.id.slice(0, 8).toUpperCase()}</span>
@@ -303,7 +303,7 @@ export default function AdminOrdersClient({ restaurant }: Props) {
                   </div>
 
                   {/* Right */}
-                  <div className="p-5 md:w-[40%] bg-gray-50 flex flex-col gap-4">
+                  <div className="p-4 md:p-5 md:w-[40%] bg-gray-50 flex flex-col gap-4">
                     {/* Payment */}
                     <div className="space-y-1.5">
                       <div className="flex justify-between text-xs">
@@ -338,31 +338,31 @@ export default function AdminOrdersClient({ restaurant }: Props) {
                     <div className="space-y-2 mt-auto">
                       {order.status === "scheduled" && (
                         <>
-                          <button onClick={() => advance(order.id, "preparing")} disabled={busy} className="w-full py-3 rounded-2xl bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest transition-all active:scale-95">
+                          <button onClick={() => advance(order.id, "preparing")} disabled={busy} className="w-full py-4 rounded-2xl bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest transition-all active:scale-95">
                             {busy ? "…" : "Accept & Start Preparing"}
                           </button>
-                          <button onClick={() => reject(order.id)} disabled={busy} className="w-full py-2.5 rounded-2xl bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-600 font-black text-xs uppercase tracking-widest transition-all border border-red-100">
+                          <button onClick={() => reject(order.id)} disabled={busy} className="w-full py-3.5 rounded-2xl bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-600 font-black text-sm uppercase tracking-widest transition-all border border-red-100">
                             {busy ? "…" : "Reject"}
                           </button>
                         </>
                       )}
                       {order.status === "pending" && (
                         <>
-                          <button onClick={() => advance(order.id, "preparing")} disabled={busy} className="w-full py-3 rounded-2xl bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest transition-all active:scale-95">
+                          <button onClick={() => advance(order.id, "preparing")} disabled={busy} className="w-full py-4 rounded-2xl bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest transition-all active:scale-95">
                             {busy ? "…" : "Accept Order"}
                           </button>
-                          <button onClick={() => reject(order.id)} disabled={busy} className="w-full py-2.5 rounded-2xl bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-600 font-black text-xs uppercase tracking-widest transition-all border border-red-100">
+                          <button onClick={() => reject(order.id)} disabled={busy} className="w-full py-3.5 rounded-2xl bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-600 font-black text-sm uppercase tracking-widest transition-all border border-red-100">
                             {busy ? "…" : "Reject"}
                           </button>
                         </>
                       )}
                       {order.status === "preparing" && (
-                        <button onClick={() => advance(order.id, "ready")} disabled={busy} className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest transition-all active:scale-95">
+                        <button onClick={() => advance(order.id, "ready")} disabled={busy} className="w-full py-4 rounded-2xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest transition-all active:scale-95">
                           {busy ? "…" : "Mark as Ready"}
                         </button>
                       )}
                       {order.status === "ready" && (
-                        <button onClick={() => advance(order.id, "completed")} disabled={busy} className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest transition-all active:scale-95">
+                        <button onClick={() => advance(order.id, "completed")} disabled={busy} className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest transition-all active:scale-95">
                           {busy ? "…" : "Mark Completed"}
                         </button>
                       )}

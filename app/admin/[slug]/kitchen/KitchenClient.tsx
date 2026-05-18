@@ -174,6 +174,7 @@ export default function KitchenClient({ restaurant }: Props) {
   const [updating, setUpdating] = useState<string | null>(null);
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const [now, setNow] = useState(() => new Date());
+  const [mobileTab, setMobileTab] = useState<ColKey>("pending");
 
   const prevIds = useRef<Set<string>>(new Set());
   const firstLoad = useRef(true);
@@ -342,54 +343,116 @@ export default function KitchenClient({ restaurant }: Props) {
           </div>
         </div>
       ) : (
-        <div className="flex-1 grid grid-cols-2 lg:grid-cols-4 min-h-0 overflow-hidden divide-x divide-white/5">
-          {COLS.map((col) => {
-            const colList = colOrders[col.key];
-            return (
-              <div key={col.key} className="flex flex-col min-h-0">
-                {/* Column header */}
-                <div
-                  className={`${col.headerCls} px-3 py-2 flex items-center justify-between flex-shrink-0`}
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* ── Mobile: tab bar (hidden on lg+) ─────────────────────── */}
+          <div className="lg:hidden flex flex-shrink-0 bg-[#16181f] border-b border-white/5">
+            {COLS.map((col) => {
+              const count = colOrders[col.key].length;
+              const isActive = mobileTab === col.key;
+              return (
+                <button
+                  key={col.key}
+                  onClick={() => setMobileTab(col.key)}
+                  className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors relative ${
+                    isActive ? "text-white" : "text-white/35 hover:text-white/60"
+                  }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`w-2 h-2 rounded-full bg-white/70 flex-shrink-0 ${
-                        colList.length > 0 ? "animate-pulse" : "opacity-40"
-                      }`}
-                    />
-                    <span className="font-black text-white text-[11px] uppercase tracking-widest">
-                      {col.label}
+                  {isActive && (
+                    <span className={`absolute top-0 left-0 right-0 h-0.5 ${col.headerCls}`} />
+                  )}
+                  <span className="text-[10px] font-black uppercase tracking-widest leading-none">
+                    {col.label}
+                  </span>
+                  <span className={`text-[11px] font-black tabular-nums px-2 py-0.5 rounded-full ${
+                    count > 0 && isActive
+                      ? `${col.headerCls} text-white`
+                      : count > 0
+                      ? "bg-white/10 text-white/60"
+                      : "text-white/20"
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── Mobile: active column cards (hidden on lg+) ───────── */}
+          <div className="lg:hidden flex-1 overflow-y-auto p-2 space-y-2">
+            {(() => {
+              const col = COLS.find((c) => c.key === mobileTab)!;
+              const list = colOrders[mobileTab];
+              return list.length === 0 ? (
+                <p className="text-center text-white/15 text-xs font-bold py-16">
+                  No orders here
+                </p>
+              ) : (
+                list.map((order) => (
+                  <KitchenCard
+                    key={order.id}
+                    order={order}
+                    col={col}
+                    isNew={newIds.has(order.id)}
+                    elapsed={getElapsed(order.createdAt, now)}
+                    createdTime={fmtTime(order.createdAt)}
+                    busy={updating === order.id}
+                    onAdvance={advance}
+                  />
+                ))
+              );
+            })()}
+          </div>
+
+          {/* ── Desktop: 4-column kanban (hidden below lg) ───────────── */}
+          <div className="hidden lg:grid lg:flex-1 grid-cols-4 min-h-0 overflow-hidden divide-x divide-white/5">
+            {COLS.map((col) => {
+              const colList = colOrders[col.key];
+              return (
+                <div key={col.key} className="flex flex-col min-h-0">
+                  {/* Column header */}
+                  <div
+                    className={`${col.headerCls} px-3 py-2 flex items-center justify-between flex-shrink-0`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`w-2 h-2 rounded-full bg-white/70 flex-shrink-0 ${
+                          colList.length > 0 ? "animate-pulse" : "opacity-40"
+                        }`}
+                      />
+                      <span className="font-black text-white text-[11px] uppercase tracking-widest">
+                        {col.label}
+                      </span>
+                    </div>
+                    <span className="bg-black/25 text-white/80 font-black text-xs px-2 py-0.5 rounded-full tabular-nums">
+                      {colList.length}
                     </span>
                   </div>
-                  <span className="bg-black/25 text-white/80 font-black text-xs px-2 py-0.5 rounded-full tabular-nums">
-                    {colList.length}
-                  </span>
-                </div>
 
-                {/* Cards */}
-                <div className="flex-1 overflow-y-auto p-2 space-y-2 scrollbar-none">
-                  {colList.length === 0 ? (
-                    <p className="text-center text-white/15 text-xs font-bold py-10">
-                      Empty
-                    </p>
-                  ) : (
-                    colList.map((order) => (
-                      <KitchenCard
-                        key={order.id}
-                        order={order}
-                        col={col}
-                        isNew={newIds.has(order.id)}
-                        elapsed={getElapsed(order.createdAt, now)}
-                        createdTime={fmtTime(order.createdAt)}
-                        busy={updating === order.id}
-                        onAdvance={advance}
-                      />
-                    ))
-                  )}
+                  {/* Cards */}
+                  <div className="flex-1 overflow-y-auto p-2 space-y-2 scrollbar-none">
+                    {colList.length === 0 ? (
+                      <p className="text-center text-white/15 text-xs font-bold py-10">
+                        Empty
+                      </p>
+                    ) : (
+                      colList.map((order) => (
+                        <KitchenCard
+                          key={order.id}
+                          order={order}
+                          col={col}
+                          isNew={newIds.has(order.id)}
+                          elapsed={getElapsed(order.createdAt, now)}
+                          createdTime={fmtTime(order.createdAt)}
+                          busy={updating === order.id}
+                          onAdvance={advance}
+                        />
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
