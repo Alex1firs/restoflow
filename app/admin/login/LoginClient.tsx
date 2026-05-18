@@ -103,7 +103,7 @@ export default function LoginClient() {
                     placeholder="you@restaurant.com"
                     required
                     autoComplete="email"
-                    className="w-full p-3 rounded-xl border border-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none placeholder:text-gray-400"
+                    className="w-full p-3 rounded-xl border border-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-gray-900 placeholder:text-gray-400"
                   />
                 </div>
 
@@ -125,7 +125,7 @@ export default function LoginClient() {
                     placeholder="••••••••"
                     required
                     autoComplete="current-password"
-                    className="w-full p-3 rounded-xl border border-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none placeholder:text-gray-400"
+                    className="w-full p-3 rounded-xl border border-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-gray-900 placeholder:text-gray-400"
                   />
                 </div>
 
@@ -168,7 +168,7 @@ export default function LoginClient() {
                     placeholder="you@restaurant.com"
                     required
                     autoComplete="email"
-                    className="w-full p-3 rounded-xl border border-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none placeholder:text-gray-400"
+                    className="w-full p-3 rounded-xl border border-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-gray-900 placeholder:text-gray-400"
                   />
                 </div>
 
