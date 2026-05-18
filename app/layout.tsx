@@ -57,6 +57,12 @@ export default function RootLayout({
         className="min-h-full flex flex-col"
         suppressHydrationWarning
       >
+        {/* Capture beforeinstallprompt BEFORE React hydrates so it's never missed */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.__pwaPrompt=null;window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__pwaPrompt=e;});`,
+          }}
+        />
         {children}
         <PWAInstallPrompt />
         <Script src="/register-sw.js" strategy="afterInteractive" />
