@@ -6,6 +6,7 @@ import { createOrderFromPaymentReference } from "@/lib/order-payments";
 import { sendNewOrderAlert } from "@/lib/notifications";
 import { sendCustomerNotification } from "@/lib/customer-notifications";
 import { getAdminDb } from "@/lib/firebase-admin";
+import { awardLoyaltyTick } from "@/lib/loyalty";
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
@@ -74,6 +75,18 @@ export async function POST(req: NextRequest) {
               itemsSummary,
               paymentMethod: "online",
             }).catch(() => {});
+
+            // Award loyalty tick
+            const orderPhone = (d.phone as string) ?? "";
+            if (orderPhone) {
+              awardLoyaltyTick({
+                orderId: newOrderId,
+                restaurantSlug: d.restaurantId as string,
+                phone: orderPhone,
+                customerName: (d.customerName as string) ?? "",
+                orderTotal: (d.total as number) ?? 0,
+              }).catch(() => {});
+            }
           }
         }
       } else {

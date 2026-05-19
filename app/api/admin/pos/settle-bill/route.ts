@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from "@/lib/auth-server";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { checkSubscriptionAccess } from "@/lib/subscription-guard";
+import { awardLoyaltyTick } from "@/lib/loyalty";
 
 const VALID_METHODS = ["cash", "bank_transfer", "card"] as const;
 type SettleMethod = (typeof VALID_METHODS)[number];
@@ -82,6 +83,18 @@ export async function POST(request: NextRequest) {
     }
 
     await orderRef.update(update);
+
+    // Award loyalty tick (fire-and-forget — never block the payment response)
+    const orderPhone = (order.phone as string) ?? (order.customerPhone as string) ?? "";
+    if (orderPhone) {
+      awardLoyaltyTick({
+        orderId,
+        restaurantSlug: user.restaurantSlug,
+        phone: orderPhone,
+        customerName: (order.customerName as string) ?? "",
+        orderTotal: (order.total as number) ?? 0,
+      }).catch(() => {});
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

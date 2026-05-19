@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useParams } from "next/navigation";
+import LoyaltyCard from "@/app/components/LoyaltyCard";
 
 type OrderStatus = "pending" | "preparing" | "ready" | "completed" | "rejected";
 
@@ -12,6 +13,7 @@ type OrderItem = { name: string; quantity: number; price: number };
 type Order = {
   restaurantId: string;
   customerName: string;
+  phone?: string;
   items: OrderItem[];
   total: number;
   status: OrderStatus;
@@ -155,7 +157,17 @@ export default function TrackOrderPage() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-gray-300">Updates appear in real-time</p>
+        {/* Loyalty card — shown when order is paid and phone is available */}
+        {order.paymentStatus === "paid" && order.phone && (
+          <div className="mt-2">
+            <LoyaltyCard
+              restaurantSlug={order.restaurantId}
+              phone={order.phone}
+            />
+          </div>
+        )}
+
+        <p className="text-center text-xs text-gray-300 mt-4">Updates appear in real-time</p>
       </div>
     </div>
   );

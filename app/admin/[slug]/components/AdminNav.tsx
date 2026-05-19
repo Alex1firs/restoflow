@@ -48,6 +48,7 @@ export default function AdminNav({ slug, role = "owner" }: Props) {
     { name: "Store",     href: `/admin/${slug}/settings`,  roles: ["owner"] },
     { name: "SEO",       href: `/admin/${slug}/seo`,       roles: ["owner", "manager"] },
     { name: "Google Business", href: `/admin/${slug}/seo/google-business`, roles: ["owner", "manager"] },
+    { name: "Loyalty",    href: `/admin/${slug}/loyalty`,    roles: ["owner", "manager"] },
     { name: "Domain",    href: `/admin/${slug}/domain`,    roles: ["owner"], badge: <DomainDot slug={slug} /> },
     { name: "QR Code",   href: `/admin/${slug}/qr`,        roles: ["owner"] },
     { name: "Staff",     href: `/admin/${slug}/staff`,     roles: ["owner"] },
