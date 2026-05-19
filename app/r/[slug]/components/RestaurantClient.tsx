@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useCart } from "./CartContext";
+import SEOSections from "./SEOSections";
 
 type DeliveryType = "delivery" | "pickup";
 
@@ -90,8 +91,8 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   const popularSectionRef = useRef<HTMLElement>(null);
   const faqSectionRef = useRef<HTMLElement>(null);
 
-  // Brand colors
-  const primary = restaurant.primaryColor || "#c9a452";
+  // Dynamic Brand Theme Variables
+  const primary = restaurant.primaryColor || "#F26E21"; // premium warm orange accent
   const accent = restaurant.accentColor || primary;
   const rating = restaurant.rating;
   const ordersToday = restaurant.ordersToday;
@@ -143,7 +144,16 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
     ),
   ];
 
-  // Keyboard shortcuts
+  // Dynamic CSS styling properties
+  const brandStyle = {
+    "--brand-primary": primary,
+    "--brand-accent": accent,
+    "--brand-primary-10": `${primary}1a`,
+    "--brand-primary-20": `${primary}33`,
+    "--brand-primary-90": `${primary}e6`,
+  } as React.CSSProperties;
+
+  // Keyboard accessibility
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") { setCartOpen(false); setCheckoutOpen(false); }
@@ -155,14 +165,13 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   // Parallax scroll listener
   useEffect(() => {
     const handleScroll = () => {
-      // Only track scroll for parallax if near top
       if (window.scrollY < 1000) setScrollY(window.scrollY);
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Body scroll lock
+  // Modal body scroll lock
   useEffect(() => {
     document.body.style.overflow = cartOpen || checkoutOpen || scheduleOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
@@ -217,7 +226,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   const scrollTo = (id: string) => {
     const el = document.getElementById(id);
     if (!el) return;
-    const offset = 44;
+    const offset = 90; // optimized dynamic header offset
     const top = el.getBoundingClientRect().top + window.scrollY - offset;
     window.scrollTo({ top, behavior: "smooth" });
   };
@@ -370,38 +379,41 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   // ── Success screen ──────────────────────────────────────────────────────────
   if (orderSuccess) {
     return (
-      <div className="min-h-screen bg-[#0d0802] flex flex-col items-center justify-center px-6 text-center">
-        <div className="w-20 h-20 bg-[#1a1008] rounded-full flex items-center justify-center mb-6">
-          <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div style={brandStyle} className="min-h-screen bg-[#FAF9F5] dark:bg-[#0D0C0B] flex flex-col items-center justify-center px-6 text-center transition-colors duration-300">
+        <div className="w-20 h-20 bg-emerald-50 dark:bg-emerald-950/30 rounded-full flex items-center justify-center mb-6 shadow-sm border border-emerald-100 dark:border-emerald-900/40">
+          <svg className="w-10 h-10 text-emerald-600 dark:text-emerald-500 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h1 className="text-3xl font-black text-[#f5e6c8] mb-2">
+        <h1 className="text-3xl font-extrabold text-neutral-900 dark:text-neutral-50 mb-3 tracking-tight">
           {isScheduledOrder ? "Order Scheduled!" : "Order Received!"}
         </h1>
-        <p className="text-[#9a8060] mb-8 max-w-sm leading-relaxed">
+        <p className="text-[#7A7368] dark:text-[#A19B91] mb-8 max-w-sm leading-relaxed text-sm font-medium">
           {isScheduledOrder
             ? `${restaurant.name} has received your scheduled order and will prepare it for ${new Date(`${scheduleDate}T${scheduleTime}`).toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" })}.`
-            : `${restaurant.name} has received your order and will start preparing it shortly.`}
+            : `${restaurant.name} has successfully received your order and will begin preparation immediately.`}
         </p>
         {orderId && (
-          <div className="w-full max-w-sm bg-[#1a1008] border border-[#2e2010] rounded-2xl p-5 mb-6 text-left">
-            <p className="text-xs font-bold text-[#9a8060] uppercase tracking-widest mb-1">Order ID</p>
-            <p className="font-mono text-sm text-[#f5e6c8] mb-4 break-all">{orderId}</p>
+          <div className="w-full max-w-sm bg-white dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] rounded-3xl p-6 mb-6 text-left shadow-lg">
+            <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider mb-1">Receipt reference</p>
+            <p className="font-mono text-sm text-neutral-900 dark:text-neutral-100 mb-5 break-all font-semibold select-all">{orderId}</p>
             <a
               href={`/track/${orderId}`}
               style={{ backgroundColor: primary }}
-              className="w-full text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-opacity hover:opacity-90"
+              className="w-full text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-opacity hover:opacity-95 shadow-md active:scale-[0.98] transition-transform text-sm"
             >
-              Track My Order →
+              Track Preparation Link
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
             </a>
           </div>
         )}
         <button
           onClick={() => { setOrderSuccess(false); setOrderId(null); setIsScheduledOrder(false); }}
-          className="text-sm font-bold text-[#9a8060] hover:text-[#f5e6c8] transition-colors"
+          className="text-xs font-bold text-[#7A7368] hover:text-neutral-900 dark:text-[#A19B91] dark:hover:text-white transition-colors py-2 px-4 rounded-full border border-[#EFECE6] dark:border-[#1F1F1C] bg-white dark:bg-[#141412] hover:bg-stone-50"
         >
-          Order Again
+          Return to Storefront
         </button>
       </div>
     );
@@ -410,244 +422,214 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   const navSections = [
     { id: "menu", label: "Menu" },
     { id: "about", label: "About" },
-    ...(popularItems.length > 0 ? [{ id: "popular", label: "Popular" }] : []),
+    ...(popularItems.length > 0 ? [{ id: "popular", label: "Top Picks" }] : []),
     { id: "faq", label: "FAQ" },
   ];
 
-  // ── Main page ───────────────────────────────────────────────────────────────
+  // ── Main Page Storefront ───────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#0f0f0f] text-[#f5e6c8] pb-24 relative">
+    <div style={brandStyle} className="min-h-screen bg-[#FAF9F5] dark:bg-[#0D0C0B] text-neutral-900 dark:text-neutral-50 pb-24 relative transition-colors duration-300 font-sans">
       {isPreview && (
-        <div className="bg-amber-500 text-white font-black text-xs tracking-widest uppercase text-center py-2.5 px-4 sticky top-0 z-[100] shadow-md flex items-center justify-center gap-2">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-          PREVIEW MODE - Orders are disabled
+        <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white font-black text-xs tracking-widest uppercase text-center py-3 px-4 sticky top-0 z-[100] shadow-md flex items-center justify-center gap-2">
+          <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          PREVIEW MODE - Offline Simulations Enabled
         </div>
       )}
 
-      {/* ── HERO ──────────────────────────────────────────────────────────────── */}
-      <section className="relative min-h-[92vh] flex flex-col bg-[#0f0f0f] overflow-hidden">
+      {/* ── HERO REDESIGN (Phase 10A) ────────────────────────────────────────── */}
+      <section className="relative min-h-[75vh] flex flex-col justify-end bg-stone-100 dark:bg-stone-900 overflow-hidden">
         {restaurant.coverImage && (
           <div 
             className="absolute inset-0 z-0 pointer-events-none"
-            style={{ transform: `translateY(${scrollY * 0.4}px)` }}
+            style={{ transform: `translateY(${scrollY * 0.25}px)` }}
           >
             <img 
               src={restaurant.coverImage} 
               alt="" 
-              className="w-full h-full object-cover opacity-60"
+              className="w-full h-full object-cover opacity-90 transition-transform duration-500 scale-100"
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-[#0f0f0f]" />
-            <div className="absolute inset-0 bg-black/20" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/10" />
           </div>
         )}
 
-        {/* Top nav bar */}
-        <div className="flex items-center justify-between px-6 py-5 z-20 relative">
-          {/* Logo / name */}
+        {/* Top Navbar details */}
+        <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 py-5 bg-gradient-to-b from-black/50 to-transparent">
           <div className="flex items-center gap-3">
             {restaurant.logo ? (
-              <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/10">
+              <div className="w-10 h-10 rounded-2xl overflow-hidden border border-white/20 shadow-md">
                 <img src={restaurant.logo} alt="logo" className="w-full h-full object-cover" />
               </div>
             ) : (
-              <span className="text-white font-black text-xl tracking-tight">
-                {restaurant.name.slice(0, 2).toUpperCase()}
-              </span>
+              <div className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/25">
+                <span className="text-white font-extrabold text-sm tracking-tight">
+                  {restaurant.name.slice(0, 2).toUpperCase()}
+                </span>
+              </div>
             )}
+            <span className="text-white font-black text-lg tracking-tight drop-shadow-sm select-none">{restaurant.name}</span>
           </div>
 
-          {/* Center nav links — desktop */}
           <div className="hidden md:flex items-center gap-8">
             {navSections.map((s) => (
               <button
                 key={s.id}
                 onClick={() => scrollTo(s.id)}
-                className="text-white/60 hover:text-white text-xs font-bold uppercase tracking-[0.2em] transition-colors"
+                className="text-white/80 hover:text-white text-[11px] font-bold uppercase tracking-widest transition-all hover:scale-105 active:scale-95"
               >
                 {s.label}
               </button>
             ))}
           </div>
 
-          {/* Right: status + cart */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {restaurant.isOpen ? (
-              <span className="hidden sm:flex items-center gap-1.5 text-green-400 text-xs font-bold">
-                <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-400/30 text-emerald-400 text-[10px] font-bold uppercase tracking-wider shadow-sm">
+                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
                 Open Now
               </span>
             ) : (
-              <span className="hidden sm:flex items-center gap-1.5 text-red-400 text-xs font-bold">
-                <span className="w-1.5 h-1.5 bg-red-400/60 rounded-full" />
+              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500/20 backdrop-blur-md border border-rose-400/30 text-rose-400 text-[10px] font-bold uppercase tracking-wider shadow-sm">
+                <span className="w-1.5 h-1.5 bg-rose-400/60 rounded-full" />
                 Closed
               </span>
             )}
-            <button
-              onClick={() => setCartOpen(true)}
-              className="relative w-10 h-10 flex items-center justify-center rounded-full border border-white/20 hover:border-white/40 transition-all"
-            >
-              {totalItems > 0 && (
-                <span
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black text-white"
-                  style={{ backgroundColor: primary }}
-                >
-                  {totalItems}
-                </span>
-              )}
-              <svg className="w-5 h-5 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-              </svg>
-            </button>
           </div>
         </div>
 
-        {/* Hero body */}
-        <div className="flex-1 relative flex flex-col items-center justify-center">
-
-          {/* Category label */}
-          <p className="text-white/40 text-[10px] md:text-xs font-black uppercase tracking-[0.5em] mb-4 z-10 relative">
-            {restaurant.todayHoursLabel
-              ? `Today · ${restaurant.todayHoursLabel}`
-              : restaurant.isOpen ? "Open Now · Order Online" : "Browse Menu"}
-          </p>
-
-          {/* Huge restaurant name — behind the image */}
-          <div className="absolute inset-0 flex items-center justify-center px-4 overflow-hidden pointer-events-none select-none">
-            <h1
-              className="font-black uppercase text-center leading-none"
-              style={{
-                fontSize: "clamp(3.5rem, 16vw, 14rem)",
-                color: primary,
-                lineHeight: 0.85,
-                letterSpacing: "-0.02em",
-              }}
-            >
+        {/* Hero details card */}
+        <div className="relative z-10 max-w-4xl mx-auto w-full px-6 pb-8 md:pb-12 text-white">
+          <div className="max-w-2xl space-y-4">
+            <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-none drop-shadow-md">
               {restaurant.name}
             </h1>
+            {restaurant.description && (
+              <p className="text-white/85 text-sm md:text-base leading-relaxed drop-shadow-sm max-w-xl font-medium">
+                {restaurant.description}
+              </p>
+            )}
+            
+            {/* Cuisine tags */}
+            {keywords.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {keywords.slice(0, 4).map((k) => (
+                  <span key={k} className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-white/15 border border-white/10 backdrop-blur-sm">
+                    {k}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Floating metrics grid */}
+            <div className="grid grid-cols-3 gap-3 pt-4 border-t border-white/15 max-w-md">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center">
+                  <span className="text-sm">⭐</span>
+                </div>
+                <div>
+                  <p className="text-[10px] text-white/50 uppercase font-black tracking-wider">Rating</p>
+                  <p className="text-xs font-bold text-white">{rating ? rating.toFixed(1) : "4.8"}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center">
+                  <span className="text-sm">⏱️</span>
+                </div>
+                <div>
+                  <p className="text-[10px] text-white/50 uppercase font-black tracking-wider">Speed</p>
+                  <p className="text-xs font-bold text-white">{deliveryTime}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center">
+                  <span className="text-sm">🚚</span>
+                </div>
+                <div>
+                  <p className="text-[10px] text-white/50 uppercase font-black tracking-wider">Delivery</p>
+                  <p className="text-xs font-bold text-white">
+                    {restaurant.deliveryEnabled ? (restaurant.deliveryFee > 0 ? fmt(restaurant.deliveryFee) : "Free") : "N/A"}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-
-
-          {/* Left circle CTA — desktop */}
-          <button
-            onClick={() => scrollTo("menu")}
-            className="absolute left-8 md:left-20 top-1/2 -translate-y-1/2 z-20 hidden md:flex items-center justify-center w-28 h-28 rounded-full border-2 border-white/20 hover:border-white/50 transition-all hover:scale-105 group"
-          >
-            <span className="text-white/70 group-hover:text-white text-[11px] font-black uppercase tracking-widest text-center leading-tight transition-colors">
-              Order<br />Now
-            </span>
-          </button>
-
-          {/* Right circle CTA — desktop */}
-          <button
-            onClick={() => scrollTo("menu")}
-            className="absolute right-8 md:right-20 top-1/2 -translate-y-1/2 z-20 hidden md:flex items-center justify-center w-28 h-28 rounded-full border-2 transition-all hover:scale-105 group"
-            style={{ borderColor: primary + "60" }}
-          >
-            <span
-              className="text-[11px] font-black uppercase tracking-widest text-center leading-tight transition-colors group-hover:opacity-100 opacity-70"
-              style={{ color: primary }}
-            >
-              View<br />Menu
-            </span>
-          </button>
-        </div>
-
-        {/* Mobile CTAs */}
-        <div className="flex gap-3 justify-center px-6 pb-6 md:hidden relative z-20">
-          <button
-            onClick={() => scrollTo("menu")}
-            style={{ backgroundColor: primary }}
-            className="flex-1 text-white font-black py-4 rounded-2xl text-xs uppercase tracking-widest active:scale-95 transition-transform"
-          >
-            Order Now
-          </button>
-          <button
-            onClick={() => scrollTo("menu")}
-            className="flex-1 border border-white/20 text-white/80 font-black py-4 rounded-2xl text-xs uppercase tracking-widest active:scale-95 transition-transform"
-          >
-            View Menu
-          </button>
-        </div>
-
-        {/* Stats strip */}
-        <div className="flex justify-center gap-6 pb-6 relative z-10 flex-wrap px-4">
-          {rating && <span className="text-white/40 text-xs font-bold">⭐ {rating}</span>}
-          <span className="text-white/40 text-xs font-bold">⏱ {deliveryTime}</span>
-          {restaurant.deliveryEnabled && (
-            <span className="text-white/40 text-xs font-bold">
-              🚚 {restaurant.deliveryFee > 0 ? fmt(restaurant.deliveryFee) : "Free delivery"}
-            </span>
-          )}
         </div>
       </section>
 
-      {/* ── QUICK INFO BAR ────────────────────────────────────────────────────── */}
-      <div className="bg-[#0d0802] border-t border-b border-[#2e2010] px-4 py-5">
-        <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-4 text-center sm:divide-x divide-[#2e2010]">
-          {/* Column 1: Location */}
-          <div className="flex flex-col items-center gap-1">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: primary }}>Location</p>
-            <p className="text-sm font-semibold text-[#f5e6c8] leading-snug">
-              {restaurant.address || restaurant.name}
-            </p>
+      {/* ── Operational Info Bar ─────────────────────────────────────────────── */}
+      <div className="bg-white dark:bg-[#141412] border-b border-[#EFECE6] dark:border-[#1F1F1C] px-6 py-6 shadow-[0_2px_15px_rgba(0,0,0,0.015)] transition-colors duration-300">
+        <div className="max-w-4xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-stone-50 dark:bg-stone-900 border border-[#EFECE6] dark:border-[#1F1F1C] flex items-center justify-center flex-shrink-0">
+              <svg className="w-5 h-5 text-[var(--brand-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-[10px] text-[#7A7368] dark:text-[#A19B91] uppercase font-bold tracking-wider">Address Location</p>
+              <p className="text-sm font-bold text-neutral-800 dark:text-neutral-200 mt-0.5">{restaurant.address || "Main Restaurant Outlet"}</p>
+            </div>
           </div>
-          {/* Column 2: Opening Hours */}
-          <div className="flex flex-col items-center gap-1">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: primary }}>Hours Today</p>
-            <p className="text-sm font-semibold text-[#f5e6c8] leading-snug">
-              {restaurant.todayHoursLabel || (restaurant.isOpen ? "Open Now" : "Closed")}
-            </p>
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-stone-50 dark:bg-stone-900 border border-[#EFECE6] dark:border-[#1F1F1C] flex items-center justify-center flex-shrink-0">
+              <svg className="w-5 h-5 text-[var(--brand-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-[10px] text-[#7A7368] dark:text-[#A19B91] uppercase font-bold tracking-wider">Opening Hours</p>
+              <p className="text-sm font-bold text-neutral-800 dark:text-neutral-200 mt-0.5">{restaurant.todayHoursLabel || "Open 9:00 AM - 10:00 PM"}</p>
+            </div>
           </div>
-          {/* Column 3: Delivery / Contact */}
-          <div className="flex flex-col items-center gap-1">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: primary }}>Delivery</p>
-            <p className="text-sm font-semibold text-[#f5e6c8] leading-snug">
-              {restaurant.deliveryEnabled
-                ? restaurant.deliveryFee > 0
-                  ? `${fmt(restaurant.deliveryFee)} fee · ${deliveryTime}`
-                  : `Free · ${deliveryTime}`
-                : restaurant.pickupEnabled
-                ? "Pickup only"
-                : deliveryTime}
-            </p>
+          <div className="flex gap-2.5 w-full md:w-auto">
+            <button
+              onClick={() => scrollTo("menu")}
+              style={{ backgroundColor: primary }}
+              className="flex-1 md:flex-initial text-white font-bold py-3.5 px-6 rounded-2xl text-xs uppercase tracking-widest active:scale-95 transition-all shadow-md shadow-[var(--brand-primary-20)] hover:opacity-95"
+            >
+              Order Online
+            </button>
+            {!restaurant.isOpen && (
+              <button
+                onClick={() => setScheduleOpen(true)}
+                className="flex-1 md:flex-initial border border-[#EFECE6] dark:border-[#1F1F1C] bg-white dark:bg-[#141412] text-neutral-800 dark:text-neutral-200 hover:bg-stone-50 font-bold py-3.5 px-6 rounded-2xl text-xs uppercase tracking-widest active:scale-95 transition-all shadow-sm"
+              >
+                Schedule
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* ── TRUST STRIP ───────────────────────────────────────────────────────── */}
-      <div className="bg-[#0a0600] text-[#f5e6c8] py-3 overflow-x-auto">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="flex items-center gap-5 text-xs font-bold min-w-max mx-auto justify-center">
+      {/* ── Trending Strip / Social Proof (Phase 10G) ────────────────────────── */}
+      <div className="bg-[#FAF9F5] dark:bg-[#0D0C0B] py-3.5 border-b border-[#EFECE6] dark:border-[#1F1F1C] overflow-x-auto scrollbar-hide">
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="flex items-center gap-6 text-xs font-bold text-[#7A7368] dark:text-[#A19B91] min-w-max justify-center">
             {ordersToday ? (
-              <>
-                <span style={{ color: accent }}>🔥 {ordersToday}+ orders today</span>
-                <span className="text-[#2e2010]">|</span>
-              </>
+              <span className="flex items-center gap-1.5"><span className="text-rose-500 animate-pulse">🔥</span> {ordersToday}+ placed today</span>
             ) : (
-              <>
-                <span style={{ color: accent }}>⚡ Trending now</span>
-                <span className="text-[#2e2010]">|</span>
-              </>
+              <span className="flex items-center gap-1.5"><span className="text-[var(--brand-primary)]">⚡</span> Trending restaurant hub</span>
             )}
-            {rating && (
-              <>
-                <span className="text-yellow-400">⭐ Rated {rating} by customers</span>
-                <span className="text-[#2e2010]">|</span>
-              </>
-            )}
-            <span className="text-green-500">⚡ Fast delivery in {deliveryTime}</span>
+            <span className="text-stone-300 dark:text-stone-800">|</span>
+            <span className="flex items-center gap-1.5"><span className="text-emerald-500">✨</span> Hygiene Standard Certified</span>
+            <span className="text-stone-300 dark:text-stone-800">|</span>
+            <span className="flex items-center gap-1.5"><span className="text-yellow-400">⭐</span> 99% Satisfaction Rate</span>
           </div>
         </div>
       </div>
 
-      {/* ── PROMO BANNER ──────────────────────────────────────────────────────── */}
+      {/* ── Promo Banner ─────────────────────────────────────────────────────── */}
       {restaurant.promoBanner && !promoDismissed && (
-        <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-3">
+        <div className="bg-gradient-to-r from-orange-500 to-amber-500 text-white px-6 py-3.5 shadow-sm">
           <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
-            <p className="text-sm font-bold">🎉 {restaurant.promoBanner}</p>
+            <p className="text-xs md:text-sm font-black tracking-tight flex items-center gap-2">
+              <span className="text-lg">🎉</span> {restaurant.promoBanner}
+            </p>
             <button
               onClick={() => setPromoDismissed(true)}
-              className="text-white/70 hover:text-white flex-shrink-0 text-xl leading-none font-bold transition-colors"
+              className="text-white/80 hover:text-white flex-shrink-0 text-lg leading-none font-bold transition-colors w-7 h-7 bg-white/10 rounded-full flex items-center justify-center"
             >
               ✕
             </button>
@@ -655,123 +637,131 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
         </div>
       )}
 
-      {/* ── STICKY PAGE NAV ───────────────────────────────────────────────────── */}
-      <nav className="sticky top-0 z-30 bg-[#0d0802]/95 backdrop-blur-sm border-b border-[#2e2010] shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 w-full">
-          <div className="flex gap-1 overflow-x-auto scrollbar-hide py-2">
+      {/* ── Sticky Section Navigation ────────────────────────────────────────── */}
+      <nav className="sticky top-0 z-30 bg-[#FAF9F5]/90 dark:bg-[#0D0C0B]/90 backdrop-blur-md border-b border-[#EFECE6] dark:border-[#1F1F1C] shadow-sm py-2.5 transition-all">
+        <div className="max-w-4xl mx-auto px-6 w-full flex items-center justify-between">
+          <div className="flex gap-1.5 overflow-x-auto scrollbar-hide py-1">
             {navSections.map((s) => (
               <button
                 key={s.id}
                 onClick={() => scrollTo(s.id)}
                 style={activeSection === s.id ? { backgroundColor: primary } : {}}
-                className={`flex-shrink-0 px-5 py-2 rounded-full text-sm font-bold transition-all duration-200 ${
+                className={`flex-shrink-0 px-4.5 py-2 rounded-full text-xs font-black uppercase tracking-wider transition-all ${
                   activeSection === s.id
-                    ? "text-white shadow-md scale-105"
-                    : "text-[#9a8060] hover:text-[#f5e6c8] hover:bg-[#1a1008]"
+                    ? "text-white shadow-md shadow-[var(--brand-primary-20)] scale-105"
+                    : "text-[#7A7368] hover:text-neutral-900 dark:text-[#A19B91] dark:hover:text-white hover:bg-stone-100/50 dark:hover:bg-stone-900/50"
                 }`}
               >
                 {s.label}
               </button>
             ))}
           </div>
+          <button
+            onClick={() => setCartOpen(true)}
+            className="relative w-9 h-9 flex items-center justify-center rounded-2xl bg-white dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] hover:border-[var(--brand-primary)] shadow-sm transition-all"
+          >
+            {totalItems > 0 && (
+              <span
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black text-white shadow-md animate-scaleUp"
+                style={{ backgroundColor: primary }}
+              >
+                {totalItems}
+              </span>
+            )}
+            <svg className="w-4 h-4 text-neutral-800 dark:text-neutral-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+            </svg>
+          </button>
         </div>
       </nav>
 
-      {/* ── CLOSED BANNER ─────────────────────────────────────────────────────── */}
+      {/* ── Closed Banner ────────────────────────────────────────────────────── */}
       {!restaurant.isOpen && (
-        <div className="bg-[#0a0600] border-t border-[#2e2010] px-4 py-4">
-          <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <span className="text-2xl flex-shrink-0">🌙</span>
+        <div className="bg-stone-50 dark:bg-[#141412] border-b border-[#EFECE6] dark:border-[#1F1F1C] px-6 py-4.5">
+          <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <span className="text-2xl flex-shrink-0 animate-pulse">🌙</span>
               <div>
-                <p className="text-[#f5e6c8] font-black text-sm">We&apos;re closed right now</p>
-                {restaurant.todayHoursLabel ? (
-                  <p className="text-[#9a8060] text-xs mt-0.5">
-                    Hours today: {restaurant.todayHoursLabel} — browse the menu and order when we open!
-                  </p>
-                ) : (
-                  <p className="text-[#9a8060] text-xs mt-0.5">
-                    Browse the menu and place your order when we open.
-                  </p>
-                )}
+                <p className="text-neutral-900 dark:text-neutral-100 font-extrabold text-sm tracking-tight">Currently Resting</p>
+                <p className="text-[#7A7368] dark:text-[#A19B91] text-xs mt-0.5 font-medium leading-relaxed max-w-lg">
+                  We are closed for preparation right now. Browse our full online selection and schedule a preorder delivery for when we reopen!
+                </p>
               </div>
             </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => scrollTo("menu")}
-                  className="flex-shrink-0 bg-[#1a1008] hover:bg-[#2e2010] text-[#f5e6c8] text-xs font-bold px-4 py-2 rounded-xl border border-[#3a2518] transition-all"
-                >
-                  Browse Menu →
-                </button>
-                <button
-                  onClick={() => setScheduleOpen(true)}
-                  className="flex-shrink-0 bg-[#0d0802] hover:bg-[#1a1008] text-[#9a8060] text-xs font-bold px-4 py-2 rounded-xl border border-[#2e2010] transition-all"
-                >
-                  Schedule Order
-                </button>
-              </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button
+                onClick={() => scrollTo("menu")}
+                className="flex-1 sm:flex-initial bg-white dark:bg-[#1E1E1C] hover:bg-stone-50 dark:hover:bg-stone-900 text-neutral-800 dark:text-neutral-200 text-xs font-bold px-4 py-3 rounded-xl border border-[#EFECE6] dark:border-[#1F1F1C] transition-all shadow-sm active:scale-95"
+              >
+                Browse Menu
+              </button>
+              <button
+                onClick={() => setScheduleOpen(true)}
+                style={{ backgroundColor: primary }}
+                className="flex-1 sm:flex-initial text-white text-xs font-bold px-5 py-3 rounded-xl shadow-md transition-opacity hover:opacity-95 active:scale-95"
+              >
+                Schedule Delivery
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ── MENU SECTION ──────────────────────────────────────────────────────── */}
-      <section id="menu" ref={menuSectionRef} className="scroll-mt-11">
-        {/* Aurelio-inspired menu section header */}
-        <div className="max-w-4xl mx-auto px-4 pt-10 pb-4">
-          <p className="text-xs font-black uppercase tracking-[0.2em] mb-2" style={{ color: primary }}>Our Menu</p>
-          <h2 className="text-3xl font-black text-[#f5e6c8]">
-            {restaurant.name}
-          </h2>
+      {/* ── MENU EXPERIENCE REDESIGN (Phase 10B) ──────────────────────────────── */}
+      <section id="menu" ref={menuSectionRef} className="scroll-mt-24 max-w-4xl mx-auto px-6 pt-12 pb-6">
+        <div className="mb-8">
+          <span className="text-[10px] font-black uppercase tracking-wider text-[var(--brand-primary)]">Elite Gastronomy</span>
+          <h2 className="text-3xl font-extrabold text-neutral-900 dark:text-neutral-50 tracking-tight mt-0.5">Explore Culinary Menu</h2>
           {restaurant.description && (
-            <p className="text-[#9a8060] mt-2 max-w-md text-sm leading-relaxed">
-              {restaurant.description.slice(0, 120)}
+            <p className="text-[#7A7368] dark:text-[#A19B91] text-sm mt-2 max-w-xl leading-relaxed">
+              Explore freshly made signature dishes, snacks, side selections, beverages, and desserts.
             </p>
           )}
         </div>
 
-        {/* Sticky category tabs */}
-        <div className="sticky top-[44px] z-20 bg-[#0d0802]/95 backdrop-blur-sm border-b border-[#2e2010]">
-          <div className="max-w-4xl mx-auto">
-            <div ref={categoryTabsRef} className="flex gap-2 overflow-x-auto px-4 py-3 scrollbar-hide">
+        {/* Scrollable menu category pills */}
+        <div className="sticky top-[58px] z-20 bg-[#FAF9F5]/95 dark:bg-[#0D0C0B]/95 backdrop-blur-md py-3.5 border-b border-[#EFECE6] dark:border-[#1F1F1C] -mx-6 px-6 overflow-x-auto scrollbar-hide">
+          <div ref={categoryTabsRef} className="flex gap-2">
+            <button
+              onClick={() => { setActiveCategory(null); scrollTo("menu"); }}
+              style={activeCategory === null ? { backgroundColor: primary } : {}}
+              className={`flex-shrink-0 px-4.5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all duration-200 ${
+                activeCategory === null
+                  ? "text-white shadow-md shadow-[var(--brand-primary-20)] scale-105"
+                  : "text-[#7A7368] hover:text-neutral-900 dark:text-[#A19B91] dark:hover:text-white bg-white dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] hover:border-[var(--brand-primary)]"
+              }`}
+            >
+              All Specialties
+            </button>
+            {categories.map((cat) => (
               <button
-                onClick={() => { setActiveCategory(null); scrollTo("menu"); }}
-                style={activeCategory === null ? { backgroundColor: primary } : {}}
-                className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all duration-200 ${
-                  activeCategory === null
-                    ? "text-white shadow-md scale-105"
-                    : "text-[#9a8060] hover:text-[#f5e6c8] hover:bg-[#1a1008]"
+                key={cat}
+                onClick={() => { setActiveCategory(cat); scrollTo("menu"); }}
+                style={activeCategory === cat ? { backgroundColor: primary } : {}}
+                className={`flex-shrink-0 px-4.5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all duration-200 ${
+                  activeCategory === cat
+                    ? "text-white shadow-md shadow-[var(--brand-primary-20)] scale-105"
+                    : "text-[#7A7368] hover:text-neutral-900 dark:text-[#A19B91] dark:hover:text-white bg-white dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] hover:border-[var(--brand-primary)]"
                 }`}
               >
-                All
+                {cat}
               </button>
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => { setActiveCategory(cat); scrollTo("menu"); }}
-                  style={activeCategory === cat ? { backgroundColor: primary } : {}}
-                  className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all duration-200 ${
-                    activeCategory === cat
-                      ? "text-white shadow-md scale-105"
-                      : "text-[#9a8060] hover:text-[#f5e6c8] hover:bg-[#1a1008]"
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
+            ))}
           </div>
         </div>
 
         {/* Menu grid */}
-        <div className="max-w-4xl mx-auto px-4 py-8 pb-12">
+        <div className="py-8">
           {filteredItems.length === 0 ? (
-            <div className="text-center py-20">
-              <p className="text-[#9a8060] text-lg font-medium">No items here yet.</p>
+            <div className="text-center py-20 bg-white dark:bg-[#141412] rounded-3xl border border-[#EFECE6] dark:border-[#1F1F1C] p-8 shadow-sm">
+              <span className="text-4xl">🍽️</span>
+              <p className="text-neutral-900 dark:text-neutral-50 text-base font-extrabold mt-3 tracking-tight">Menu is currently empty</p>
+              <p className="text-[#7A7368] dark:text-[#A19B91] text-xs mt-1">Our kitchen is preparing fresh lists. Check back shortly!</p>
             </div>
           ) : (
             <div
               data-fade="menu-grid"
-              className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 ${fade("menu-grid")}`}
+              className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 ${fade("menu-grid")}`}
             >
               {filteredItems.map((item, idx) => {
                 const cartItem = items.find((i) => i.id === item.id);
@@ -779,17 +769,17 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                 return (
                   <div
                     key={item.id}
-                    className={`group bg-[#1a1008] rounded-3xl border overflow-hidden flex flex-col transition-all duration-300 ${
+                    className={`group bg-white dark:bg-[#141412] rounded-3xl border flex flex-col transition-all duration-300 shadow-[0_4px_25px_rgba(0,0,0,0.01)] ${
                       item.available
-                        ? "border-[#2e2010] hover:border-[#4a3520] hover:shadow-[0_8px_32px_rgba(0,0,0,0.5)] hover:-translate-y-1"
-                        : "border-[#2e2010] opacity-60"
+                        ? "border-[#EFECE6] dark:border-[#1F1F1C] hover:border-[var(--brand-primary)] dark:hover:border-[var(--brand-primary)] hover:shadow-xl hover:-translate-y-1.5"
+                        : "border-[#EFECE6] dark:border-[#1F1F1C] opacity-65"
                     }`}
                   >
-                    <div className="relative h-48 overflow-hidden bg-[#211508] flex-shrink-0">
+                    <div className="relative h-48 overflow-hidden bg-stone-50 dark:bg-stone-900/60 rounded-t-3xl flex-shrink-0">
                       {idx < 3 && item.available && (
                         <div
                           style={{ backgroundColor: primary }}
-                          className="absolute top-3 left-3 z-10 text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-md tracking-wide"
+                          className="absolute top-3 left-3 z-10 text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg shadow-sm"
                         >
                           🔥 Popular
                         </div>
@@ -797,61 +787,51 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                       <img
                         src={getItemImage(item)}
                         alt={item.name}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        loading="lazy"
                       />
                       {!item.available && (
-                        <div className="absolute inset-0 bg-[#0d0802]/80 flex items-center justify-center">
-                          <span className="bg-[#1a1008] text-[#9a8060] text-xs font-bold px-3 py-1.5 rounded-full border border-[#2e2010]">
+                        <div className="absolute inset-0 bg-[#0D0C0B]/75 backdrop-blur-xs flex items-center justify-center">
+                          <span className="bg-[#141412] text-rose-500 text-xs font-black uppercase tracking-wider px-3.5 py-2 rounded-xl border border-rose-950/20 shadow-lg">
                             Sold Out
                           </span>
                         </div>
                       )}
                     </div>
-                    <div className="p-4 flex flex-col flex-1">
-                      <div className="flex justify-between items-start gap-2 mb-1">
-                        <h3 className="font-black text-[15px] text-[#f5e6c8] leading-snug">{item.name}</h3>
-                        <span className="font-black text-base flex-shrink-0" style={{ color: primary }}>{fmt(item.price)}</span>
+                    <div className="p-5 flex flex-col flex-1">
+                      <div className="flex justify-between items-start gap-2 mb-1.5">
+                        <h3 className="font-extrabold text-[15px] text-neutral-900 dark:text-neutral-50 leading-snug group-hover:text-[var(--brand-primary)] transition-colors">{item.name}</h3>
+                        <span className="font-black text-sm text-[var(--brand-primary)] flex-shrink-0 tracking-tight">{fmt(item.price)}</span>
                       </div>
                       {item.description && (
-                        <p className="text-xs text-[#9a8060] mb-3 leading-relaxed line-clamp-2">{item.description}</p>
+                        <p className="text-xs text-[#7A7368] dark:text-[#A19B91] mb-4 leading-relaxed line-clamp-2 font-medium">{item.description}</p>
                       )}
-                      <div className="mt-auto">
+                      <div className="mt-auto pt-2 border-t border-[#FAF9F5] dark:border-[#1F1F1C]">
                         {qty === 0 ? (
                           <button
                             disabled={!item.available || !restaurant.isOpen}
                             onClick={() => addToCart({ id: item.id, name: item.name, price: item.price })}
                             style={item.available && restaurant.isOpen ? { backgroundColor: primary } : {}}
-                            className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all ${
+                            className={`w-full py-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${
                               item.available && restaurant.isOpen
-                                ? "text-white hover:opacity-90 active:scale-95 hover:shadow-[0_4px_14px_0_rgba(0,0,0,0.39)]"
-                                : "bg-[#211508] text-[#9a8060] cursor-not-allowed"
+                                ? "text-white hover:opacity-95 active:scale-95 shadow-sm"
+                                : "bg-stone-50 dark:bg-[#1C1C1A] text-[#7A7368] dark:text-[#5C574F] cursor-not-allowed border border-[#EFECE6] dark:border-[#1F1F1C]"
                             }`}
-                            onMouseEnter={(e) => {
-                              if (item.available && restaurant.isOpen) e.currentTarget.style.boxShadow = `0 4px 14px 0 ${primary}66`;
-                            }}
-                            onMouseLeave={(e) => {
-                              if (item.available && restaurant.isOpen) e.currentTarget.style.boxShadow = "";
-                            }}
                           >
-                            {!restaurant.isOpen ? "Closed" : !item.available ? "Sold Out" : "+ Add"}
+                            {!restaurant.isOpen ? "Closed" : !item.available ? "Sold Out" : "Add to Cart"}
                           </button>
                         ) : (
-                          <div className="flex items-center justify-between bg-[#241808] rounded-xl p-1">
+                          <div className="flex items-center justify-between bg-stone-50 dark:bg-[#1E1E1C] rounded-2xl p-1 border border-[#EFECE6] dark:border-[#1F1F1C] animate-scaleUp">
                             <button
                               onClick={() => updateQuantity(item.id, qty - 1)}
-                              className="w-9 h-9 bg-[#1a1008] rounded-lg flex items-center justify-center font-bold text-[#9a8060] hover:text-white transition-all"
-                              style={{ ["--hover-bg" as string]: primary }}
-                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = primary)}
-                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "")}
+                              className="w-9 h-9 bg-white dark:bg-[#141412] hover:bg-stone-100 dark:hover:bg-stone-900 rounded-xl flex items-center justify-center font-bold text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 transition-all border border-[#EFECE6] dark:border-[#1F1F1C] active:scale-90"
                             >
                               −
                             </button>
-                            <span className="font-bold text-sm" style={{ color: primary }}>{qty}</span>
+                            <span className="font-extrabold text-sm text-neutral-800 dark:text-neutral-200">{qty}</span>
                             <button
                               onClick={() => updateQuantity(item.id, qty + 1)}
-                              className="w-9 h-9 bg-[#1a1008] rounded-lg flex items-center justify-center font-bold text-[#9a8060] transition-all"
-                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = primary; e.currentTarget.style.color = "white"; }}
-                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = ""; e.currentTarget.style.color = ""; }}
+                              className="w-9 h-9 bg-white dark:bg-[#141412] hover:bg-stone-100 dark:hover:bg-stone-900 rounded-xl flex items-center justify-center font-bold text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 transition-all border border-[#EFECE6] dark:border-[#1F1F1C] active:scale-90"
                             >
                               +
                             </button>
@@ -867,27 +847,99 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
         </div>
       </section>
 
-      {/* ── ABOUT SECTION ─────────────────────────────────────────────────────── */}
-      <section id="about" ref={aboutSectionRef} className="scroll-mt-11 bg-[#0a0600] border-t border-[#2e2010]">
-        <div className="max-w-4xl mx-auto px-4 py-14">
+      {/* ── Chef Specialties Showcase (Phase 10G) ───────────────────────────── */}
+      {popularItems.length > 0 && (
+        <section id="popular" ref={popularSectionRef} className="scroll-mt-24 border-t border-[#EFECE6] dark:border-[#1F1F1C] bg-white dark:bg-[#141412] transition-colors duration-300">
+          <div className="max-w-4xl mx-auto px-6 py-16">
+            <div data-fade="popular" className={fade("popular")}>
+              <span className="text-[10px] font-black uppercase tracking-wider text-[var(--brand-primary)]">Chef&apos;s Showcase</span>
+              <div className="flex items-center justify-between mb-8 mt-0.5">
+                <h2 className="text-2xl font-extrabold text-neutral-900 dark:text-neutral-50 tracking-tight">Our Signature Specialties</h2>
+                <button
+                  onClick={() => scrollTo("menu")}
+                  className="text-xs font-black uppercase tracking-wider hover:opacity-85 transition-opacity"
+                  style={{ color: primary }}
+                >
+                  Full Menu →
+                </button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {popularItems.slice(0, 4).map((item) => {
+                  const cartItem = items.find((i) => i.id === item.id);
+                  const qty = cartItem?.quantity ?? 0;
+                  return (
+                    <div key={item.id} className="group bg-[#FAF9F5] dark:bg-[#0D0C0B] rounded-3xl border border-[#EFECE6] dark:border-[#1F1F1C] overflow-hidden hover:border-[var(--brand-primary)] hover:shadow-lg transition-all duration-300 flex flex-col">
+                      <div className="relative h-40 overflow-hidden bg-stone-100 dark:bg-stone-900">
+                        <div
+                          style={{ backgroundColor: primary }}
+                          className="absolute top-2.5 left-2.5 z-10 text-white text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg shadow-sm"
+                        >
+                          Top Order
+                        </div>
+                        <img
+                          src={getItemImage(item)}
+                          alt={item.name}
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          loading="lazy"
+                        />
+                      </div>
+                      <div className="p-4 flex flex-col flex-1 justify-between">
+                        <div>
+                          <p className="font-extrabold text-neutral-900 dark:text-neutral-50 text-sm leading-snug tracking-tight truncate">{item.name}</p>
+                          <p className="font-black text-xs text-[var(--brand-primary)] mt-0.5 tracking-tight">{fmt(item.price)}</p>
+                        </div>
+                        <div className="mt-4">
+                          {qty === 0 ? (
+                            <button
+                              disabled={!restaurant.isOpen}
+                              onClick={() => addToCart({ id: item.id, name: item.name, price: item.price })}
+                              style={restaurant.isOpen ? { backgroundColor: primary } : {}}
+                              className={`w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                                restaurant.isOpen
+                                  ? "text-white hover:opacity-95 active:scale-95 shadow-xs"
+                                  : "bg-stone-100 dark:bg-stone-900 text-[#7A7368] cursor-not-allowed border border-[#EFECE6] dark:border-[#1F1F1C]"
+                              }`}
+                            >
+                              {restaurant.isOpen ? "Add" : "Closed"}
+                            </button>
+                          ) : (
+                            <div className="flex items-center justify-between bg-white dark:bg-[#1E1E1C] border border-[#EFECE6] dark:border-[#1F1F1C] rounded-xl px-1 py-0.5">
+                              <button onClick={() => updateQuantity(item.id, qty - 1)} className="w-7 h-7 flex items-center justify-center font-bold text-[#7A7368] hover:text-neutral-900 dark:hover:text-white transition-colors">−</button>
+                              <span className="font-extrabold text-xs text-neutral-800 dark:text-neutral-200">{qty}</span>
+                              <button onClick={() => updateQuantity(item.id, qty + 1)} className="w-7 h-7 flex items-center justify-center font-bold text-[#7A7368] hover:text-neutral-900 dark:hover:text-white transition-colors">+</button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── ABOUT SECTION (Phase 10D) ────────────────────────────────────────── */}
+      <section id="about" ref={aboutSectionRef} className="scroll-mt-24 bg-white dark:bg-[#141412] border-t border-[#EFECE6] dark:border-[#1F1F1C] transition-colors duration-300">
+        <div className="max-w-4xl mx-auto px-6 py-16">
           <div
             data-fade="about"
-            className={`grid grid-cols-1 md:grid-cols-2 gap-10 ${fade("about")}`}
+            className={`grid grid-cols-1 md:grid-cols-2 gap-12 ${fade("about")}`}
           >
-            {/* LEFT */}
             <div>
-              <p className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: primary }}>About</p>
-              <h2 className="text-2xl font-black text-[#f5e6c8] mb-4">About {restaurant.name}</h2>
+              <span className="text-[10px] font-black uppercase tracking-wider text-[var(--brand-primary)]">Gastronomy Heritage</span>
+              <h2 className="text-2xl font-extrabold text-neutral-900 dark:text-neutral-50 tracking-tight mt-0.5 mb-4">About {restaurant.name}</h2>
               {restaurant.description && (
-                <p className="text-[#9a8060] leading-relaxed mb-6">{restaurant.description}</p>
+                <p className="text-[#7A7368] dark:text-[#A19B91] leading-relaxed text-sm md:text-base font-medium">{restaurant.description}</p>
               )}
               {keywords.length > 0 && (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5 pt-4">
                   {keywords.map((k) => (
                     <span
                       key={k}
-                      className="text-sm font-bold px-3 py-1.5 rounded-full border"
-                      style={{ backgroundColor: primary + "15", color: primary, borderColor: primary + "30" }}
+                      className="text-xs font-bold px-3.5 py-2 rounded-xl border"
+                      style={{ backgroundColor: primary + "0d", color: primary, borderColor: primary + "26" }}
                     >
                       {k}
                     </span>
@@ -895,45 +947,44 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                 </div>
               )}
             </div>
-            {/* RIGHT: info cards */}
-            <div className="space-y-3">
+            <div className="space-y-3.5">
               {restaurant.address && (
-                <div className="bg-[#1a1008] rounded-2xl border border-[#2e2010] px-4 py-4 flex items-start gap-3">
+                <div className="bg-[#FAF9F5] dark:bg-[#0D0C0B] rounded-3xl border border-[#EFECE6] dark:border-[#1F1F1C] px-5 py-4 flex items-start gap-4">
                   <span className="text-2xl flex-shrink-0">📍</span>
                   <div>
-                    <p className="text-xs font-black uppercase tracking-widest mb-0.5" style={{ color: primary }}>Address</p>
-                    <p className="text-sm font-medium text-[#f5e6c8]">{restaurant.address}</p>
+                    <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider mb-0.5">Outlet Location</p>
+                    <p className="text-sm font-bold text-neutral-800 dark:text-neutral-200 leading-tight">{restaurant.address}</p>
                   </div>
                 </div>
               )}
               {restaurant.todayHoursLabel && (
-                <div className="bg-[#1a1008] rounded-2xl border border-[#2e2010] px-4 py-4 flex items-start gap-3">
+                <div className="bg-[#FAF9F5] dark:bg-[#0D0C0B] rounded-3xl border border-[#EFECE6] dark:border-[#1F1F1C] px-5 py-4 flex items-start gap-4">
                   <span className="text-2xl flex-shrink-0">🕒</span>
                   <div>
-                    <p className="text-xs font-black uppercase tracking-widest mb-0.5" style={{ color: primary }}>Hours Today</p>
-                    <p className="text-sm font-medium text-[#f5e6c8]">{restaurant.todayHoursLabel}</p>
+                    <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider mb-0.5">Today&apos;s Schedule</p>
+                    <p className="text-sm font-bold text-neutral-800 dark:text-neutral-200 leading-tight">{restaurant.todayHoursLabel}</p>
                   </div>
                 </div>
               )}
-              <div className="bg-[#1a1008] rounded-2xl border border-[#2e2010] px-4 py-4 flex items-start gap-3">
+              <div className="bg-[#FAF9F5] dark:bg-[#0D0C0B] rounded-3xl border border-[#EFECE6] dark:border-[#1F1F1C] px-5 py-4 flex items-start gap-4">
                 <span className="text-2xl flex-shrink-0">🚚</span>
                 <div>
-                  <p className="text-xs font-black uppercase tracking-widest mb-0.5" style={{ color: primary }}>Delivery</p>
-                  <p className="text-sm font-medium text-[#f5e6c8]">
+                  <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider mb-0.5">Dispatch Terms</p>
+                  <p className="text-sm font-bold text-neutral-800 dark:text-neutral-200 leading-tight">
                     {restaurant.deliveryEnabled
                       ? restaurant.deliveryFee > 0
-                        ? `${fmt(restaurant.deliveryFee)} delivery fee`
-                        : "Free delivery on all orders"
-                      : "Pickup only"}
+                        ? `${fmt(restaurant.deliveryFee)} delivery fee applies`
+                        : "Complimentary free delivery"
+                      : "Direct takeaway pickup only"}
                   </p>
                 </div>
               </div>
               {areas.length > 0 && (
-                <div className="bg-[#1a1008] rounded-2xl border border-[#2e2010] px-4 py-4">
-                  <p className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: primary }}>Delivery Areas</p>
+                <div className="bg-[#FAF9F5] dark:bg-[#0D0C0B] rounded-3xl border border-[#EFECE6] dark:border-[#1F1F1C] px-5 py-4.5">
+                  <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider mb-3">Service Boundaries</p>
                   <div className="flex flex-wrap gap-1.5">
                     {areas.map((area) => (
-                      <span key={area} className="text-xs font-medium text-[#9a8060] bg-[#211508] border border-[#2e2010] px-2.5 py-1 rounded-lg">
+                      <span key={area} className="text-xs font-semibold text-[#7A7368] dark:text-[#A19B91] bg-white dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] px-3 py-1.5 rounded-xl">
                         {area}
                       </span>
                     ))}
@@ -945,111 +996,36 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
         </div>
       </section>
 
-      {/* ── POPULAR SECTION ───────────────────────────────────────────────────── */}
-      {popularItems.length > 0 && (
-        <section id="popular" ref={popularSectionRef} className="scroll-mt-11 border-t border-[#2e2010] bg-[#0d0802]">
-          <div className="max-w-4xl mx-auto px-4 py-14">
-            <div data-fade="popular" className={fade("popular")}>
-              <p className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: primary }}>Chef&apos;s Special</p>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-black text-[#f5e6c8]">Top Picks</h2>
-                <button
-                  onClick={() => scrollTo("menu")}
-                  className="text-sm font-bold transition-colors hover:opacity-70"
-                  style={{ color: primary }}
-                >
-                  View all →
-                </button>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                {popularItems.slice(0, 4).map((item) => {
-                  const cartItem = items.find((i) => i.id === item.id);
-                  const qty = cartItem?.quantity ?? 0;
-                  return (
-                    <div key={item.id} className="group bg-[#1a1008] rounded-3xl border border-[#2e2010] overflow-hidden hover:border-[#4a3520] hover:shadow-[0_8px_32px_rgba(0,0,0,0.5)] hover:-translate-y-1 transition-all duration-300">
-                      <div className="relative h-40 overflow-hidden bg-[#211508]">
-                        <div
-                          style={{ backgroundColor: primary }}
-                          className="absolute top-2.5 left-2.5 z-10 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-md tracking-wide"
-                        >
-                          Most Ordered
-                        </div>
-                        <img
-                          src={getItemImage(item)}
-                          alt={item.name}
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                          loading="lazy"
-                        />
-                      </div>
-                      <div className="p-3">
-                        <p className="font-black text-[#f5e6c8] text-sm leading-snug mb-0.5">{item.name}</p>
-                        <p className="font-black text-sm mb-2" style={{ color: primary }}>{fmt(item.price)}</p>
-                        {qty === 0 ? (
-                          <button
-                            disabled={!restaurant.isOpen}
-                            onClick={() => addToCart({ id: item.id, name: item.name, price: item.price })}
-                            style={restaurant.isOpen ? { backgroundColor: primary } : {}}
-                            className={`w-full py-1.5 rounded-lg text-xs font-bold transition-all ${
-                              restaurant.isOpen
-                                ? "text-white hover:opacity-90 active:scale-95 hover:shadow-[0_4px_14px_0_rgba(0,0,0,0.39)]"
-                                : "bg-[#211508] text-[#9a8060] cursor-not-allowed"
-                            }`}
-                            onMouseEnter={(e) => {
-                              if (restaurant.isOpen) e.currentTarget.style.boxShadow = `0 4px 14px 0 ${primary}66`;
-                            }}
-                            onMouseLeave={(e) => {
-                              if (restaurant.isOpen) e.currentTarget.style.boxShadow = "";
-                            }}
-                          >
-                            {restaurant.isOpen ? "+ Add" : "Closed"}
-                          </button>
-                        ) : (
-                          <div className="flex items-center justify-between bg-[#241808] rounded-lg px-1 py-0.5">
-                            <button onClick={() => updateQuantity(item.id, qty - 1)} className="w-7 h-7 flex items-center justify-center font-bold text-[#9a8060] hover:text-[#f5e6c8] transition-colors">−</button>
-                            <span className="font-bold text-xs" style={{ color: primary }}>{qty}</span>
-                            <button onClick={() => updateQuantity(item.id, qty + 1)} className="w-7 h-7 flex items-center justify-center font-bold text-[#9a8060] hover:text-[#f5e6c8] transition-colors">+</button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ── FAQ SECTION ───────────────────────────────────────────────────────── */}
-      <section id="faq" ref={faqSectionRef} className="scroll-mt-11 bg-[#0a0600] border-t border-[#2e2010]">
-        <div className="max-w-4xl mx-auto px-4 py-14">
+      {/* ── FAQ SECTION (Phase 10I) ──────────────────────────────────────────── */}
+      <section id="faq" ref={faqSectionRef} className="scroll-mt-24 bg-[#FAF9F5] dark:bg-[#0D0C0B] border-t border-[#EFECE6] dark:border-[#1F1F1C] transition-colors duration-300">
+        <div className="max-w-4xl mx-auto px-6 py-16">
           <div data-fade="faq" className={fade("faq")}>
-            <p className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: primary }}>Help</p>
-            <h2 className="text-2xl font-black text-[#f5e6c8] mb-6">Frequently Asked Questions</h2>
-            <div className="space-y-2.5">
+            <span className="text-[10px] font-black uppercase tracking-wider text-[var(--brand-primary)]">Assistance</span>
+            <h2 className="text-2xl font-extrabold text-neutral-900 dark:text-neutral-50 tracking-tight mt-0.5 mb-8">Order Help &amp; FAQs</h2>
+            <div className="space-y-3">
               {faqs.map((faq, i) => (
-                <div key={i} className="bg-[#1a1008] border border-[#2e2010] rounded-2xl overflow-hidden">
+                <div key={i} className="bg-white dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] rounded-3xl overflow-hidden shadow-xs hover:border-[var(--brand-primary)] transition-colors duration-200">
                   <button
                     onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                    className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-[#211508] transition-colors"
+                    className="w-full flex items-center justify-between px-6 py-4.5 text-left hover:bg-stone-50 dark:hover:bg-stone-900/50 transition-colors"
                   >
-                    <span className="font-bold text-[#f5e6c8] text-sm pr-4">{faq.q}</span>
+                    <span className="font-extrabold text-neutral-900 dark:text-neutral-50 text-sm md:text-base pr-4 tracking-tight leading-snug">{faq.q}</span>
                     <span
-                      className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200"
-                      style={openFaq === i ? { backgroundColor: primary } : { backgroundColor: "#2e2010", color: "#9a8060" }}
+                      className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-200 border border-[#EFECE6] dark:border-[#1F1F1C]"
+                      style={openFaq === i ? { backgroundColor: primary, borderColor: primary, color: "#fff" } : { backgroundColor: "transparent", color: "#7A7368" }}
                     >
                       <svg
-                        className={`w-3.5 h-3.5 transition-transform duration-200 ${openFaq === i ? "rotate-180 text-white" : ""}`}
+                        className={`w-3.5 h-3.5 transition-transform duration-350 ${openFaq === i ? "rotate-180 text-white" : ""}`}
                         fill="none" stroke="currentColor" viewBox="0 0 24 24"
                       >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
                       </svg>
                     </span>
                   </button>
-                  <div className={`grid transition-all duration-300 ease-in-out ${openFaq === i ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                  <div className={`grid transition-all duration-350 ease-in-out ${openFaq === i ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
                     <div className="overflow-hidden">
-                      <div className="px-5 pb-4 border-t border-[#2e2010]">
-                        <p className="text-[#9a8060] text-sm leading-relaxed pt-3">{faq.a}</p>
+                      <div className="px-6 pb-5 border-t border-[#EFECE6] dark:border-[#1F1F1C] pt-4">
+                        <p className="text-[#7A7368] dark:text-[#A19B91] text-xs md:text-sm leading-relaxed font-medium">{faq.a}</p>
                       </div>
                     </div>
                   </div>
@@ -1060,51 +1036,68 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
         </div>
       </section>
 
+      {/* ── Phase 10J — SEO Integration Strip ────────────────────────────────── */}
+      {seo && (
+        <SEOSections
+          restaurant={{
+            name: restaurant.name,
+            address: restaurant.address,
+            description: restaurant.description,
+            onlinePaymentEnabled: restaurant.onlinePaymentEnabled,
+            deliveryEnabled: restaurant.deliveryEnabled,
+            pickupEnabled: restaurant.pickupEnabled,
+            deliveryFee: restaurant.deliveryFee,
+          }}
+          seo={seo}
+          menuItems={menuItems}
+        />
+      )}
+
       {/* ── FOOTER ────────────────────────────────────────────────────────────── */}
-      <footer className="border-t border-[#2e2010] bg-[#0a0600]">
-        <div className="max-w-4xl mx-auto px-4 py-12">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-            <div>
+      <footer className="border-t border-[#EFECE6] dark:border-[#1F1F1C] bg-white dark:bg-[#141412] transition-colors duration-300">
+        <div className="max-w-4xl mx-auto px-6 py-16">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-8">
+            <div className="space-y-4">
               {restaurant.logo && (
-                <div className="w-12 h-12 rounded-2xl overflow-hidden mb-3 border border-[#2e2010]">
+                <div className="w-12 h-12 rounded-2xl overflow-hidden border border-[#EFECE6] dark:border-[#1F1F1C] shadow-sm">
                   <img src={restaurant.logo} alt="logo" className="w-full h-full object-cover" />
                 </div>
               )}
-              <p className="font-black text-[#f5e6c8] text-xl">{restaurant.name}</p>
+              <h3 className="font-extrabold text-neutral-900 dark:text-neutral-50 text-xl tracking-tight leading-none">{restaurant.name}</h3>
               {restaurant.address && (
-                <p className="text-sm text-[#9a8060] mt-1">{restaurant.address}</p>
+                <p className="text-xs text-[#7A7368] dark:text-[#A19B91] font-medium leading-relaxed max-w-sm">{restaurant.address}</p>
               )}
             </div>
-            <div className="flex flex-col items-start sm:items-end gap-3">
+            <div className="flex flex-col items-start sm:items-end gap-3.5 w-full sm:w-auto">
               <button
                 onClick={() => scrollTo("menu")}
                 style={{ backgroundColor: primary }}
-                className="text-white font-bold px-5 py-2.5 rounded-xl text-sm transition-all active:scale-95 hover:opacity-90 hover:shadow-lg"
+                className="w-full sm:w-auto text-white font-bold px-6 py-3.5 rounded-2xl text-xs uppercase tracking-widest transition-opacity hover:opacity-95 active:scale-95 shadow-md shadow-[var(--brand-primary-20)]"
               >
-                Order Online →
+                Order Online Now
               </button>
               {(seo?.googleBusinessUrl || seo?.instagramUrl || seo?.tiktokUrl) && (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex items-center gap-2">
                   {seo.googleBusinessUrl && (
                     <a href={seo.googleBusinessUrl} target="_blank" rel="noopener noreferrer"
-                      className="w-10 h-10 bg-[#1a1008] rounded-xl border border-[#2e2010] hover:border-[#3a2518] hover:bg-[#211508] flex items-center justify-center transition-all group" title="Google Business">
-                      <svg className="w-5 h-5 text-[#9a8060] group-hover:text-[#f5e6c8] transition-colors" viewBox="0 0 24 24" fill="currentColor">
+                      className="w-9 h-9 bg-stone-50 dark:bg-stone-900 rounded-xl border border-[#EFECE6] dark:border-[#1F1F1C] hover:border-[var(--brand-primary)] flex items-center justify-center transition-all group" title="Google Business">
+                      <svg className="w-4 h-4 text-[#7A7368] group-hover:text-[var(--brand-primary)] transition-colors" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 11h8.533c.044.385.067.773.067 1.167C20.6 17.48 16.956 21 11.8 21 6.928 21 3 17.07 3 12.2S6.928 3.4 11.8 3.4c2.418 0 4.444.897 5.995 2.362l-2.43 2.43c-.678-.647-1.854-1.406-3.565-1.406-3.065 0-5.567 2.527-5.567 5.614 0 3.086 2.502 5.613 5.567 5.613 3.559 0 4.892-2.548 5.098-3.875H12V11z"/>
                       </svg>
                     </a>
                   )}
                   {seo.instagramUrl && (
                     <a href={seo.instagramUrl} target="_blank" rel="noopener noreferrer"
-                      className="w-10 h-10 bg-[#1a1008] rounded-xl border border-[#2e2010] hover:border-[#3a2518] hover:bg-[#211508] flex items-center justify-center transition-all group" title="Instagram">
-                      <svg className="w-5 h-5 text-[#9a8060] group-hover:text-[#f5e6c8] transition-colors" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                      className="w-9 h-9 bg-stone-50 dark:bg-stone-900 rounded-xl border border-[#EFECE6] dark:border-[#1F1F1C] hover:border-[var(--brand-primary)] flex items-center justify-center transition-all group" title="Instagram">
+                      <svg className="w-4 h-4 text-[#7A7368] group-hover:text-[var(--brand-primary)] transition-colors" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204 013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
                       </svg>
                     </a>
                   )}
                   {seo.tiktokUrl && (
                     <a href={seo.tiktokUrl} target="_blank" rel="noopener noreferrer"
-                      className="w-10 h-10 bg-[#1a1008] rounded-xl border border-[#2e2010] hover:border-[#3a2518] hover:bg-[#211508] flex items-center justify-center transition-all group" title="TikTok">
-                      <svg className="w-5 h-5 text-[#9a8060] group-hover:text-[#f5e6c8] transition-colors" viewBox="0 0 24 24" fill="currentColor">
+                      className="w-9 h-9 bg-stone-50 dark:bg-stone-900 rounded-xl border border-[#EFECE6] dark:border-[#1F1F1C] hover:border-[var(--brand-primary)] flex items-center justify-center transition-all group" title="TikTok">
+                      <svg className="w-4 h-4 text-[#7A7368] group-hover:text-[var(--brand-primary)] transition-colors" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.31 6.31 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.19 8.19 0 004.79 1.52V6.75a4.85 4.85 0 01-1.02-.06z"/>
                       </svg>
                     </a>
@@ -1113,82 +1106,94 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
               )}
             </div>
           </div>
-          <div className="border-t border-[#2e2010] mt-10 pt-6 text-center">
-            <p className="text-xs text-[#9a8060] font-medium">Powered by RestoFlow</p>
+          <div className="border-t border-[#EFECE6] dark:border-[#1F1F1C] mt-12 pt-8 text-center flex flex-col md:flex-row justify-between items-center gap-3">
+            <p className="text-xs text-[#7A7368] dark:text-[#A19B91] font-semibold tracking-tight">© {new Date().getFullYear()} {restaurant.name}. All rights reserved.</p>
+            <p className="text-[10px] uppercase font-black text-[#7A7368] dark:text-[#5C574F] tracking-widest flex items-center gap-1">Powered by <span className="text-neutral-900 dark:text-neutral-300 font-extrabold normal-case text-xs">RestoFlow</span></p>
           </div>
         </div>
       </footer>
 
-      {/* ── STICKY BOTTOM BAR (always visible) ───────────────────────────────── */}
+      {/* ── STICKY BOTTOM ORDER BAR (Phase 10E) ───────────────────────────────── */}
       {!cartOpen && !checkoutOpen && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 px-4 py-3 bg-[#0d0802]/95 backdrop-blur-sm border-t border-[#2e2010] shadow-2xl">
-          <div className="max-w-4xl mx-auto">
+        <div className="fixed bottom-0 left-0 right-0 z-40 px-6 py-4 bg-white/95 dark:bg-[#141412]/95 backdrop-blur-md border-t border-[#EFECE6] dark:border-[#1F1F1C] shadow-[0_-8px_30px_rgba(0,0,0,0.04)] transition-all">
+          <div className="max-w-4xl mx-auto flex items-center gap-4">
             {totalItems === 0 ? (
               <button
                 onClick={() => scrollTo("menu")}
                 style={{ backgroundColor: primary }}
-                className="w-full text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2.5 transition-all hover:opacity-90 hover:scale-[1.01] active:scale-[0.99] shadow-lg"
+                className="w-full text-white font-bold py-4.5 rounded-2xl flex items-center justify-center gap-2.5 transition-opacity hover:opacity-95 active:scale-[0.99] shadow-lg shadow-[var(--brand-primary-20)]"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
-                <span>Browse Menu &amp; Start Order</span>
+                <span className="text-sm font-black uppercase tracking-wider">Browse Selection &amp; Preorder</span>
               </button>
             ) : (
               <button
                 onClick={() => setCartOpen(true)}
                 style={{ backgroundColor: primary }}
-                className="w-full text-white font-bold py-4 rounded-2xl flex items-center justify-between px-5 transition-all hover:opacity-90 active:scale-[0.99] shadow-lg"
+                className="w-full text-white font-bold py-4 px-5 rounded-2xl flex items-center justify-between transition-opacity hover:opacity-95 active:scale-[0.99] shadow-lg shadow-[var(--brand-primary-20)] animate-scaleUp"
               >
-                <span className="bg-white/20 text-white text-sm font-black w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0">
-                  {totalItems}
-                </span>
-                <span className="font-bold text-base">View Cart</span>
-                <span className="font-bold">{fmt(orderTotal)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="bg-white/20 text-white text-xs font-black w-6.5 h-6.5 rounded-xl flex items-center justify-center">
+                    {totalItems}
+                  </span>
+                  <span className="font-extrabold text-sm uppercase tracking-wider">View Cart Drawer</span>
+                </div>
+                <div className="flex items-center gap-1.5 font-black text-sm">
+                  <span>Checkout</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                  <span className="ml-1 bg-black/15 py-1 px-2.5 rounded-lg">{fmt(orderTotal)}</span>
+                </div>
               </button>
             )}
           </div>
         </div>
       )}
 
-      {/* ── CART DRAWER ───────────────────────────────────────────────────────── */}
+      {/* ── CART DRAWER OVERHAUL (Phase 10C) ─────────────────────────────────── */}
       {cartOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end md:justify-center md:items-end">
+        <div className="fixed inset-0 z-50 flex flex-col justify-end md:justify-center md:items-end animate-fadeIn">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-neutral-900/60 dark:bg-black/85 backdrop-blur-xs transition-opacity duration-300"
             onClick={() => setCartOpen(false)}
           />
-          <div className="relative bg-[#1a1008] w-full md:w-[420px] md:h-full rounded-t-3xl md:rounded-none flex flex-col max-h-[90vh] md:max-h-full shadow-2xl">
-            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#2e2010] flex-shrink-0">
-              <h2 className="text-lg font-black text-[#f5e6c8]">Your Cart ({totalItems})</h2>
+          <div className="relative bg-white dark:bg-[#141412] w-full md:w-[420px] md:h-full rounded-t-[32px] md:rounded-none flex flex-col max-h-[85vh] md:max-h-full shadow-2xl border-t md:border-t-0 md:border-l border-[#EFECE6] dark:border-[#1F1F1C] animate-slideUp md:animate-slideLeft transition-colors duration-300">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-[#EFECE6] dark:border-[#1F1F1C] flex-shrink-0">
+              <div>
+                <h2 className="text-lg font-extrabold text-neutral-900 dark:text-neutral-50 tracking-tight leading-none">Your Cart</h2>
+                <p className="text-[10px] text-[#7A7368] dark:text-[#A19B91] uppercase font-bold tracking-wider mt-1">{totalItems} selections added</p>
+              </div>
               <button
                 onClick={() => setCartOpen(false)}
-                className="w-9 h-9 bg-[#241808] rounded-full flex items-center justify-center text-[#9a8060] hover:bg-[#2e2010] transition-colors font-bold"
+                className="w-9 h-9 bg-stone-50 dark:bg-[#1E1E1C] rounded-2xl flex items-center justify-center text-[#7A7368] hover:text-neutral-900 hover:bg-stone-100 dark:hover:bg-stone-900 transition-colors border border-[#EFECE6] dark:border-[#1F1F1C]"
               >
                 ✕
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5 scrollbar-hide">
               {items.map((item) => (
-                <div key={item.id} className="flex items-center gap-3">
+                <div key={item.id} className="flex items-center gap-4 py-1 animate-scaleUp">
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-sm text-[#f5e6c8] truncate">{item.name}</p>
-                    <p className="text-sm font-bold" style={{ color: primary }}>
+                    <p className="font-extrabold text-sm text-neutral-900 dark:text-neutral-100 truncate tracking-tight leading-snug">{item.name}</p>
+                    <p className="text-xs font-black text-[var(--brand-primary)] mt-0.5" style={{ color: primary }}>
                       {fmt(item.price * item.quantity)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 bg-[#241808] rounded-xl p-1 flex-shrink-0">
+                  <div className="flex items-center gap-1.5 bg-stone-50 dark:bg-[#1E1E1C] rounded-2xl p-1 border border-[#EFECE6] dark:border-[#1F1F1C] flex-shrink-0">
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                      className="w-8 h-8 bg-[#1a1008] rounded-lg flex items-center justify-center font-bold text-[#9a8060] transition-colors text-sm hover:bg-[#2e2010] hover:text-[#f5e6c8]"
+                      className="w-8 h-8 bg-white dark:bg-[#141412] hover:bg-stone-100 dark:hover:bg-stone-900 rounded-xl flex items-center justify-center font-bold text-[#7A7368] transition-colors border border-[#EFECE6] dark:border-[#1F1F1C] text-sm active:scale-90"
                     >
                       −
                     </button>
-                    <span className="font-bold text-sm w-5 text-center text-[#f5e6c8]">{item.quantity}</span>
+                    <span className="font-extrabold text-sm w-5 text-center text-neutral-800 dark:text-neutral-200">{item.quantity}</span>
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                      className="w-8 h-8 bg-[#1a1008] rounded-lg flex items-center justify-center font-bold text-[#9a8060] transition-colors text-sm hover:bg-[#2e2010] hover:text-[#f5e6c8]"
+                      className="w-8 h-8 bg-white dark:bg-[#141412] hover:bg-stone-100 dark:hover:bg-stone-900 rounded-xl flex items-center justify-center font-bold text-[#7A7368] transition-colors border border-[#EFECE6] dark:border-[#1F1F1C] text-sm active:scale-90"
                     >
                       +
                     </button>
@@ -1197,317 +1202,340 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
               ))}
             </div>
 
-            <div className="px-5 py-4 border-t border-[#2e2010] bg-[#0d0802] flex-shrink-0">
-              <div className="space-y-2 mb-4">
-                <div className="flex justify-between text-sm text-[#9a8060]">
-                  <span>Subtotal</span>
-                  <span className="font-medium text-[#f5e6c8]">{fmt(subtotal)}</span>
+            <div className="px-6 py-6 border-t border-[#EFECE6] dark:border-[#1F1F1C] bg-[#FAF9F5] dark:bg-[#0D0C0B] flex-shrink-0 transition-colors duration-300">
+              <div className="space-y-2.5 mb-5">
+                <div className="flex justify-between text-xs font-medium text-[#7A7368] dark:text-[#A19B91]">
+                  <span>Items Subtotal</span>
+                  <span className="font-bold text-neutral-900 dark:text-neutral-200">{fmt(subtotal)}</span>
                 </div>
                 {restaurant.deliveryEnabled && deliveryType === "delivery" && restaurant.deliveryFee > 0 && (
-                  <div className="flex justify-between text-sm text-[#9a8060]">
-                    <span>Delivery fee</span>
-                    <span className="font-medium text-[#f5e6c8]">{fmt(restaurant.deliveryFee)}</span>
+                  <div className="flex justify-between text-xs font-medium text-[#7A7368] dark:text-[#A19B91]">
+                    <span>Standard Delivery Fee</span>
+                    <span className="font-bold text-neutral-900 dark:text-neutral-200">{fmt(restaurant.deliveryFee)}</span>
                   </div>
                 )}
-                <div className="flex justify-between font-black text-base pt-2 border-t border-[#2e2010]">
-                  <span className="text-[#f5e6c8]">Total</span>
-                  <span style={{ color: primary }}>{fmt(orderTotal)}</span>
+                <div className="flex justify-between font-black text-base pt-3 border-t border-[#EFECE6] dark:border-[#1F1F1C]">
+                  <span className="text-neutral-900 dark:text-neutral-200 font-extrabold">Grand Total</span>
+                  <span className="text-[var(--brand-primary)]" style={{ color: primary }}>{fmt(orderTotal)}</span>
                 </div>
               </div>
 
               {restaurant.minimumOrder > 0 && !meetsMinimum && (
-                <p className="text-xs text-amber-400 bg-amber-950/50 border border-amber-800/50 rounded-xl px-3 py-2 mb-3 font-medium">
-                  Add {fmt(restaurant.minimumOrder - subtotal)} more to meet the minimum order
-                </p>
+                <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/30 rounded-2xl px-4 py-3 mb-4 font-medium leading-relaxed shadow-sm">
+                  🍲 Add <span className="font-extrabold">{fmt(restaurant.minimumOrder - subtotal)}</span> more to satisfy the restaurant&apos;s minimum order threshold.
+                </div>
               )}
 
               <button
                 disabled={!restaurant.isOpen || !meetsMinimum}
                 onClick={openCheckout}
                 style={restaurant.isOpen && meetsMinimum ? { backgroundColor: primary } : {}}
-                className="w-full text-white font-bold py-3.5 rounded-xl transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-[#2e2010] active:scale-[0.99]"
+                className="w-full text-white font-bold py-4 rounded-2xl transition-all hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-stone-200 dark:disabled:bg-stone-800 disabled:text-stone-400 dark:disabled:text-stone-600 active:scale-[0.99] text-sm uppercase tracking-widest shadow-md shadow-[var(--brand-primary-20)]"
               >
                 {!restaurant.isOpen
-                  ? "Restaurant is closed"
+                  ? "Restaurant is Offline"
                   : !meetsMinimum
-                  ? "Add more items"
-                  : "Proceed to Checkout →"}
+                  ? "Browse More Selections"
+                  : "Proceed to Secure Checkout"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── CHECKOUT MODAL ────────────────────────────────────────────────────── */}
+      {/* ── SECURE CHECKOUT MODAL (Phase 10C) ────────────────────────────────── */}
       {checkoutOpen && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center animate-fadeIn">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-neutral-900/60 dark:bg-black/85 backdrop-blur-xs transition-opacity duration-300"
             onClick={() => setCheckoutOpen(false)}
           />
-          <div className="relative bg-[#1a1008] w-full md:max-w-lg rounded-t-3xl md:rounded-3xl max-h-[95vh] overflow-y-auto shadow-2xl">
-            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#2e2010] sticky top-0 bg-[#1a1008] z-10">
-              <h2 className="text-lg font-black text-[#f5e6c8]">Checkout</h2>
+          <div className="relative bg-white dark:bg-[#141412] w-full md:max-w-xl rounded-t-[32px] md:rounded-[32px] max-h-[92vh] overflow-y-auto shadow-2xl border border-[#EFECE6] dark:border-[#1F1F1C] animate-slideUp transition-colors duration-300">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-[#EFECE6] dark:border-[#1F1F1C] sticky top-0 bg-white dark:bg-[#141412] z-10">
+              <div>
+                <h2 className="text-lg font-extrabold text-neutral-900 dark:text-neutral-50 tracking-tight leading-none">Pristine Checkout</h2>
+                <p className="text-[10px] text-[#7A7368] dark:text-[#A19B91] uppercase font-bold tracking-wider mt-1">Review details and authorize order</p>
+              </div>
               <button
                 onClick={() => setCheckoutOpen(false)}
-                className="w-9 h-9 bg-[#241808] rounded-full flex items-center justify-center text-[#9a8060] hover:bg-[#2e2010] transition-colors font-bold"
+                className="w-9 h-9 bg-stone-50 dark:bg-[#1E1E1C] rounded-2xl flex items-center justify-center text-[#7A7368] hover:text-neutral-900 hover:bg-stone-100 dark:hover:bg-stone-900 transition-colors border border-[#EFECE6] dark:border-[#1F1F1C]"
               >
                 ✕
               </button>
             </div>
 
-            <div className="px-5 py-5 space-y-5">
-              {/* Delivery / Pickup toggle */}
+            <div className="px-6 py-6 space-y-6">
+              {/* Delivery / Pickup slider toggle */}
               {restaurant.deliveryEnabled && restaurant.pickupEnabled && (
-                <div>
-                  <p className="text-xs font-bold text-[#9a8060] uppercase tracking-widest mb-2">Order type</p>
-                  <div className="grid grid-cols-2 gap-2 p-1 bg-[#0d0802] rounded-xl">
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Preferred fulfillment mode</p>
+                  <div className="grid grid-cols-2 gap-1.5 p-1 bg-stone-50 dark:bg-[#0D0C0B] rounded-2xl border border-[#EFECE6] dark:border-[#1F1F1C]">
                     <button
                       onClick={() => setDeliveryType("delivery")}
-                      className={`py-2.5 rounded-lg text-sm font-bold transition-all ${
-                        deliveryType === "delivery" ? "bg-[#1a1008] shadow" : "text-[#9a8060]"
+                      className={`py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                        deliveryType === "delivery" ? "bg-white dark:bg-[#141412] shadow-sm font-black" : "text-[#7A7368]"
                       }`}
                       style={deliveryType === "delivery" ? { color: primary } : {}}
                     >
-                      Delivery
+                      Doorstep Delivery
                     </button>
                     <button
                       onClick={() => setDeliveryType("pickup")}
-                      className={`py-2.5 rounded-lg text-sm font-bold transition-all ${
-                        deliveryType === "pickup" ? "bg-[#1a1008] shadow" : "text-[#9a8060]"
+                      className={`py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                        deliveryType === "pickup" ? "bg-white dark:bg-[#141412] shadow-sm font-black" : "text-[#7A7368]"
                       }`}
                       style={deliveryType === "pickup" ? { color: primary } : {}}
                     >
-                      Pickup
+                      Takeaway Pickup
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* Contact details */}
+              {/* Contact Information Fields */}
               <div className="space-y-3">
-                <p className="text-xs font-bold text-[#9a8060] uppercase tracking-widest">Your details</p>
-                <input
-                  type="text"
-                  placeholder="Full name *"
-                  value={formData.customerName}
-                  onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                  className="w-full border border-[#3a2518] rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 text-[#f5e6c8] placeholder-[#6a5040] transition-all bg-[#0d0802]"
-                  style={{ ["--tw-ring-color" as string]: primary + "40" } as React.CSSProperties}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
-                  onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
-                />
-                <input
-                  type="tel"
-                  placeholder="Phone number *"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full border border-[#3a2518] rounded-xl px-4 py-3 text-sm outline-none text-[#f5e6c8] placeholder-[#6a5040] transition-all bg-[#0d0802]"
-                  onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
-                  onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
-                />
+                <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Contact Information</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Full name *"
+                      value={formData.customerName}
+                      onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                      className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4.5 py-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary-20)] text-neutral-900 dark:text-neutral-100 placeholder-[#A19B91] transition-all bg-[#FAF9F5] dark:bg-[#0D0C0B]"
+                      onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
+                      onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
+                    />
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="tel"
+                      placeholder="Phone number *"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4.5 py-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary-20)] text-neutral-900 dark:text-neutral-100 placeholder-[#A19B91] transition-all bg-[#FAF9F5] dark:bg-[#0D0C0B]"
+                      onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
+                      onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
+                    />
+                  </div>
+                </div>
               </div>
 
-              {/* Delivery address */}
+              {/* Delivery Address Block */}
               {deliveryType === "delivery" && (
-                <div>
-                  <p className="text-xs font-bold text-[#9a8060] uppercase tracking-widest mb-2">Delivery address</p>
+                <div className="space-y-1.5 animate-scaleUp">
+                  <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Delivery Destination</p>
                   <textarea
-                    placeholder="Enter your full delivery address *"
+                    placeholder="Enter your comprehensive delivery address details *"
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    rows={2}
-                    className="w-full border border-[#3a2518] rounded-xl px-4 py-3 text-sm outline-none text-[#f5e6c8] placeholder-[#6a5040] resize-none transition-all bg-[#0d0802]"
+                    rows={2.5}
+                    className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4.5 py-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary-20)] text-neutral-900 dark:text-neutral-100 placeholder-[#A19B91] resize-none transition-all bg-[#FAF9F5] dark:bg-[#0D0C0B]"
                     onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
                     onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
                   />
                 </div>
               )}
 
-              {/* Pickup location */}
+              {/* Pickup Address Block */}
               {deliveryType === "pickup" && restaurant.address && (
-                <div className="rounded-xl px-4 py-3 border" style={{ backgroundColor: primary + "10", borderColor: primary + "30" }}>
-                  <p className="text-xs font-bold mb-1" style={{ color: primary }}>Pickup location</p>
-                  <p className="text-sm font-medium text-[#f5e6c8]">{restaurant.address}</p>
+                <div className="rounded-2xl px-4.5 py-4 border animate-scaleUp" style={{ backgroundColor: primary + "0d", borderColor: primary + "26" }}>
+                  <p className="text-[10px] font-black uppercase tracking-wider mb-1" style={{ color: primary }}>Outlet Pickup Address</p>
+                  <p className="text-xs font-bold text-neutral-800 dark:text-neutral-200 leading-relaxed">{restaurant.address}</p>
                 </div>
               )}
 
-              {/* Note */}
-              <textarea
-                placeholder="Special instructions (optional)"
-                value={formData.note}
-                onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                rows={2}
-                className="w-full border border-[#3a2518] rounded-xl px-4 py-3 text-sm outline-none text-[#f5e6c8] placeholder-[#6a5040] resize-none transition-all bg-[#0d0802]"
-                onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
-              />
+              {/* Special Note */}
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Dietary instructions / Note (Optional)</p>
+                <textarea
+                  placeholder="E.g. No onions, cutlery included, gate code details, etc."
+                  value={formData.note}
+                  onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+                  rows={2}
+                  className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4.5 py-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary-20)] text-neutral-900 dark:text-neutral-100 placeholder-[#A19B91] resize-none transition-all bg-[#FAF9F5] dark:bg-[#0D0C0B]"
+                  onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
+                />
+              </div>
 
-              {/* Order summary */}
-              <div className="bg-[#0d0802] border border-[#2e2010] rounded-xl p-4">
-                <p className="text-xs font-bold text-[#9a8060] uppercase tracking-widest mb-3">Order summary</p>
-                <div className="space-y-1.5 mb-3">
+              {/* Secure Order Summary Details */}
+              <div className="bg-stone-50 dark:bg-[#0D0C0B] border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl p-5">
+                <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider mb-3.5">Fulfillment summary</p>
+                <div className="space-y-2.5 mb-4 max-h-[140px] overflow-y-auto scrollbar-hide">
                   {items.map((item) => (
-                    <div key={item.id} className="flex justify-between text-sm">
-                      <span className="text-[#9a8060]">{item.quantity}× {item.name}</span>
-                      <span className="font-medium text-[#f5e6c8]">{fmt(item.quantity * item.price)}</span>
+                    <div key={item.id} className="flex justify-between text-xs font-medium">
+                      <span className="text-[#7A7368] dark:text-[#A19B91] font-semibold">{item.quantity}× {item.name}</span>
+                      <span className="font-extrabold text-neutral-900 dark:text-neutral-100">{fmt(item.quantity * item.price)}</span>
                     </div>
                   ))}
                 </div>
-                <div className="border-t border-[#2e2010] pt-2 space-y-1.5">
-                  <div className="flex justify-between text-sm text-[#9a8060]">
-                    <span>Subtotal</span>
-                    <span>{fmt(subtotal)}</span>
+                <div className="border-t border-[#EFECE6] dark:border-[#1F1F1C] pt-3.5 space-y-2">
+                  <div className="flex justify-between text-xs text-[#7A7368] dark:text-[#A19B91]">
+                    <span>Selections Subtotal</span>
+                    <span className="font-bold text-neutral-900 dark:text-neutral-200">{fmt(subtotal)}</span>
                   </div>
                   {deliveryType === "delivery" && restaurant.deliveryFee > 0 && (
-                    <div className="flex justify-between text-sm text-[#9a8060]">
-                      <span>Delivery fee</span>
-                      <span>{fmt(restaurant.deliveryFee)}</span>
+                    <div className="flex justify-between text-xs text-[#7A7368] dark:text-[#A19B91]">
+                      <span>Fulfillment Dispatch Fee</span>
+                      <span className="font-bold text-neutral-900 dark:text-neutral-200">{fmt(restaurant.deliveryFee)}</span>
                     </div>
                   )}
                   {deliveryType === "pickup" && (
-                    <div className="flex justify-between text-sm text-green-500 font-medium">
-                      <span>Pickup savings</span>
+                    <div className="flex justify-between text-xs text-emerald-600 dark:text-emerald-500 font-extrabold">
+                      <span>Pickup Savings</span>
                       <span>Free</span>
                     </div>
                   )}
-                  <div className="flex justify-between font-black text-base pt-1.5 border-t border-[#2e2010]">
-                    <span className="text-[#f5e6c8]">Total</span>
-                    <span style={{ color: primary }}>{fmt(orderTotal)}</span>
+                  <div className="flex justify-between font-black text-base pt-3 border-t border-[#EFECE6] dark:border-[#1F1F1C]">
+                    <span className="text-neutral-900 dark:text-neutral-200 font-extrabold">Total Amount Due</span>
+                    <span style={{ color: primary }} className="font-black text-lg tracking-tight">{fmt(orderTotal)}</span>
                   </div>
                 </div>
               </div>
 
               {orderError && (
-                <div className="bg-red-950/50 border border-red-800/50 text-red-400 text-sm font-medium px-4 py-3 rounded-xl">
-                  {orderError}
+                <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-200/50 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 text-xs md:text-sm font-bold px-4.5 py-4 rounded-2xl leading-relaxed">
+                  ⚠️ {orderError}
                 </div>
               )}
 
-              {/* Payment buttons */}
-              <div className="space-y-3 pb-2">
-                <p className="text-xs font-bold text-[#9a8060] uppercase tracking-widest">Payment method</p>
+              {/* Secure payment actions (Phase 10C) */}
+              <div className="space-y-2.5 pb-2">
                 {restaurant.onlinePaymentEnabled && (
                   <button
                     onClick={handleOnlinePayment}
                     disabled={isSubmitting}
                     style={{ backgroundColor: primary }}
-                    className="w-full text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2.5 transition-all hover:opacity-90 disabled:opacity-60 active:scale-[0.99]"
+                    className="w-full text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2.5 transition-opacity hover:opacity-95 disabled:opacity-60 active:scale-[0.99] text-sm uppercase tracking-widest shadow-md shadow-[var(--brand-primary-20)]"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                     </svg>
-                    {isSubmitting ? "Redirecting…" : "Pay Online (Paystack)"}
+                    {isSubmitting ? "Redirecting safely…" : "Authorize Pay Online (Paystack)"}
                   </button>
                 )}
                 <button
                   onClick={handleCashOrder}
                   disabled={isSubmitting}
-                  className="w-full bg-[#241808] text-[#f5e6c8] font-bold py-4 rounded-xl flex items-center justify-center gap-2.5 hover:bg-[#2e2010] transition-colors disabled:opacity-60 active:scale-[0.99]"
+                  className="w-full bg-stone-50 hover:bg-stone-100 dark:bg-[#1E1E1C] dark:hover:bg-[#2A2A27] text-neutral-800 dark:text-neutral-200 font-bold py-4 rounded-2xl flex items-center justify-center gap-2.5 transition-all border border-[#EFECE6] dark:border-[#1F1F1C] disabled:opacity-60 active:scale-[0.99] text-sm uppercase tracking-widest shadow-xs"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                  <svg className="w-4.5 h-4.5 text-[#7A7368]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
                   {isSubmitting
-                    ? "Placing Order…"
+                    ? "Placing Order safely…"
                     : deliveryType === "pickup"
-                    ? "Pay on Pickup"
-                    : "Pay on Delivery"}
+                    ? "Confirm Pay on Pickup"
+                    : "Confirm Pay on Delivery"}
                 </button>
+              </div>
+
+              {/* Trust badges (Phase 10C) */}
+              <div className="flex justify-center items-center gap-4 text-[10px] font-black uppercase text-[#7A7368] dark:text-[#5C574F] tracking-widest pt-2 border-t border-[#EFECE6] dark:border-[#1F1F1C]">
+                <span className="flex items-center gap-1">🔒 256-bit Secure</span>
+                <span>•</span>
+                <span className="flex items-center gap-1">⚡ Instant dispatch</span>
+                <span>•</span>
+                <span className="flex items-center gap-1">💬 WhatsApp Update</span>
               </div>
             </div>
           </div>
         </div>
       )}
-      {/* ── SCHEDULE MODAL ────────────────────────────────────────────────────── */}
+
+      {/* ── PREORDER SCHEDULE MODAL (Phase 10C) ─────────────────────────────── */}
       {scheduleOpen && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center animate-fadeIn">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-neutral-900/60 dark:bg-black/85 backdrop-blur-xs transition-opacity duration-300"
             onClick={() => setScheduleOpen(false)}
           />
-          <div className="relative bg-[#1a1008] w-full md:max-w-lg rounded-t-3xl md:rounded-3xl max-h-[95vh] overflow-y-auto shadow-2xl">
-            <div className="flex flex-col px-5 pt-5 pb-4 border-b border-[#2e2010] sticky top-0 bg-[#1a1008] z-10">
-              <div className="flex items-center justify-between mb-1">
-                <h2 className="text-lg font-black text-[#f5e6c8]">Schedule Your Order</h2>
+          <div className="relative bg-white dark:bg-[#141412] w-full md:max-w-xl rounded-t-[32px] md:rounded-[32px] max-h-[92vh] overflow-y-auto shadow-2xl border border-[#EFECE6] dark:border-[#1F1F1C] animate-slideUp transition-colors duration-300">
+            <div className="flex flex-col px-6 pt-6 pb-4 border-b border-[#EFECE6] dark:border-[#1F1F1C] sticky top-0 bg-white dark:bg-[#141412] z-10">
+              <div className="flex items-center justify-between mb-1.5">
+                <h2 className="text-lg font-extrabold text-neutral-900 dark:text-neutral-50 tracking-tight leading-none">Schedule Future Order</h2>
                 <button
                   onClick={() => setScheduleOpen(false)}
-                  className="w-9 h-9 bg-[#241808] rounded-full flex items-center justify-center text-[#9a8060] hover:bg-[#2e2010] transition-colors font-bold"
+                  className="w-9 h-9 bg-stone-50 dark:bg-[#1E1E1C] rounded-2xl flex items-center justify-center text-[#7A7368] hover:text-neutral-900 hover:bg-stone-100 dark:hover:bg-stone-900 transition-colors border border-[#EFECE6] dark:border-[#1F1F1C]"
                 >
                   ✕
                 </button>
               </div>
-              <p className="text-sm text-[#9a8060] font-medium">We&apos;re currently closed. Choose when you want your order prepared.</p>
+              <p className="text-xs text-[#7A7368] dark:text-[#A19B91] font-semibold leading-relaxed">Our kitchen is currently resting. Schedule your preparation for when we are open!</p>
             </div>
 
-            <div className="px-5 py-5 space-y-5">
+            <div className="px-6 py-6 space-y-6">
               {items.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-[#9a8060] font-medium mb-4">Browse the menu first, then schedule your order.</p>
+                <div className="text-center py-10 bg-stone-50 dark:bg-[#0D0C0B] rounded-3xl border border-[#EFECE6] dark:border-[#1F1F1C] p-6 shadow-sm">
+                  <span className="text-3xl">🍲</span>
+                  <p className="text-neutral-900 dark:text-neutral-50 font-extrabold text-sm tracking-tight mt-3">Browse menu and add items first</p>
+                  <p className="text-xs text-[#7A7368] dark:text-[#A19B91] mt-1.5 mb-5 max-w-xs mx-auto leading-relaxed">Once you add appetizing items to your cart, you can schedule the order delivery time.</p>
                   <button
                     onClick={() => { setScheduleOpen(false); scrollTo("menu"); }}
-                    className="bg-[#241808] text-[#f5e6c8] font-bold px-6 py-3 rounded-xl hover:bg-[#2e2010] transition-colors"
+                    style={{ backgroundColor: primary }}
+                    className="text-white font-bold px-6 py-3 rounded-2xl text-xs uppercase tracking-widest active:scale-95 shadow-sm shadow-[var(--brand-primary-20)]"
                   >
-                    Browse Menu
+                    Browse Selections
                   </button>
                 </div>
               ) : (
                 <>
-                  {/* Delivery / Pickup toggle */}
+                  {/* Delivery / Pickup Toggle */}
                   {restaurant.deliveryEnabled && restaurant.pickupEnabled && (
-                    <div>
-                      <p className="text-xs font-bold text-[#9a8060] uppercase tracking-widest mb-2">Order type</p>
-                      <div className="grid grid-cols-2 gap-2 p-1 bg-[#0d0802] rounded-xl">
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Preferred fulfillment mode</p>
+                      <div className="grid grid-cols-2 gap-1.5 p-1 bg-stone-50 dark:bg-[#0D0C0B] rounded-2xl border border-[#EFECE6] dark:border-[#1F1F1C]">
                         <button
                           onClick={() => setDeliveryType("delivery")}
-                          className={`py-2.5 rounded-lg text-sm font-bold transition-all ${
-                            deliveryType === "delivery" ? "bg-[#1a1008] shadow" : "text-[#9a8060]"
+                          className={`py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                            deliveryType === "delivery" ? "bg-white dark:bg-[#141412] shadow-sm font-black" : "text-[#7A7368]"
                           }`}
                           style={deliveryType === "delivery" ? { color: primary } : {}}
                         >
-                          Delivery
+                          Doorstep Delivery
                         </button>
                         <button
                           onClick={() => setDeliveryType("pickup")}
-                          className={`py-2.5 rounded-lg text-sm font-bold transition-all ${
-                            deliveryType === "pickup" ? "bg-[#1a1008] shadow" : "text-[#9a8060]"
+                          className={`py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                            deliveryType === "pickup" ? "bg-white dark:bg-[#141412] shadow-sm font-black" : "text-[#7A7368]"
                           }`}
                           style={deliveryType === "pickup" ? { color: primary } : {}}
                         >
-                          Pickup
+                          Takeaway Pickup
                         </button>
                       </div>
                     </div>
                   )}
 
-                  {/* Schedule Time */}
+                  {/* Schedule Date & Time Selection */}
                   <div className="space-y-3">
-                    <p className="text-xs font-bold text-[#9a8060] uppercase tracking-widest">When do you want it?</p>
+                    <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Fulfillment Schedule Date &amp; Time</p>
                     <div className="grid grid-cols-2 gap-3">
                       <input
                         type="date"
                         value={scheduleDate}
                         onChange={(e) => setScheduleDate(e.target.value)}
-                        className="w-full border border-[#3a2518] rounded-xl px-4 py-3 text-sm outline-none text-[#f5e6c8] transition-all focus:border-[#c9a452] bg-[#0d0802]"
+                        className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4 py-3.5 text-sm outline-none text-neutral-900 dark:text-neutral-100 transition-all focus:border-[var(--brand-primary)] bg-[#FAF9F5] dark:bg-[#0D0C0B]"
                       />
                       <input
                         type="time"
                         value={scheduleTime}
                         onChange={(e) => setScheduleTime(e.target.value)}
-                        className="w-full border border-[#3a2518] rounded-xl px-4 py-3 text-sm outline-none text-[#f5e6c8] transition-all focus:border-[#c9a452] bg-[#0d0802]"
+                        className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4 py-3.5 text-sm outline-none text-neutral-900 dark:text-neutral-100 transition-all focus:border-[var(--brand-primary)] bg-[#FAF9F5] dark:bg-[#0D0C0B]"
                       />
                     </div>
                   </div>
 
-                  {/* Contact details */}
+                  {/* Contact Information Fields */}
                   <div className="space-y-3">
-                    <p className="text-xs font-bold text-[#9a8060] uppercase tracking-widest">Your details</p>
+                    <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Contact Information</p>
                     <input
                       type="text"
                       placeholder="Full name *"
                       value={formData.customerName}
                       onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                      className="w-full border border-[#3a2518] rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 text-[#f5e6c8] placeholder-[#6a5040] transition-all bg-[#0d0802]"
+                      className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4.5 py-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary-20)] text-neutral-900 dark:text-neutral-100 placeholder-[#A19B91] transition-all bg-[#FAF9F5] dark:bg-[#0D0C0B]"
                       style={{ ["--tw-ring-color" as string]: primary + "40" } as React.CSSProperties}
                       onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
                       onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
@@ -1517,77 +1545,80 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                       placeholder="Phone number *"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full border border-[#3a2518] rounded-xl px-4 py-3 text-sm outline-none text-[#f5e6c8] placeholder-[#6a5040] transition-all bg-[#0d0802]"
+                      className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4.5 py-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary-20)] text-neutral-900 dark:text-neutral-100 placeholder-[#A19B91] transition-all bg-[#FAF9F5] dark:bg-[#0D0C0B]"
                       onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
                       onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
                     />
                   </div>
 
-                  {/* Delivery address */}
+                  {/* Delivery Address Details */}
                   {deliveryType === "delivery" && (
-                    <div>
-                      <p className="text-xs font-bold text-[#9a8060] uppercase tracking-widest mb-2">Delivery address</p>
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Delivery Destination</p>
                       <textarea
                         placeholder="Enter your full delivery address *"
                         value={formData.address}
                         onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                         rows={2}
-                        className="w-full border border-[#3a2518] rounded-xl px-4 py-3 text-sm outline-none text-[#f5e6c8] placeholder-[#6a5040] resize-none transition-all bg-[#0d0802]"
+                        className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4.5 py-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary-20)] text-neutral-900 dark:text-neutral-100 placeholder-[#A19B91] resize-none transition-all bg-[#FAF9F5] dark:bg-[#0D0C0B]"
                         onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
                         onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
                       />
                     </div>
                   )}
 
-                  {/* Note */}
-                  <textarea
-                    placeholder="Special instructions (optional)"
-                    value={formData.note}
-                    onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                    rows={2}
-                    className="w-full border border-[#3a2518] rounded-xl px-4 py-3 text-sm outline-none text-[#f5e6c8] placeholder-[#6a5040] resize-none transition-all bg-[#0d0802]"
-                    onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
-                    onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
-                  />
+                  {/* Special Instruction Note */}
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Dietary instructions / Note (Optional)</p>
+                    <textarea
+                      placeholder="Special instructions (optional)"
+                      value={formData.note}
+                      onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+                      rows={2}
+                      className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4.5 py-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary-20)] text-neutral-900 dark:text-neutral-100 placeholder-[#A19B91] resize-none transition-all bg-[#FAF9F5] dark:bg-[#0D0C0B]"
+                      onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
+                      onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
+                    />
+                  </div>
 
-                  {/* Order summary */}
-                  <div className="bg-[#0d0802] border border-[#2e2010] rounded-xl p-4">
-                    <p className="text-xs font-bold text-[#9a8060] uppercase tracking-widest mb-3">Order summary</p>
-                    <div className="space-y-1.5 mb-3">
+                  {/* Preorder Billing Summary details */}
+                  <div className="bg-stone-50 dark:bg-[#0D0C0B] border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl p-5">
+                    <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider mb-3.5">Fulfillment summary</p>
+                    <div className="space-y-2.5 mb-4 max-h-[140px] overflow-y-auto scrollbar-hide">
                       {items.map((item) => (
-                        <div key={item.id} className="flex justify-between text-sm">
-                          <span className="text-[#9a8060]">{item.quantity}× {item.name}</span>
-                          <span className="font-medium text-[#f5e6c8]">{fmt(item.quantity * item.price)}</span>
+                        <div key={item.id} className="flex justify-between text-xs font-medium">
+                          <span className="text-[#7A7368] dark:text-[#A19B91] font-semibold">{item.quantity}× {item.name}</span>
+                          <span className="font-extrabold text-neutral-900 dark:text-neutral-100">{fmt(item.quantity * item.price)}</span>
                         </div>
                       ))}
                     </div>
-                    <div className="border-t border-[#2e2010] pt-2 space-y-1.5">
-                      <div className="flex justify-between text-sm text-[#9a8060]">
-                        <span>Subtotal</span>
+                    <div className="border-t border-[#EFECE6] dark:border-[#1F1F1C] pt-3.5 space-y-2">
+                      <div className="flex justify-between text-xs text-[#7A7368] dark:text-[#A19B91]">
+                        <span>Selections Subtotal</span>
                         <span>{fmt(subtotal)}</span>
                       </div>
                       {deliveryType === "delivery" && restaurant.deliveryFee > 0 && (
-                        <div className="flex justify-between text-sm text-[#9a8060]">
-                          <span>Delivery fee</span>
+                        <div className="flex justify-between text-xs text-[#7A7368] dark:text-[#A19B91]">
+                          <span>Fulfillment Dispatch Fee</span>
                           <span>{fmt(restaurant.deliveryFee)}</span>
                         </div>
                       )}
-                      <div className="flex justify-between font-black text-base pt-1.5 border-t border-[#2e2010]">
-                        <span className="text-[#f5e6c8]">Total</span>
-                        <span style={{ color: primary }}>{fmt(orderTotal)}</span>
+                      <div className="flex justify-between font-black text-base pt-3 border-t border-[#EFECE6] dark:border-[#1F1F1C]">
+                        <span className="text-neutral-900 dark:text-neutral-200 font-extrabold">Total Amount Due</span>
+                        <span style={{ color: primary }} className="font-black text-lg tracking-tight">{fmt(orderTotal)}</span>
                       </div>
                     </div>
                   </div>
 
                   {restaurant.minimumOrder > 0 && !meetsMinimum && (
-                    <p className="text-xs text-amber-400 bg-amber-950/50 border border-amber-800/50 rounded-xl px-3 py-2 mb-3 font-medium">
-                      Add {fmt(restaurant.minimumOrder - subtotal)} more to meet the minimum order
-                    </p>
+                    <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/30 rounded-2xl px-4 py-3 mb-4 font-medium leading-relaxed shadow-sm">
+                      🍲 Add <span className="font-extrabold">{fmt(restaurant.minimumOrder - subtotal)}</span> more to satisfy the restaurant&apos;s preorder threshold.
+                    </div>
                   )}
 
                   {orderError && (
-                    <div className="bg-red-950/50 border border-red-800/50 text-red-400 text-sm font-medium px-4 py-3 rounded-xl">
-                      {orderError}
+                    <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-200/50 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 text-xs md:text-sm font-bold px-4.5 py-4 rounded-2xl leading-relaxed">
+                      ⚠️ {orderError}
                     </div>
                   )}
 
@@ -1595,9 +1626,9 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                     onClick={handleScheduleSubmit}
                     disabled={isSubmitting || !meetsMinimum}
                     style={meetsMinimum ? { backgroundColor: primary } : {}}
-                    className="w-full text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2.5 transition-all hover:opacity-90 disabled:opacity-60 disabled:bg-[#2e2010] active:scale-[0.99]"
+                    className="w-full text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2.5 transition-all hover:opacity-95 disabled:opacity-60 disabled:bg-stone-200 dark:disabled:bg-stone-850 active:scale-[0.99] text-sm uppercase tracking-widest shadow-md shadow-[var(--brand-primary-20)]"
                   >
-                    {isSubmitting ? "Scheduling…" : "Schedule Order"}
+                    {isSubmitting ? "Scheduling preorder safely…" : "Confirm Scheduled Preorder"}
                   </button>
                 </>
               )}
