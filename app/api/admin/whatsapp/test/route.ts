@@ -61,8 +61,12 @@ export async function POST(req: NextRequest) {
   });
 
   if (!result.success) {
+    let errorMsg = result.error ?? "Failed to send test message.";
+    if (errorMsg.includes("131030") || errorMsg.includes("allowed list")) {
+      errorMsg = "WhatsApp API error: Recipient phone number not in allowed list. This happens because your Meta WhatsApp App is in Sandbox/Development mode. To send messages to any number, you must switch your Meta App to Live (Production) mode.";
+    }
     return NextResponse.json(
-      { error: result.error ?? "Failed to send test message." },
+      { error: errorMsg },
       { status: 502 }
     );
   }
