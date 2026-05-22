@@ -56,7 +56,7 @@ def create_menu_card():
     draw.text((width//2, 600), "SCAN TO VIEW MENU", fill=text_color, anchor="mm", font=font_main)
     
     # 4. QR CODE (Centered in a white box)
-    qr_data = "https://restoflow-nine.vercel.app/r/grills-capitol"
+    qr_data = "https://restoflow.org/r/grills-capitol"
     qr = qrcode.QRCode(version=1, box_size=20, border=4)
     qr.add_data(qr_data)
     qr.make(fit=True)

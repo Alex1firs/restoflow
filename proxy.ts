@@ -3,6 +3,8 @@ import type { NextRequest } from "next/server";
 
 // All hostnames that belong to Restaflow itself (not restaurant custom domains)
 const MAIN_HOSTS = [
+  "restoflow.org",
+  "www.restoflow.org",
   "restoflow-nine.vercel.app",
   "restaflow.com",
   "www.restaflow.com",

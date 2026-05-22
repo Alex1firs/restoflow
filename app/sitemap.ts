@@ -4,7 +4,7 @@ import { getAdminDb } from "@/lib/firebase-admin";
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://restoflow-nine.vercel.app";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://restoflow.org";
 
   const staticPages: MetadataRoute.Sitemap = [
     { url: appUrl, lastModified: new Date(), changeFrequency: "weekly", priority: 1 },
