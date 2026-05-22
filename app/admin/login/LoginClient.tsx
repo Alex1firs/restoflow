@@ -41,7 +41,14 @@ export default function LoginClient() {
         return;
       }
 
-      const restaurantSlug = userDoc.data().restaurantSlug as string;
+      const userData = userDoc.data();
+      const role = userData.role as string;
+      if (role === "super_admin") {
+        router.push("/super-admin/overview");
+        return;
+      }
+
+      const restaurantSlug = userData.restaurantSlug as string;
       router.push(`/admin/${restaurantSlug}/orders`);
     } catch (err: unknown) {
       const code = (err as { code?: string }).code;

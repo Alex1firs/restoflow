@@ -13,7 +13,11 @@ export default async function LoginPage() {
       const decoded = await getAdminAuth().verifySessionCookie(session, true);
       const userDoc = await getAdminDb().collection("users").doc(decoded.uid).get();
       if (userDoc.exists) {
-        const slug = userDoc.data()!.restaurantSlug as string;
+        const userData = userDoc.data()!;
+        if (userData.role === "super_admin") {
+          redirect("/super-admin/overview");
+        }
+        const slug = userData.restaurantSlug as string;
         redirect(`/admin/${slug}/orders`);
       }
     } catch {
