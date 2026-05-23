@@ -73,6 +73,27 @@ const DEFAULT_MANIFEST = {
 
 export const revalidate = 0; // Dynamic on every request
 
+const BASE_DOMAINS = [
+  "restoflow.org",
+  "restaflow.com",
+  "localhost",
+  "restoflow-nine.vercel.app",
+];
+
+function getRestoFlowSubdomain(host: string): string | null {
+  const bare = host.replace(/^www\./, "").split(":")[0].toLowerCase();
+  for (const base of BASE_DOMAINS) {
+    if (bare === base) return null;
+    if (bare.endsWith("." + base)) {
+      const subdomain = bare.slice(0, -(base.length + 1));
+      if (subdomain && subdomain !== "www") {
+        return subdomain;
+      }
+    }
+  }
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   const host = request.headers.get("host") ?? "";
   const referer = request.headers.get("referer") ?? "";
@@ -86,8 +107,19 @@ export async function GET(request: NextRequest) {
   const db = getAdminDb();
 
   try {
-    if (!isMainHost(bareHost)) {
-      // 1. Custom Domain flow: Fetch restaurant details matching customDomain = bareHost
+    const subdomain = getRestoFlowSubdomain(bareHost);
+    if (subdomain) {
+      // 1. RestoFlow Subdomain flow: Fetch restaurant details matching doc ID (slug)
+      const snap = await db.collection("restaurants").doc(subdomain).get();
+      if (snap.exists) {
+        const d = snap.data()!;
+        restaurantName = (d.name as string) ?? "";
+        restaurantLogo = (d.logo as string) ?? "";
+        startUrl = "/"; // Subdomains open directly at the root
+        scope = "/";
+      }
+    } else if (!isMainHost(bareHost)) {
+      // 2. Custom Domain flow: Fetch restaurant details matching customDomain = bareHost
       const snap = await db
         .collection("restaurants")
         .where("customDomain", "==", bareHost)

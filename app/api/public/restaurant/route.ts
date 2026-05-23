@@ -21,6 +21,27 @@ function isMainHost(host: string): boolean {
 
 export const revalidate = 3600; // Cache for 1 hour
 
+const BASE_DOMAINS = [
+  "restoflow.org",
+  "restaflow.com",
+  "localhost",
+  "restoflow-nine.vercel.app",
+];
+
+function getRestoFlowSubdomain(host: string): string | null {
+  const bare = host.replace(/^www\./, "").split(":")[0].toLowerCase();
+  for (const base of BASE_DOMAINS) {
+    if (bare === base) return null;
+    if (bare.endsWith("." + base)) {
+      const subdomain = bare.slice(0, -(base.length + 1));
+      if (subdomain && subdomain !== "www") {
+        return subdomain;
+      }
+    }
+  }
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const domain = searchParams.get("domain");
@@ -29,10 +50,21 @@ export async function GET(request: NextRequest) {
   const db = getAdminDb();
 
   try {
-    // 1. Look up by custom domain
+    // 1. Look up by custom domain or subdomain
     if (domain) {
       const bareDomain = domain.replace(/^www\./, "").split(":")[0].toLowerCase();
-      if (!isMainHost(bareDomain)) {
+      
+      const subdomain = getRestoFlowSubdomain(bareDomain);
+      if (subdomain) {
+        const snap = await db.collection("restaurants").doc(subdomain).get();
+        if (snap.exists) {
+          const d = snap.data()!;
+          return NextResponse.json({
+            name: (d.name as string) ?? null,
+            logo: (d.logo as string) ?? null,
+          });
+        }
+      } else if (!isMainHost(bareDomain)) {
         const snap = await db
           .collection("restaurants")
           .where("customDomain", "==", bareDomain)

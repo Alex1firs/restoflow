@@ -21,7 +21,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const restaurantPages: MetadataRoute.Sitemap = snap.docs.map((doc) => {
       const d = doc.data();
       const customDomain = d.customDomain as string | undefined;
-      const baseUrl = customDomain ? `https://${customDomain}` : `${appUrl}/r/${doc.id}`;
+      
+      let baseUrl = "";
+      if (customDomain) {
+        baseUrl = `https://${customDomain}`;
+      } else {
+        try {
+          const parsed = new URL(appUrl);
+          const host = parsed.host.replace(/^www\./, "");
+          baseUrl = `${parsed.protocol}//${doc.id}.${host}`;
+        } catch {
+          baseUrl = `https://${doc.id}.restoflow.org`;
+        }
+      }
+
       return {
         url: baseUrl,
         lastModified: new Date(),

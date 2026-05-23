@@ -46,9 +46,16 @@ export function buildPageDescription(r: RestaurantSEOData): string {
 }
 
 export function buildCanonicalUrl(r: RestaurantSEOData): string {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   if (r.customDomain) return `https://${r.customDomain}`;
-  return `${appUrl}/r/${r.slug}`;
+  
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://restoflow.org";
+  try {
+    const parsed = new URL(appUrl);
+    const host = parsed.host.replace(/^www\./, "");
+    return `${parsed.protocol}//${r.slug}.${host}`;
+  } catch {
+    return `https://${r.slug}.restoflow.org`;
+  }
 }
 
 export function buildJsonLd(r: RestaurantSEOData): object {

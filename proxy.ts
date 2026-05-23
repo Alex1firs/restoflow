@@ -11,6 +11,13 @@ const MAIN_HOSTS = [
   "localhost",
 ];
 
+const BASE_DOMAINS = [
+  "restoflow.org",
+  "restaflow.com",
+  "localhost",
+  "restoflow-nine.vercel.app",
+];
+
 function isMainHost(host: string): boolean {
   const bare = host.replace(/^www\./, "").split(":")[0];
   // Match exact names and any *.vercel.app preview/deployment URLs
@@ -21,9 +28,49 @@ function isMainHost(host: string): boolean {
   );
 }
 
+export function getRestoFlowSubdomain(host: string): string | null {
+  const bare = host.replace(/^www\./, "").split(":")[0].toLowerCase();
+  for (const base of BASE_DOMAINS) {
+    if (bare === base) return null;
+    if (bare.endsWith("." + base)) {
+      const subdomain = bare.slice(0, -(base.length + 1));
+      if (subdomain && subdomain !== "www") {
+        return subdomain;
+      }
+    }
+  }
+  return null;
+}
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const host = request.headers.get("host") ?? "";
+
+  // ── RestoFlow subdomain rewrite ─────────────────────────────────────────
+  // Handle requests on restaurant subdomains (e.g. grills-capitol.restoflow.org)
+  const subdomain = getRestoFlowSubdomain(host);
+  if (subdomain) {
+    // 1. If trying to access system/platform pages on a subdomain, redirect to the main domain
+    const systemPaths = [
+      "/pricing",
+      "/terms",
+      "/privacy-policy",
+      "/refund-policy",
+      "/get-started",
+    ];
+    if (pathname.startsWith("/admin") || pathname.startsWith("/super-admin") || systemPaths.includes(pathname)) {
+      const mainUrl = new URL(pathname, "https://restoflow.org");
+      request.nextUrl.searchParams.forEach((value, key) => {
+        mainUrl.searchParams.set(key, value);
+      });
+      return NextResponse.redirect(mainUrl);
+    }
+
+    // 2. Otherwise, transparently rewrite to the storefront slug path (preserving full subpath)
+    const url = request.nextUrl.clone();
+    url.pathname = `/r/${subdomain}${pathname === "/" ? "" : pathname}`;
+    return NextResponse.rewrite(url);
+  }
 
   // ── Custom restaurant domain rewrite ────────────────────────────────────
   // Restaurant owners can point their own domain (e.g. grills.com) at this app.
@@ -63,3 +110,4 @@ export const config = {
     "/((?!_next/static|_next/image|favicon.ico|icons/|manifest\\.json|sw\\.js|offline\\.html|api/).*)",
   ],
 };
+
