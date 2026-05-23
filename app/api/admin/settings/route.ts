@@ -37,6 +37,7 @@ export async function PUT(req: NextRequest) {
     rating,
     ordersToday,
     deliveryTime,
+    hidePrices,
   } = body as {
     name?: string;
     description?: string;
@@ -59,6 +60,7 @@ export async function PUT(req: NextRequest) {
     rating?: number | string;
     ordersToday?: number | string;
     deliveryTime?: string;
+    hidePrices?: boolean;
   };
 
   if (!name?.trim()) {
@@ -92,6 +94,7 @@ export async function PUT(req: NextRequest) {
       rating: typeof rating === "number" ? rating : null,
       ordersToday: typeof ordersToday === "number" ? ordersToday : null,
       deliveryTime: (deliveryTime ?? "").trim(),
+      hidePrices: hidePrices === true,
     });
 
   return NextResponse.json({ success: true });

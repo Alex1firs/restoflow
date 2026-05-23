@@ -254,6 +254,7 @@ export default async function RDomainPage({
     deliveryEnabled: rData.deliveryEnabled !== false,
     pickupEnabled: rData.pickupEnabled !== false,
     todayHoursLabel,
+    hidePrices: (restaurantDoc.data().hidePrices as boolean) ?? false,
   };
 
   return (

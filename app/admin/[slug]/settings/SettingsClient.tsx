@@ -34,6 +34,7 @@ type Props = {
     rating: number | null;
     ordersToday: number | null;
     deliveryTime: string;
+    hidePrices: boolean;
   };
 };
 
@@ -59,6 +60,7 @@ export default function SettingsClient({ restaurant }: Props) {
     rating: restaurant.rating || "",
     ordersToday: restaurant.ordersToday || "",
     deliveryTime: restaurant.deliveryTime || "20–35 min",
+    hidePrices: restaurant.hidePrices,
   });
 
   const [openingHours, setOpeningHours] = useState<OpeningHours>(
@@ -345,6 +347,15 @@ export default function SettingsClient({ restaurant }: Props) {
               description="Customers collect from your location"
               enabled={form.pickupEnabled}
               onToggle={() => setField("pickupEnabled", !form.pickupEnabled)}
+            />
+          </div>
+
+          <div className="border-t border-gray-100 my-4 pt-4">
+            <Toggle
+              label="Hide Prices (Catalog Mode)"
+              description="Hide prices on your public menu. Customers can still place Dine-in or Pay-on-Delivery orders without seeing price totals."
+              enabled={form.hidePrices}
+              onToggle={() => setField("hidePrices", !form.hidePrices)}
             />
           </div>
 

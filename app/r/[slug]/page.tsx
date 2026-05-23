@@ -224,6 +224,7 @@ export default async function RestaurantPage({
     rating: rData.rating ?? null,
     ordersToday: rData.ordersToday ?? null,
     deliveryTime: rData.deliveryTime ?? "",
+    hidePrices: (docSnap.data()?.hidePrices as boolean) ?? false,
   };
 
   return (

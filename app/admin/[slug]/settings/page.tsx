@@ -52,6 +52,7 @@ export default async function SettingsPage({ params }: Props) {
     rating: (data.rating as number) ?? null,
     ordersToday: (data.ordersToday as number) ?? null,
     deliveryTime: (data.deliveryTime as string) ?? "",
+    hidePrices: (data.hidePrices as boolean) ?? false,
   };
 
   return (

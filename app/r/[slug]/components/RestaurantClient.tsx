@@ -38,6 +38,7 @@ interface RestaurantClientProps {
     rating?: number | null;
     ordersToday?: number | null;
     deliveryTime?: string;
+    hidePrices?: boolean;
   };
   menuItems: MenuItemData[];
   seo?: {
@@ -103,7 +104,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   const subtotal = totalPrice;
   const effectiveDeliveryFee = deliveryType === "pickup" ? 0 : restaurant.deliveryFee;
   const orderTotal = subtotal + effectiveDeliveryFee;
-  const meetsMinimum = restaurant.minimumOrder <= 0 || subtotal >= restaurant.minimumOrder;
+  const meetsMinimum = restaurant.hidePrices || restaurant.minimumOrder <= 0 || subtotal >= restaurant.minimumOrder;
 
   const areas = parseList(seo?.serviceAreas);
   const keywords = parseList(seo?.foodKeywords);
@@ -138,9 +139,11 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
         ? `${restaurant.name} serves ${keywords.join(", ")}.`
         : `${restaurant.name} serves a variety of freshly prepared meals. Browse the menu to see all available items.`,
     },
-    ...(restaurant.deliveryFee > 0
-      ? [{ q: `What is the delivery fee at ${restaurant.name}?`, a: `The delivery fee is ${fmt(restaurant.deliveryFee)}. This is added at checkout.` }]
-      : [{ q: `Does ${restaurant.name} offer free delivery?`, a: `Yes — ${restaurant.name} currently offers free delivery on all orders.` }]
+    ...(!restaurant.hidePrices
+      ? restaurant.deliveryFee > 0
+        ? [{ q: `What is the delivery fee at ${restaurant.name}?`, a: `The delivery fee is ${fmt(restaurant.deliveryFee)}. This is added at checkout.` }]
+        : [{ q: `Does ${restaurant.name} offer free delivery?`, a: `Yes — ${restaurant.name} currently offers free delivery on all orders.` }]
+      : []
     ),
   ];
 
@@ -548,7 +551,13 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                 <div>
                   <p className="text-[10px] text-white/50 uppercase font-black tracking-wider">Delivery</p>
                   <p className="text-xs font-bold text-white">
-                    {restaurant.deliveryEnabled ? (restaurant.deliveryFee > 0 ? fmt(restaurant.deliveryFee) : "Free") : "N/A"}
+                    {restaurant.deliveryEnabled
+                      ? restaurant.hidePrices
+                        ? "Available"
+                        : restaurant.deliveryFee > 0
+                        ? fmt(restaurant.deliveryFee)
+                        : "Free"
+                      : "N/A"}
                   </p>
                 </div>
               </div>
@@ -801,7 +810,9 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                     <div className="p-5 flex flex-col flex-1">
                       <div className="flex justify-between items-start gap-2 mb-1.5">
                         <h3 className="font-extrabold text-[15px] text-neutral-900 dark:text-neutral-50 leading-snug group-hover:text-[var(--brand-primary)] transition-colors">{item.name}</h3>
-                        <span className="font-black text-sm text-[var(--brand-primary)] flex-shrink-0 tracking-tight">{fmt(item.price)}</span>
+                        {!restaurant.hidePrices && (
+                          <span className="font-black text-sm text-[var(--brand-primary)] flex-shrink-0 tracking-tight">{fmt(item.price)}</span>
+                        )}
                       </div>
                       {item.description && (
                         <p className="text-xs text-[#7A7368] dark:text-[#A19B91] mb-4 leading-relaxed line-clamp-2 font-medium">{item.description}</p>
@@ -886,7 +897,9 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                       <div className="p-4 flex flex-col flex-1 justify-between">
                         <div>
                           <p className="font-extrabold text-neutral-900 dark:text-neutral-50 text-sm leading-snug tracking-tight truncate">{item.name}</p>
-                          <p className="font-black text-xs text-[var(--brand-primary)] mt-0.5 tracking-tight">{fmt(item.price)}</p>
+                          {!restaurant.hidePrices && (
+                            <p className="font-black text-xs text-[var(--brand-primary)] mt-0.5 tracking-tight">{fmt(item.price)}</p>
+                          )}
                         </div>
                         <div className="mt-4">
                           {qty === 0 ? (
@@ -972,7 +985,9 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                   <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider mb-0.5">Dispatch Terms</p>
                   <p className="text-sm font-bold text-neutral-800 dark:text-neutral-200 leading-tight">
                     {restaurant.deliveryEnabled
-                      ? restaurant.deliveryFee > 0
+                      ? restaurant.hidePrices
+                        ? "Delivery service is active"
+                        : restaurant.deliveryFee > 0
                         ? `${fmt(restaurant.deliveryFee)} delivery fee applies`
                         : "Complimentary free delivery"
                       : "Direct takeaway pickup only"}
@@ -1145,7 +1160,9 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
-                  <span className="ml-1 bg-black/15 py-1 px-2.5 rounded-lg">{fmt(orderTotal)}</span>
+                  {!restaurant.hidePrices && (
+                    <span className="ml-1 bg-black/15 py-1 px-2.5 rounded-lg">{fmt(orderTotal)}</span>
+                  )}
                 </div>
               </button>
             )}
@@ -1179,9 +1196,11 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                 <div key={item.id} className="flex items-center gap-4 py-1 animate-scaleUp">
                   <div className="flex-1 min-w-0">
                     <p className="font-extrabold text-sm text-neutral-900 dark:text-neutral-100 truncate tracking-tight leading-snug">{item.name}</p>
-                    <p className="text-xs font-black text-[var(--brand-primary)] mt-0.5" style={{ color: primary }}>
-                      {fmt(item.price * item.quantity)}
-                    </p>
+                    {!restaurant.hidePrices && (
+                      <p className="text-xs font-black text-[var(--brand-primary)] mt-0.5" style={{ color: primary }}>
+                        {fmt(item.price * item.quantity)}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5 bg-stone-50 dark:bg-[#1E1E1C] rounded-2xl p-1 border border-[#EFECE6] dark:border-[#1F1F1C] flex-shrink-0">
                     <button
@@ -1203,22 +1222,31 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
             </div>
 
             <div className="px-6 py-6 border-t border-[#EFECE6] dark:border-[#1F1F1C] bg-[#FAF9F5] dark:bg-[#0D0C0B] flex-shrink-0 transition-colors duration-300">
-              <div className="space-y-2.5 mb-5">
-                <div className="flex justify-between text-xs font-medium text-[#7A7368] dark:text-[#A19B91]">
-                  <span>Items Subtotal</span>
-                  <span className="font-bold text-neutral-900 dark:text-neutral-200">{fmt(subtotal)}</span>
+              {restaurant.hidePrices ? (
+                <div className="mb-5 text-center bg-stone-100/50 dark:bg-stone-900/50 border border-dashed border-stone-200 dark:border-stone-800 rounded-2xl py-3.5 px-4">
+                  <p className="text-xs font-black text-neutral-700 dark:text-neutral-300">📖 Catalog Order Mode Active</p>
+                  <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1 leading-relaxed">
+                    Pay table-side or in-person upon order dispatch. Prices are hidden from the menu.
+                  </p>
                 </div>
-                {restaurant.deliveryEnabled && deliveryType === "delivery" && restaurant.deliveryFee > 0 && (
+              ) : (
+                <div className="space-y-2.5 mb-5">
                   <div className="flex justify-between text-xs font-medium text-[#7A7368] dark:text-[#A19B91]">
-                    <span>Standard Delivery Fee</span>
-                    <span className="font-bold text-neutral-900 dark:text-neutral-200">{fmt(restaurant.deliveryFee)}</span>
+                    <span>Items Subtotal</span>
+                    <span className="font-bold text-neutral-900 dark:text-neutral-200">{fmt(subtotal)}</span>
                   </div>
-                )}
-                <div className="flex justify-between font-black text-base pt-3 border-t border-[#EFECE6] dark:border-[#1F1F1C]">
-                  <span className="text-neutral-900 dark:text-neutral-200 font-extrabold">Grand Total</span>
-                  <span className="text-[var(--brand-primary)]" style={{ color: primary }}>{fmt(orderTotal)}</span>
+                  {restaurant.deliveryEnabled && deliveryType === "delivery" && restaurant.deliveryFee > 0 && (
+                    <div className="flex justify-between text-xs font-medium text-[#7A7368] dark:text-[#A19B91]">
+                      <span>Standard Delivery Fee</span>
+                      <span className="font-bold text-neutral-900 dark:text-neutral-200">{fmt(restaurant.deliveryFee)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-black text-base pt-3 border-t border-[#EFECE6] dark:border-[#1F1F1C]">
+                    <span className="text-neutral-900 dark:text-neutral-200 font-extrabold">Grand Total</span>
+                    <span className="text-[var(--brand-primary)]" style={{ color: primary }}>{fmt(orderTotal)}</span>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {restaurant.minimumOrder > 0 && !meetsMinimum && (
                 <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/30 rounded-2xl px-4 py-3 mb-4 font-medium leading-relaxed shadow-sm">
@@ -1366,32 +1394,47 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                   {items.map((item) => (
                     <div key={item.id} className="flex justify-between text-xs font-medium">
                       <span className="text-[#7A7368] dark:text-[#A19B91] font-semibold">{item.quantity}× {item.name}</span>
-                      <span className="font-extrabold text-neutral-900 dark:text-neutral-100">{fmt(item.quantity * item.price)}</span>
+                      {!restaurant.hidePrices && (
+                        <span className="font-extrabold text-neutral-900 dark:text-neutral-100">{fmt(item.quantity * item.price)}</span>
+                      )}
                     </div>
                   ))}
                 </div>
-                <div className="border-t border-[#EFECE6] dark:border-[#1F1F1C] pt-3.5 space-y-2">
-                  <div className="flex justify-between text-xs text-[#7A7368] dark:text-[#A19B91]">
-                    <span>Selections Subtotal</span>
-                    <span className="font-bold text-neutral-900 dark:text-neutral-200">{fmt(subtotal)}</span>
+                {restaurant.hidePrices ? (
+                  <div className="border-t border-[#EFECE6] dark:border-[#1F1F1C] pt-3.5">
+                    <div className="bg-stone-100/50 dark:bg-stone-900/50 border border-dashed border-stone-200 dark:border-stone-800 rounded-xl p-3 text-center">
+                      <p className="text-xs font-black text-neutral-700 dark:text-neutral-300">📖 Catalog Order Mode</p>
+                      <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1 leading-relaxed">
+                        {deliveryType === "delivery"
+                          ? "Please pay cash or card upon delivery dispatch."
+                          : "Please pay table-side or at the counter upon order collection."}
+                      </p>
+                    </div>
                   </div>
-                  {deliveryType === "delivery" && restaurant.deliveryFee > 0 && (
+                ) : (
+                  <div className="border-t border-[#EFECE6] dark:border-[#1F1F1C] pt-3.5 space-y-2">
                     <div className="flex justify-between text-xs text-[#7A7368] dark:text-[#A19B91]">
-                      <span>Fulfillment Dispatch Fee</span>
-                      <span className="font-bold text-neutral-900 dark:text-neutral-200">{fmt(restaurant.deliveryFee)}</span>
+                      <span>Selections Subtotal</span>
+                      <span className="font-bold text-neutral-900 dark:text-neutral-200">{fmt(subtotal)}</span>
                     </div>
-                  )}
-                  {deliveryType === "pickup" && (
-                    <div className="flex justify-between text-xs text-emerald-600 dark:text-emerald-500 font-extrabold">
-                      <span>Pickup Savings</span>
-                      <span>Free</span>
+                    {deliveryType === "delivery" && restaurant.deliveryFee > 0 && (
+                      <div className="flex justify-between text-xs text-[#7A7368] dark:text-[#A19B91]">
+                        <span>Fulfillment Dispatch Fee</span>
+                        <span className="font-bold text-neutral-900 dark:text-neutral-200">{fmt(restaurant.deliveryFee)}</span>
+                      </div>
+                    )}
+                    {deliveryType === "pickup" && (
+                      <div className="flex justify-between text-xs text-emerald-600 dark:text-emerald-500 font-extrabold">
+                        <span>Pickup Savings</span>
+                        <span>Free</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-black text-base pt-3 border-t border-[#EFECE6] dark:border-[#1F1F1C]">
+                      <span className="text-neutral-900 dark:text-neutral-200 font-extrabold">Total Amount Due</span>
+                      <span style={{ color: primary }} className="font-black text-lg tracking-tight">{fmt(orderTotal)}</span>
                     </div>
-                  )}
-                  <div className="flex justify-between font-black text-base pt-3 border-t border-[#EFECE6] dark:border-[#1F1F1C]">
-                    <span className="text-neutral-900 dark:text-neutral-200 font-extrabold">Total Amount Due</span>
-                    <span style={{ color: primary }} className="font-black text-lg tracking-tight">{fmt(orderTotal)}</span>
                   </div>
-                </div>
+                )}
               </div>
 
               {orderError && (
@@ -1402,33 +1445,51 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
 
               {/* Secure payment actions (Phase 10C) */}
               <div className="space-y-2.5 pb-2">
-                {restaurant.onlinePaymentEnabled && (
+                {restaurant.hidePrices ? (
                   <button
-                    onClick={handleOnlinePayment}
+                    onClick={handleCashOrder}
                     disabled={isSubmitting}
                     style={{ backgroundColor: primary }}
                     className="w-full text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2.5 transition-opacity hover:opacity-95 disabled:opacity-60 active:scale-[0.99] text-sm uppercase tracking-widest shadow-md shadow-[var(--brand-primary-20)]"
                   >
                     <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7m0 0l-7 7m7-7H3" />
                     </svg>
-                    {isSubmitting ? "Redirecting safely…" : "Authorize Pay Online (Paystack)"}
+                    {isSubmitting
+                      ? "Placing Order safely…"
+                      : "Confirm & Place Order"}
                   </button>
+                ) : (
+                  <>
+                    {restaurant.onlinePaymentEnabled && (
+                      <button
+                        onClick={handleOnlinePayment}
+                        disabled={isSubmitting}
+                        style={{ backgroundColor: primary }}
+                        className="w-full text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2.5 transition-opacity hover:opacity-95 disabled:opacity-60 active:scale-[0.99] text-sm uppercase tracking-widest shadow-md shadow-[var(--brand-primary-20)]"
+                      >
+                        <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                        </svg>
+                        {isSubmitting ? "Redirecting safely…" : "Authorize Pay Online (Paystack)"}
+                      </button>
+                    )}
+                    <button
+                      onClick={handleCashOrder}
+                      disabled={isSubmitting}
+                      className="w-full bg-stone-50 hover:bg-stone-100 dark:bg-[#1E1E1C] dark:hover:bg-[#2A2A27] text-neutral-800 dark:text-neutral-200 font-bold py-4 rounded-2xl flex items-center justify-center gap-2.5 transition-all border border-[#EFECE6] dark:border-[#1F1F1C] disabled:opacity-60 active:scale-[0.99] text-sm uppercase tracking-widest shadow-xs"
+                    >
+                      <svg className="w-4.5 h-4.5 text-[#7A7368]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      {isSubmitting
+                        ? "Placing Order safely…"
+                        : deliveryType === "pickup"
+                        ? "Confirm Pay on Pickup"
+                        : "Confirm Pay on Delivery"}
+                    </button>
+                  </>
                 )}
-                <button
-                  onClick={handleCashOrder}
-                  disabled={isSubmitting}
-                  className="w-full bg-stone-50 hover:bg-stone-100 dark:bg-[#1E1E1C] dark:hover:bg-[#2A2A27] text-neutral-800 dark:text-neutral-200 font-bold py-4 rounded-2xl flex items-center justify-center gap-2.5 transition-all border border-[#EFECE6] dark:border-[#1F1F1C] disabled:opacity-60 active:scale-[0.99] text-sm uppercase tracking-widest shadow-xs"
-                >
-                  <svg className="w-4.5 h-4.5 text-[#7A7368]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                  {isSubmitting
-                    ? "Placing Order safely…"
-                    : deliveryType === "pickup"
-                    ? "Confirm Pay on Pickup"
-                    : "Confirm Pay on Delivery"}
-                </button>
               </div>
 
               {/* Trust badges (Phase 10C) */}
@@ -1588,26 +1649,41 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                       {items.map((item) => (
                         <div key={item.id} className="flex justify-between text-xs font-medium">
                           <span className="text-[#7A7368] dark:text-[#A19B91] font-semibold">{item.quantity}× {item.name}</span>
-                          <span className="font-extrabold text-neutral-900 dark:text-neutral-100">{fmt(item.quantity * item.price)}</span>
+                          {!restaurant.hidePrices && (
+                            <span className="font-extrabold text-neutral-900 dark:text-neutral-100">{fmt(item.quantity * item.price)}</span>
+                          )}
                         </div>
                       ))}
                     </div>
-                    <div className="border-t border-[#EFECE6] dark:border-[#1F1F1C] pt-3.5 space-y-2">
-                      <div className="flex justify-between text-xs text-[#7A7368] dark:text-[#A19B91]">
-                        <span>Selections Subtotal</span>
-                        <span>{fmt(subtotal)}</span>
-                      </div>
-                      {deliveryType === "delivery" && restaurant.deliveryFee > 0 && (
-                        <div className="flex justify-between text-xs text-[#7A7368] dark:text-[#A19B91]">
-                          <span>Fulfillment Dispatch Fee</span>
-                          <span>{fmt(restaurant.deliveryFee)}</span>
+                    {restaurant.hidePrices ? (
+                      <div className="border-t border-[#EFECE6] dark:border-[#1F1F1C] pt-3.5">
+                        <div className="bg-stone-100/50 dark:bg-stone-900/50 border border-dashed border-stone-200 dark:border-stone-800 rounded-xl p-3 text-center">
+                          <p className="text-xs font-black text-neutral-700 dark:text-neutral-300">📖 Catalog Order Mode</p>
+                          <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1 leading-relaxed">
+                            {deliveryType === "delivery"
+                              ? "Please pay cash or card upon preorder dispatch."
+                              : "Please pay table-side or at the counter upon order collection."}
+                          </p>
                         </div>
-                      )}
-                      <div className="flex justify-between font-black text-base pt-3 border-t border-[#EFECE6] dark:border-[#1F1F1C]">
-                        <span className="text-neutral-900 dark:text-neutral-200 font-extrabold">Total Amount Due</span>
-                        <span style={{ color: primary }} className="font-black text-lg tracking-tight">{fmt(orderTotal)}</span>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="border-t border-[#EFECE6] dark:border-[#1F1F1C] pt-3.5 space-y-2">
+                        <div className="flex justify-between text-xs text-[#7A7368] dark:text-[#A19B91]">
+                          <span>Selections Subtotal</span>
+                          <span>{fmt(subtotal)}</span>
+                        </div>
+                        {deliveryType === "delivery" && restaurant.deliveryFee > 0 && (
+                          <div className="flex justify-between text-xs text-[#7A7368] dark:text-[#A19B91]">
+                            <span>Fulfillment Dispatch Fee</span>
+                            <span>{fmt(restaurant.deliveryFee)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between font-black text-base pt-3 border-t border-[#EFECE6] dark:border-[#1F1F1C]">
+                          <span className="text-neutral-900 dark:text-neutral-200 font-extrabold">Total Amount Due</span>
+                          <span style={{ color: primary }} className="font-black text-lg tracking-tight">{fmt(orderTotal)}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {restaurant.minimumOrder > 0 && !meetsMinimum && (
