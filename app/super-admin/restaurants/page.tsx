@@ -1,5 +1,5 @@
 import { getAdminDb } from "@/lib/firebase-admin";
-import { getPlan } from "@/lib/plans";
+import { getPlanSafe } from "@/lib/plans";
 import RestaurantsClient from "./RestaurantsClient";
 
 export const revalidate = 0;
@@ -18,7 +18,7 @@ export default async function SuperAdminRestaurantsPage() {
     let status: string = (d.subscriptionStatus as string) ?? "trialing";
     if (status !== "suspended" && endDate && endDate < now) status = "expired";
 
-    const plan = getPlan(d.planId as string);
+    const plan = getPlanSafe(d.planId as string);
     const createdAt = d.createdAt
       ? (d.createdAt.toDate ? d.createdAt.toDate() : new Date((d.createdAt.seconds ?? 0) * 1000))
       : null;

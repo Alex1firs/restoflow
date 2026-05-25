@@ -1,5 +1,5 @@
 import { getAdminDb } from "@/lib/firebase-admin";
-import { getPlan } from "@/lib/plans";
+import { getPlanSafe } from "@/lib/plans";
 
 export const revalidate = 0;
 
@@ -42,7 +42,7 @@ export default async function SuperAdminOverview() {
       trialing++;
     } else {
       active++;
-      const plan = getPlan(r.planId as string);
+      const plan = getPlanSafe(r.planId as string);
       if (plan) mrr += plan.monthlyPrice;
     }
   }

@@ -38,3 +38,8 @@ export function getPlan(id: string): Plan {
   }
   return plan;
 }
+
+/** Returns undefined instead of throwing — use in display/analytics paths where stale plan IDs are tolerable. */
+export function getPlanSafe(id: string): Plan | undefined {
+  return PLANS.find((p) => p.id === id);
+}

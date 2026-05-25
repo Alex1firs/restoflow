@@ -1,5 +1,5 @@
 import { getAdminDb } from "@/lib/firebase-admin";
-import { getPlan } from "@/lib/plans";
+import { getPlanSafe } from "@/lib/plans";
 import SubscriptionsClient from "./SubscriptionsClient";
 
 export const revalidate = 0;
@@ -22,7 +22,7 @@ export default async function SuperAdminSubscriptionsPage() {
     if (status !== "suspended" && endDate && endDate < now) status = "expired";
 
     const daysRemaining = endDate && endDate > now ? Math.ceil((endDate.getTime() - now.getTime()) / 86400000) : null;
-    const plan = getPlan(d.planId as string);
+    const plan = getPlanSafe(d.planId as string);
 
     return {
       slug: doc.id,
