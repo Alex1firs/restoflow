@@ -29,7 +29,7 @@ export async function processSuccessfulPayment(
 ): Promise<boolean> {
   const { reference, amount, metadata } = data;
   const restaurantId = metadata?.restaurantId;
-  const planId = metadata?.planId ?? "starter";
+  const planId = metadata?.planId ?? "pro";
   const paymentType = metadata?.paymentType ?? "subscription";
   const ownerUid = metadata?.ownerUid ?? "";
   const planName = metadata?.planName ?? "";

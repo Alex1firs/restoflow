@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { getAdminDb } from "@/lib/firebase-admin";
+import { serverEnv } from "@/lib/env";
 
 export async function GET() {
   let user: Awaited<ReturnType<typeof getAuthenticatedUser>>;
@@ -17,7 +18,7 @@ export async function GET() {
   return NextResponse.json({
     bankName: (d.paymentBankName as string) ?? "",
     bankCode: (d.paymentBankCode as string) ?? "",
-    accountNumber: (d.paymentAccountNumber as string) ?? "",
+    accountNumber: "",
     accountName: (d.paymentAccountName as string) ?? "",
     subaccountCode: (d.paystackSubaccountCode as string) ?? "",
   });
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
   const paystackRes = await fetch("https://api.paystack.co/subaccount", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+      Authorization: `Bearer ${serverEnv.PAYSTACK_SECRET_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -68,11 +69,10 @@ export async function POST(req: NextRequest) {
   });
 
   if (!paystackRes.ok) {
-    const errData = await paystackRes.json().catch(() => ({}));
-    const msg =
-      (errData as { message?: string }).message ??
-      "Failed to create payment account. Check your bank details.";
-    return NextResponse.json({ error: msg }, { status: 422 });
+    return NextResponse.json(
+      { error: "Failed to create payment account. Check your bank details and try again." },
+      { status: 422 }
+    );
   }
 
   const { data: subData } = await paystackRes.json();
@@ -82,7 +82,6 @@ export async function POST(req: NextRequest) {
     paystackSubaccountCode: subaccountCode,
     paymentBankName: bankName.trim(),
     paymentBankCode: bankCode.trim(),
-    paymentAccountNumber: accountNumber.trim(),
     paymentAccountName: accountName.trim(),
   });
 

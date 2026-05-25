@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { checkIsOpen } from "@/lib/restaurant-utils";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
+  const { allowed } = await checkRateLimit(`orders_init:${getClientIp(req)}`, 10, 60_000);
+  if (!allowed) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+
   let body: unknown;
   try {
     body = await req.json();
@@ -137,7 +141,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!paystackRes.ok) {
-      console.error("Paystack init error:", await paystackRes.text());
+      console.error("Paystack init error");
       return NextResponse.json({ error: "Payment provider error. Please try again." }, { status: 502 });
     }
 
@@ -160,8 +164,8 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ authorizationUrl, reference });
-  } catch (error) {
-    console.error("Order initialize failed:", error);
+  } catch {
+    console.error("Order initialize failed");
     return NextResponse.json({ error: "Failed to initialize payment. Please try again." }, { status: 500 });
   }
 }

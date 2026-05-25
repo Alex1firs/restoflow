@@ -29,6 +29,12 @@ export const PLANS: Plan[] = [
   },
 ];
 
-export function getPlan(id: string): Plan | undefined {
-  return PLANS.find((p) => p.id === id);
+export function getPlan(id: string): Plan {
+  const plan = PLANS.find((p) => p.id === id);
+  if (!plan) {
+    throw new Error(
+      `Unknown plan ID "${id}". Valid plans: ${PLANS.map((p) => p.id).join(", ")}.`
+    );
+  }
+  return plan;
 }

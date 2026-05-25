@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const VERCEL_API_TOKEN = process.env.VERCEL_API_TOKEN ?? "";
 const VERCEL_PROJECT_ID = process.env.VERCEL_PROJECT_ID ?? "";
@@ -13,6 +14,9 @@ export async function GET() {
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const { allowed } = await checkRateLimit(`domain_check:${user.uid}`, 30, 60_000);
+  if (!allowed) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
 
   const db = getAdminDb();
   const snap = await db.collection("restaurants").doc(user.restaurantSlug).get();

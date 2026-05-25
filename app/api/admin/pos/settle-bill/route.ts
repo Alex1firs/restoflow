@@ -42,66 +42,91 @@ export async function POST(request: NextRequest) {
   const db = getAdminDb();
   const orderRef = db.collection("orders").doc(orderId);
 
+  type TxResult =
+    | { outcome: "error"; message: string; status: number }
+    | { outcome: "already_paid" }
+    | { outcome: "settled"; loyaltyPayload: { phone: string; customerName: string; total: number } | null };
+
+  let result: TxResult;
+
   try {
-    const snap = await orderRef.get();
-    if (!snap.exists) {
-      return NextResponse.json({ error: "Order not found" }, { status: 404 });
-    }
+    result = await db.runTransaction(async (tx): Promise<TxResult> => {
+      const snap = await tx.get(orderRef);
+      if (!snap.exists) {
+        return { outcome: "error", message: "Order not found", status: 404 };
+      }
 
-    const order = snap.data()!;
+      const order = snap.data()!;
 
-    if (order.restaurantId !== user.restaurantSlug) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+      if (order.restaurantId !== user.restaurantSlug) {
+        return { outcome: "error", message: "Forbidden", status: 403 };
+      }
 
-    if (order.serviceMode !== "dine_in") {
-      return NextResponse.json(
-        { error: "Only dine-in orders can be settled here" },
-        { status: 400 }
-      );
-    }
+      if (order.serviceMode !== "dine_in") {
+        return { outcome: "error", message: "Only dine-in orders can be settled here", status: 400 };
+      }
 
-    if (order.status === "rejected") {
-      return NextResponse.json({ error: "Cannot settle a cancelled order" }, { status: 400 });
-    }
+      if (order.status === "rejected") {
+        return { outcome: "error", message: "Cannot settle a cancelled order", status: 400 };
+      }
 
-    // Idempotent — already settled
-    if (order.paymentStatus === "paid") {
-      return NextResponse.json({ success: true, alreadyPaid: true });
-    }
+      // Idempotent — already settled (second concurrent call sees the committed write)
+      if (order.paymentStatus === "paid") {
+        return { outcome: "already_paid" };
+      }
 
-    const update: Record<string, unknown> = {
-      paymentStatus: "paid",
-      paymentMethod,
-      paidAt: FieldValue.serverTimestamp(),
-      settledByStaffId: user.uid,
-      settledByStaffName: typeof staffName === "string" ? staffName.trim() : "",
-    };
+      const update: Record<string, unknown> = {
+        paymentStatus: "paid",
+        paymentMethod,
+        paidAt: FieldValue.serverTimestamp(),
+        settledByStaffId: user.uid,
+        settledByStaffName: typeof staffName === "string" ? staffName.trim() : "",
+      };
 
-    if (typeof settlementNote === "string" && settlementNote.trim()) {
-      update.settlementNote = settlementNote.trim();
-    }
+      if (typeof settlementNote === "string" && settlementNote.trim()) {
+        update.settlementNote = settlementNote.trim();
+      }
 
-    await orderRef.update(update);
+      tx.update(orderRef, update);
 
-    // Award loyalty tick (fire-and-forget — never block the payment response)
-    const orderPhone = (order.phone as string) ?? (order.customerPhone as string) ?? "";
-    if (orderPhone) {
-      awardLoyaltyTick({
-        orderId,
-        restaurantSlug: user.restaurantSlug,
-        phone: orderPhone,
-        customerName: (order.customerName as string) ?? "",
-        orderTotal: (order.total as number) ?? 0,
-      }).catch(() => {});
-    }
+      const phone = (order.phone as string) ?? (order.customerPhone as string) ?? "";
+      const loyaltyPayload = phone
+        ? {
+            phone,
+            customerName: (order.customerName as string) ?? "",
+            total: (order.total as number) ?? 0,
+          }
+        : null;
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Settle bill failed:", error);
+      return { outcome: "settled", loyaltyPayload };
+    });
+  } catch {
+    console.error("Settle bill failed");
     return NextResponse.json(
       { error: "Failed to settle bill. Please try again." },
       { status: 500 }
     );
   }
+
+  if (result.outcome === "error") {
+    return NextResponse.json({ error: result.message }, { status: result.status });
+  }
+
+  if (result.outcome === "already_paid") {
+    return NextResponse.json({ success: true, alreadyPaid: true });
+  }
+
+  // Award loyalty tick (fire-and-forget — never block the payment response)
+  if (result.loyaltyPayload) {
+    const p = result.loyaltyPayload;
+    awardLoyaltyTick({
+      orderId,
+      restaurantSlug: user.restaurantSlug,
+      phone: p.phone,
+      customerName: p.customerName,
+      orderTotal: p.total,
+    }).catch(() => {});
+  }
+
+  return NextResponse.json({ success: true });
 }

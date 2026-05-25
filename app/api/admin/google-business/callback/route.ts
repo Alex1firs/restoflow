@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebase-admin";
-import { getGoogleConfig, exchangeCodeForTokens } from "@/lib/google-oauth";
+import { getGoogleConfig, exchangeCodeForTokens, storeGoogleTokens } from "@/lib/google-oauth";
 import { FieldValue } from "firebase-admin/firestore";
 
 export async function GET(req: NextRequest) {
@@ -58,13 +58,7 @@ export async function GET(req: NextRequest) {
     const { accessToken, refreshToken, tokenExpiry, email, googleUserId } =
       await exchangeCodeForTokens(code);
 
-    // Store tokens securely — server-side only, never exposed to frontend
-    await db.collection("google_tokens").doc(slug).set({
-      accessToken,
-      refreshToken,
-      tokenExpiry,
-      updatedAt: Date.now(),
-    });
+    await storeGoogleTokens(slug, { accessToken, refreshToken, tokenExpiry });
 
     // Update restaurant document with non-sensitive connection info
     await db
@@ -82,13 +76,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(
       new URL(`/admin/${slug}/seo/google-business?connected=1`, req.url)
     );
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "unknown_error";
+  } catch {
     return NextResponse.redirect(
-      new URL(
-        `/admin/${slug}/seo/google-business?error=${encodeURIComponent(msg)}`,
-        req.url
-      )
+      new URL(`/admin/${slug}/seo/google-business?error=connection_failed`, req.url)
     );
   }
 }

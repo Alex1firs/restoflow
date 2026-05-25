@@ -1,4 +1,56 @@
 import "server-only";
+import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
+
+// ── Token encryption (AES-256-GCM) ──────────────────────────────────────────
+// Set GOOGLE_TOKEN_ENCRYPTION_KEY to 64 random hex chars (32 bytes).
+// Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+function getEncKey(): Buffer {
+  const hex = process.env.GOOGLE_TOKEN_ENCRYPTION_KEY;
+  if (!hex) throw new Error("GOOGLE_TOKEN_ENCRYPTION_KEY is not set");
+  const key = Buffer.from(hex, "hex");
+  if (key.length !== 32) throw new Error("GOOGLE_TOKEN_ENCRYPTION_KEY must be 64 hex chars (32 bytes)");
+  return key;
+}
+
+function encryptToken(plaintext: string): string {
+  const key = getEncKey();
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const enc = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${iv.toString("hex")}:${tag.toString("hex")}:${enc.toString("hex")}`;
+}
+
+function decryptToken(encrypted: string): string {
+  const key = getEncKey();
+  const parts = encrypted.split(":");
+  if (parts.length !== 3) throw new Error("Token format invalid — reconnect Google account");
+  const [ivHex, tagHex, cipherHex] = parts;
+  const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(ivHex, "hex"));
+  decipher.setAuthTag(Buffer.from(tagHex, "hex"));
+  return Buffer.concat([
+    decipher.update(Buffer.from(cipherHex, "hex")),
+    decipher.final(),
+  ]).toString("utf8");
+}
+
+// Called by the OAuth callback route — handles encryption internally
+export async function storeGoogleTokens(
+  slug: string,
+  tokens: { accessToken: string; refreshToken: string; tokenExpiry: number }
+): Promise<void> {
+  const { getAdminDb } = await import("./firebase-admin");
+  await getAdminDb()
+    .collection("google_tokens")
+    .doc(slug)
+    .set({
+      accessToken: encryptToken(tokens.accessToken),
+      refreshToken: encryptToken(tokens.refreshToken),
+      tokenExpiry: tokens.tokenExpiry,
+      updatedAt: Date.now(),
+    });
+}
 
 export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/business.manage",
@@ -114,17 +166,20 @@ export async function getValidAccessToken(slug: string): Promise<string> {
   const tokenDoc = await db.collection("google_tokens").doc(slug).get();
   if (!tokenDoc.exists) throw new Error("No Google account connected");
 
-  const { accessToken, refreshToken, tokenExpiry } = tokenDoc.data() as {
+  const stored = tokenDoc.data() as {
     accessToken: string;
     refreshToken: string;
     tokenExpiry: number;
   };
 
-  if (Date.now() > tokenExpiry - 300_000) {
+  const accessToken = decryptToken(stored.accessToken);
+  const refreshToken = decryptToken(stored.refreshToken);
+
+  if (Date.now() > stored.tokenExpiry - 300_000) {
     const { accessToken: newToken, tokenExpiry: newExpiry } =
       await refreshAccessToken(refreshToken);
     await db.collection("google_tokens").doc(slug).update({
-      accessToken: newToken,
+      accessToken: encryptToken(newToken),
       tokenExpiry: newExpiry,
     });
     return newToken;

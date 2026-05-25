@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import { getAdminDb } from "./firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 
@@ -5,6 +6,7 @@ export async function createOrderFromPaymentReference(reference: string): Promis
   const db = getAdminDb();
   const pendingRef = db.collection("pending_payments").doc(reference);
   const orderRef = db.collection("orders").doc();
+  const trackingToken = randomBytes(16).toString("hex");
 
   return db.runTransaction(async (tx) => {
     const pending = await tx.get(pendingRef);
@@ -26,6 +28,7 @@ export async function createOrderFromPaymentReference(reference: string): Promis
       paymentReference: reference,
       status: "pending",
       deliveryType: d.deliveryType ?? "delivery",
+      trackingToken,
       createdAt: FieldValue.serverTimestamp(),
     });
     tx.delete(pendingRef);

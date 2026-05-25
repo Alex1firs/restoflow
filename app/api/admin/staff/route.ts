@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomBytes } from "crypto";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { getAdminAuth, getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
@@ -49,7 +50,8 @@ export async function POST(req: NextRequest) {
   if (!email?.trim()) return NextResponse.json({ error: "Email is required" }, { status: 400 });
   if (!["manager", "staff"].includes(role ?? "")) return NextResponse.json({ error: "Role must be manager or staff" }, { status: 400 });
 
-  const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4).toUpperCase() + "!1";
+  // randomBytes gives cryptographically secure randomness; Math.random() does not.
+  const tempPassword = randomBytes(12).toString("base64url") + "!1A";
 
   try {
     const authUser = await getAdminAuth().createUser({
@@ -60,6 +62,9 @@ export async function POST(req: NextRequest) {
 
     const resetLink = await getAdminAuth().generatePasswordResetLink(email.trim());
 
+    // Store the reset link in the user doc so it can be retrieved via Admin SDK
+    // by a super-admin if email delivery is not yet configured. Never expose it
+    // in an API response — reset links are single-use credentials.
     await getAdminDb().collection("users").doc(authUser.uid).set({
       email: email.trim(),
       displayName: displayName?.trim() ?? "",
@@ -67,10 +72,11 @@ export async function POST(req: NextRequest) {
       role,
       disabled: false,
       createdBy: user.uid,
+      pendingResetLink: resetLink,
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    return NextResponse.json({ uid: authUser.uid, resetLink }, { status: 201 });
+    return NextResponse.json({ uid: authUser.uid }, { status: 201 });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to create staff account";
     return NextResponse.json({ error: msg }, { status: 422 });

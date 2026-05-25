@@ -3,6 +3,7 @@ import { createOrderFromPaymentReference, getOrderByReference } from "@/lib/orde
 import { getAdminDb } from "@/lib/firebase-admin";
 import { awardLoyaltyTick } from "@/lib/loyalty";
 import LoyaltyCard from "@/app/components/LoyaltyCard";
+import { serverEnv } from "@/lib/env";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -22,6 +23,7 @@ export default async function PaymentCallbackPage({ params, searchParams }: Prop
 
   let success = false;
   let orderId: string | null = null;
+  let trackingToken: string | null = null;
   let message = "";
   let loyaltyResult: Awaited<ReturnType<typeof awardLoyaltyTick>> = null;
   let orderPhone = "";
@@ -30,7 +32,7 @@ export default async function PaymentCallbackPage({ params, searchParams }: Prop
   try {
     const verifyRes = await fetch(
       `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
-      { headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` } }
+      { headers: { Authorization: `Bearer ${serverEnv.PAYSTACK_SECRET_KEY}` } }
     );
 
     if (!verifyRes.ok) {
@@ -41,21 +43,23 @@ export default async function PaymentCallbackPage({ params, searchParams }: Prop
       if (txData.status !== "success") {
         message = `Payment was not completed (status: ${txData.status}). No charge was made.`;
       } else {
-        const isNew = !await getOrderByReference(reference);
-        orderId = await createOrderFromPaymentReference(reference);
-        if (!orderId) {
-          orderId = await getOrderByReference(reference);
-        }
+        // createOrderFromPaymentReference runs a Firestore transaction that deletes
+        // pending_payments/{reference} atomically — only the first concurrent caller
+        // gets a non-null return. Use that as the idempotency signal.
+        const createdOrderId = await createOrderFromPaymentReference(reference);
+        const isCreator = createdOrderId !== null;
+        orderId = createdOrderId ?? await getOrderByReference(reference);
         if (orderId) {
           success = true;
 
-          // Fetch order to get phone and award loyalty tick
-          if (isNew && orderId) {
+          // Only award loyalty once — the caller that actually created the order
+          if (isCreator) {
             try {
               const orderSnap = await getAdminDb().collection("orders").doc(orderId).get();
               if (orderSnap.exists) {
                 const d = orderSnap.data()!;
                 orderPhone = (d.phone as string) ?? "";
+                trackingToken = (d.trackingToken as string) ?? null;
                 const rSnap = await getAdminDb().collection("restaurants").doc(slug).get();
                 restaurantName = (rSnap.data()?.name as string) ?? "";
 
@@ -87,6 +91,7 @@ export default async function PaymentCallbackPage({ params, searchParams }: Prop
       slug={slug}
       success={success}
       orderId={orderId}
+      trackingToken={trackingToken}
       message={message}
       loyaltyResult={loyaltyResult}
       orderPhone={orderPhone}
@@ -99,6 +104,7 @@ function ResultPage({
   slug,
   success,
   orderId,
+  trackingToken,
   message,
   loyaltyResult,
   orderPhone,
@@ -107,6 +113,7 @@ function ResultPage({
   slug: string;
   success: boolean;
   orderId?: string | null;
+  trackingToken?: string | null;
   message?: string;
   loyaltyResult?: Awaited<ReturnType<typeof awardLoyaltyTick>>;
   orderPhone?: string;
@@ -165,7 +172,7 @@ function ResultPage({
             )}
 
             <Link
-              href={orderId ? `/track/${orderId}` : `/r/${slug}`}
+              href={orderId ? `/track/${orderId}${trackingToken ? `?t=${trackingToken}` : ""}` : `/r/${slug}`}
               className="block w-full text-center bg-orange-600 hover:bg-orange-500 text-white font-black py-4 px-10 rounded-2xl uppercase tracking-widest transition-all mb-3"
             >
               {orderId ? "Track Order" : "Back to Menu"}

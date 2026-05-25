@@ -22,7 +22,6 @@ export type OnboardingResult = {
   alreadyProcessed: boolean;
   slug: string;
   email: string;
-  resetLink: string;
 };
 
 function toSlug(name: string): string {
@@ -68,18 +67,21 @@ export async function processOnboarding(
   const record = snap.data() as OnboardingRecord;
 
   // Idempotency — already fully processed
-  if (record.status === "complete" && record.resetLink) {
+  if (record.status === "complete") {
     return {
       success: true,
       alreadyProcessed: true,
       slug: record.slug,
       email: record.email,
-      resetLink: record.resetLink,
     };
   }
 
   const { restaurantName, slug, email, phone, address, planId } = record;
-  const plan = getPlan(planId);
+
+  // Validate the plan exists before doing any writes. Throws with a clear message
+  // for unknown plan IDs rather than silently continuing with undefined plan data.
+  getPlan(planId);
+
   const now = new Date();
   const trialEnd = new Date(now);
   trialEnd.setDate(trialEnd.getDate() + 7);
@@ -94,7 +96,9 @@ export async function processOnboarding(
     uid = newUser.uid;
   }
 
-  // Generate password reset link (single-use, valid for 1 hour)
+  // Generate a password reset link so the owner can set their password.
+  // Stored in the onboarding doc (Admin-SDK-only read) for retrieval by support.
+  // Never returned in API responses — reset links are single-use credentials.
   const resetLink = await auth.generatePasswordResetLink(email);
 
   const batch = db.batch();
@@ -141,6 +145,5 @@ export async function processOnboarding(
     alreadyProcessed: false,
     slug,
     email,
-    resetLink,
   };
 }

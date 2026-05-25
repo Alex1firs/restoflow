@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { getAdminDb } from "@/lib/firebase-admin";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { serverEnv } from "@/lib/env";
 
 export async function POST(req: NextRequest) {
   let user: Awaited<ReturnType<typeof getAuthenticatedUser>>;
@@ -9,6 +11,9 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const { allowed } = await checkRateLimit(`payments_init:${user.uid}`, 10, 60_000);
+  if (!allowed) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
 
   const body = await req.json().catch(() => null);
   if (!body) {
@@ -59,11 +64,11 @@ export async function POST(req: NextRequest) {
   const paystackRes = await fetch("https://api.paystack.co/transaction/initialize", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+      Authorization: `Bearer ${serverEnv.PAYSTACK_SECRET_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      email: restaurant.ownerEmail ?? `${restaurantId}@noreply.grills.ng`,
+      email: (restaurant.ownerEmail as string | undefined) ?? "orders@restoflow.app",
       amount: amountKobo,
       currency: "NGN",
       callback_url: callbackUrl,
@@ -79,8 +84,7 @@ export async function POST(req: NextRequest) {
   });
 
   if (!paystackRes.ok) {
-    const err = await paystackRes.text();
-    console.error("Paystack initialize error:", err);
+    console.error("Paystack initialize error");
     return NextResponse.json({ error: "Payment provider error" }, { status: 502 });
   }
 

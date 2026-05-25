@@ -27,8 +27,8 @@ export async function POST(request: NextRequest) {
     });
 
     return response;
-  } catch (error) {
-    console.error("Session creation error:", error);
+  } catch {
+    console.error("Session creation error");
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 }

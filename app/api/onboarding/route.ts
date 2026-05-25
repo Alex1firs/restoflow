@@ -3,9 +3,14 @@ import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { getPlan } from "@/lib/plans";
 import { generateUniqueSlug, processOnboarding } from "@/lib/onboarding";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { serverEnv } from "@/lib/env";
 
 export async function POST(req: NextRequest) {
   try {
+    const { allowed } = await checkRateLimit(`onboarding:${getClientIp(req)}`, 5, 60_000);
+    if (!allowed) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+
     const body = await req.json().catch(() => null);
     if (!body) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
@@ -57,7 +62,6 @@ export async function POST(req: NextRequest) {
         directActivation: true,
         slug: result.slug,
         email: result.email,
-        resetLink: result.resetLink,
       });
     }
 
@@ -70,7 +74,7 @@ export async function POST(req: NextRequest) {
     const paystackRes = await fetch("https://api.paystack.co/transaction/initialize", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+        Authorization: `Bearer ${serverEnv.PAYSTACK_SECRET_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -91,9 +95,8 @@ export async function POST(req: NextRequest) {
     });
 
     if (!paystackRes.ok) {
-      const err = await paystackRes.text();
-      console.error("Paystack initialize error:", err);
-      return NextResponse.json({ error: `Payment provider error: ${err}` }, { status: 502 });
+      console.error("Paystack initialize error");
+      return NextResponse.json({ error: "Payment provider error" }, { status: 502 });
     }
 
     const { data } = await paystackRes.json();
@@ -102,9 +105,8 @@ export async function POST(req: NextRequest) {
       authorizationUrl: data.authorization_url as string,
       reference: data.reference as string,
     });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Internal server error";
-    console.error("POST /api/onboarding error:", err);
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch {
+    console.error("POST /api/onboarding error");
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -7,12 +7,19 @@ import { sendNewOrderAlert } from "@/lib/notifications";
 import { sendCustomerNotification } from "@/lib/customer-notifications";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { awardLoyaltyTick } from "@/lib/loyalty";
+import { serverEnv } from "@/lib/env";
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
 
   const signature = req.headers.get("x-paystack-signature");
-  const secret = process.env.PAYSTACK_SECRET_KEY!;
+  if (!signature) {
+    return NextResponse.json({ error: "Missing signature" }, { status: 401 });
+  }
+
+  // serverEnv.PAYSTACK_SECRET_KEY throws immediately if the var is unset,
+  // preventing HMAC from being computed against the string "undefined".
+  const secret = serverEnv.PAYSTACK_SECRET_KEY;
   const expected = createHmac("sha512", secret).update(rawBody).digest("hex");
 
   if (signature !== expected) {

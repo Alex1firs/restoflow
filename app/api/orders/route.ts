@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomBytes } from "crypto";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { checkIsOpen } from "@/lib/restaurant-utils";
 import { sendNewOrderAlert } from "@/lib/notifications";
 import { sendCustomerNotification } from "@/lib/customer-notifications";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
+  const { allowed } = await checkRateLimit(`orders:${getClientIp(request)}`, 10, 60_000);
+  if (!allowed) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+
   let body: unknown;
   try {
     body = await request.json();
@@ -145,6 +150,8 @@ export async function POST(request: NextRequest) {
 
     const total = itemsTotal + deliveryFee;
 
+    const trackingToken = randomBytes(16).toString("hex");
+
     const orderRef = await db.collection("orders").add({
       restaurantId: restaurantId.trim(),
       customerName: customerName.trim(),
@@ -161,6 +168,7 @@ export async function POST(request: NextRequest) {
       deliveryType: resolvedDeliveryType,
       orderType: isScheduled ? "scheduled" : "normal",
       ...(isScheduled ? { scheduledFor } : {}),
+      trackingToken,
       createdAt: FieldValue.serverTimestamp(),
     });
 
@@ -188,9 +196,9 @@ export async function POST(request: NextRequest) {
       deliveryType: resolvedDeliveryType,
     }).catch(() => {});
 
-    return NextResponse.json({ orderId }, { status: 201 });
-  } catch (error) {
-    console.error("Order creation failed:", error);
+    return NextResponse.json({ orderId, trackingToken }, { status: 201 });
+  } catch {
+    console.error("Order creation failed");
     return NextResponse.json({ error: "Failed to place order. Please try again." }, { status: 500 });
   }
 }

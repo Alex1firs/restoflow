@@ -80,6 +80,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [trackingToken, setTrackingToken] = useState<string | null>(null);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [activeSection, setActiveSection] = useState("menu");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -296,6 +297,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
         throw new Error(data.error || "Failed to schedule order");
       }
       setOrderId(data.orderId);
+      setTrackingToken(data.trackingToken ?? null);
       setIsScheduledOrder(true);
       setOrderSuccess(true);
       clearCart();
@@ -325,6 +327,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
       const data = await res.json();
       if (!res.ok) { setOrderError(data.error ?? "Failed to place order."); return; }
       setOrderId(data.orderId);
+      setTrackingToken(data.trackingToken ?? null);
       clearCart();
       setFormData({ customerName: "", phone: "", address: "", note: "" });
       setCheckoutOpen(false);
@@ -401,7 +404,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
             <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider mb-1">Receipt reference</p>
             <p className="font-mono text-sm text-neutral-900 dark:text-neutral-100 mb-5 break-all font-semibold select-all">{orderId}</p>
             <a
-              href={`/track/${orderId}`}
+              href={`/track/${orderId}${trackingToken ? `?t=${trackingToken}` : ""}`}
               style={{ backgroundColor: primary }}
               className="w-full text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-opacity hover:opacity-95 shadow-md active:scale-[0.98] transition-transform text-sm"
             >
@@ -413,7 +416,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
           </div>
         )}
         <button
-          onClick={() => { setOrderSuccess(false); setOrderId(null); setIsScheduledOrder(false); }}
+          onClick={() => { setOrderSuccess(false); setOrderId(null); setTrackingToken(null); setIsScheduledOrder(false); }}
           className="text-xs font-bold text-[#7A7368] hover:text-neutral-900 dark:text-[#A19B91] dark:hover:text-white transition-colors py-2 px-4 rounded-full border border-[#EFECE6] dark:border-[#1F1F1C] bg-white dark:bg-[#141412] hover:bg-stone-50"
         >
           Return to Storefront
