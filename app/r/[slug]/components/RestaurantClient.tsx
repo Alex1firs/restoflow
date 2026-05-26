@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useCart } from "./CartContext";
 import SEOSections from "./SEOSections";
 
-type DeliveryType = "delivery" | "pickup";
+type DeliveryType = "delivery" | "pickup" | "dine_in";
 
 interface MenuItemData {
   id: string;
@@ -31,6 +31,7 @@ interface RestaurantClientProps {
     isOpen: boolean;
     deliveryEnabled: boolean;
     pickupEnabled: boolean;
+    dineInEnabled: boolean;
     todayHoursLabel: string | null;
     primaryColor?: string;
     accentColor?: string;
@@ -51,6 +52,7 @@ interface RestaurantClientProps {
     tiktokUrl?: string;
   };
   isPreview?: boolean;
+  initialTable?: string;
 }
 
 function fmt(n: number) {
@@ -62,7 +64,7 @@ function parseList(s?: string): string[] {
   return s.split(",").map((x) => x.trim()).filter(Boolean);
 }
 
-export default function RestaurantClient({ restaurant, menuItems, seo, isPreview }: RestaurantClientProps) {
+export default function RestaurantClient({ restaurant, menuItems, seo, isPreview, initialTable }: RestaurantClientProps) {
   const { items, addToCart, updateQuantity, clearCart, totalPrice, totalItems } = useCart();
 
   const [cartOpen, setCartOpen] = useState(false);
@@ -73,10 +75,12 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   const [isScheduledOrder, setIsScheduledOrder] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [deliveryType, setDeliveryType] = useState<DeliveryType>(
-    restaurant.deliveryEnabled ? "delivery" : "pickup"
-  );
-  const [formData, setFormData] = useState({ customerName: "", phone: "", address: "", note: "" });
+  const [deliveryType, setDeliveryType] = useState<DeliveryType>(() => {
+    if (initialTable && restaurant.dineInEnabled) return "dine_in";
+    if (restaurant.deliveryEnabled) return "delivery";
+    return "pickup";
+  });
+  const [formData, setFormData] = useState({ customerName: "", phone: "", address: "", note: "", tableNumber: initialTable ?? "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -103,7 +107,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   const categories = [...new Set(menuItems.map((i) => i.category))].filter(Boolean);
   const filteredItems = activeCategory ? menuItems.filter((i) => i.category === activeCategory) : menuItems;
   const subtotal = totalPrice;
-  const effectiveDeliveryFee = deliveryType === "pickup" ? 0 : restaurant.deliveryFee;
+  const effectiveDeliveryFee = (deliveryType === "pickup" || deliveryType === "dine_in") ? 0 : restaurant.deliveryFee;
   const orderTotal = subtotal + effectiveDeliveryFee;
   const meetsMinimum = restaurant.hidePrices || restaurant.minimumOrder <= 0 || subtotal >= restaurant.minimumOrder;
 
@@ -249,13 +253,22 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
     return null;
   };
 
+  const tableLabel = formData.tableNumber.trim()
+    ? `Table ${formData.tableNumber.trim()}`
+    : "";
+
   const buildPayload = () => ({
     restaurantId: restaurant.slug,
     customerName: formData.customerName.trim(),
     phone: formData.phone.trim(),
-    address: deliveryType === "delivery" ? formData.address.trim() : (restaurant.address || "Pickup"),
+    address: deliveryType === "delivery"
+      ? formData.address.trim()
+      : deliveryType === "dine_in"
+      ? "Dine In"
+      : (restaurant.address || "Pickup"),
     note: formData.note.trim(),
     deliveryType,
+    ...(deliveryType === "dine_in" ? { serviceMode: "dine_in", tableLabel } : {}),
     items: items.map((i) => ({ id: i.id, quantity: i.quantity })),
   });
 
@@ -329,7 +342,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
       setOrderId(data.orderId);
       setTrackingToken(data.trackingToken ?? null);
       clearCart();
-      setFormData({ customerName: "", phone: "", address: "", note: "" });
+      setFormData({ customerName: "", phone: "", address: "", note: "", tableNumber: "" });
       setCheckoutOpen(false);
       setOrderSuccess(true);
     } catch {
@@ -1244,6 +1257,12 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                       <span className="font-bold text-neutral-900 dark:text-neutral-200">{fmt(restaurant.deliveryFee)}</span>
                     </div>
                   )}
+                  {deliveryType === "dine_in" && (
+                    <div className="flex justify-between text-xs text-emerald-600 dark:text-emerald-500 font-bold">
+                      <span>Dine In — No delivery fee</span>
+                      <span>Free</span>
+                    </div>
+                  )}
                   <div className="flex justify-between font-black text-base pt-3 border-t border-[#EFECE6] dark:border-[#1F1F1C]">
                     <span className="text-neutral-900 dark:text-neutral-200 font-extrabold">Grand Total</span>
                     <span className="text-[var(--brand-primary)]" style={{ color: primary }}>{fmt(orderTotal)}</span>
@@ -1296,29 +1315,48 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
             </div>
 
             <div className="px-6 py-6 space-y-6">
-              {/* Delivery / Pickup slider toggle */}
-              {restaurant.deliveryEnabled && restaurant.pickupEnabled && (
+              {/* Fulfillment mode selector */}
+              {(restaurant.deliveryEnabled || restaurant.pickupEnabled || restaurant.dineInEnabled) && (
                 <div className="space-y-1.5">
                   <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Preferred fulfillment mode</p>
-                  <div className="grid grid-cols-2 gap-1.5 p-1 bg-stone-50 dark:bg-[#0D0C0B] rounded-2xl border border-[#EFECE6] dark:border-[#1F1F1C]">
-                    <button
-                      onClick={() => setDeliveryType("delivery")}
-                      className={`py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
-                        deliveryType === "delivery" ? "bg-white dark:bg-[#141412] shadow-sm font-black" : "text-[#7A7368]"
-                      }`}
-                      style={deliveryType === "delivery" ? { color: primary } : {}}
-                    >
-                      Doorstep Delivery
-                    </button>
-                    <button
-                      onClick={() => setDeliveryType("pickup")}
-                      className={`py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
-                        deliveryType === "pickup" ? "bg-white dark:bg-[#141412] shadow-sm font-black" : "text-[#7A7368]"
-                      }`}
-                      style={deliveryType === "pickup" ? { color: primary } : {}}
-                    >
-                      Takeaway Pickup
-                    </button>
+                  <div className={`grid gap-1.5 p-1 bg-stone-50 dark:bg-[#0D0C0B] rounded-2xl border border-[#EFECE6] dark:border-[#1F1F1C] ${
+                    [restaurant.deliveryEnabled, restaurant.pickupEnabled, restaurant.dineInEnabled].filter(Boolean).length === 3
+                      ? "grid-cols-3"
+                      : "grid-cols-2"
+                  }`}>
+                    {restaurant.deliveryEnabled && (
+                      <button
+                        onClick={() => setDeliveryType("delivery")}
+                        className={`py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                          deliveryType === "delivery" ? "bg-white dark:bg-[#141412] shadow-sm" : "text-[#7A7368]"
+                        }`}
+                        style={deliveryType === "delivery" ? { color: primary } : {}}
+                      >
+                        Doorstep Delivery
+                      </button>
+                    )}
+                    {restaurant.pickupEnabled && (
+                      <button
+                        onClick={() => setDeliveryType("pickup")}
+                        className={`py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                          deliveryType === "pickup" ? "bg-white dark:bg-[#141412] shadow-sm" : "text-[#7A7368]"
+                        }`}
+                        style={deliveryType === "pickup" ? { color: primary } : {}}
+                      >
+                        Takeaway Pickup
+                      </button>
+                    )}
+                    {restaurant.dineInEnabled && (
+                      <button
+                        onClick={() => setDeliveryType("dine_in")}
+                        className={`py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                          deliveryType === "dine_in" ? "bg-white dark:bg-[#141412] shadow-sm" : "text-[#7A7368]"
+                        }`}
+                        style={deliveryType === "dine_in" ? { color: primary } : {}}
+                      >
+                        Dine In
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -1376,6 +1414,23 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                 </div>
               )}
 
+              {/* Dine In — Table Number */}
+              {deliveryType === "dine_in" && (
+                <div className="space-y-2 animate-scaleUp">
+                  <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Table Number (Optional)</p>
+                  <input
+                    type="text"
+                    placeholder="e.g. 5 or Table 5"
+                    value={formData.tableNumber}
+                    onChange={(e) => setFormData({ ...formData, tableNumber: e.target.value })}
+                    className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4.5 py-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary-20)] text-neutral-900 dark:text-neutral-100 placeholder-[#A19B91] transition-all bg-[#FAF9F5] dark:bg-[#0D0C0B]"
+                    onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
+                  />
+                  <p className="text-[10px] text-[#7A7368] dark:text-[#A19B91]">Your order will be brought to your table. Staff will be notified of your table number.</p>
+                </div>
+              )}
+
               {/* Special Note */}
               <div className="space-y-1.5">
                 <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Dietary instructions / Note (Optional)</p>
@@ -1426,9 +1481,9 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                         <span className="font-bold text-neutral-900 dark:text-neutral-200">{fmt(restaurant.deliveryFee)}</span>
                       </div>
                     )}
-                    {deliveryType === "pickup" && (
+                    {(deliveryType === "pickup" || deliveryType === "dine_in") && (
                       <div className="flex justify-between text-xs text-emerald-600 dark:text-emerald-500 font-extrabold">
-                        <span>Pickup Savings</span>
+                        <span>{deliveryType === "dine_in" ? "No delivery fee" : "Pickup Savings"}</span>
                         <span>Free</span>
                       </div>
                     )}
@@ -1489,6 +1544,8 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                         ? "Placing Order safely…"
                         : deliveryType === "pickup"
                         ? "Confirm Pay on Pickup"
+                        : deliveryType === "dine_in"
+                        ? "Confirm Pay at Table"
                         : "Confirm Pay on Delivery"}
                     </button>
                   </>
@@ -1546,28 +1603,32 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
               ) : (
                 <>
                   {/* Delivery / Pickup Toggle */}
-                  {restaurant.deliveryEnabled && restaurant.pickupEnabled && (
+                  {(restaurant.deliveryEnabled || restaurant.pickupEnabled) && (
                     <div className="space-y-1.5">
                       <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Preferred fulfillment mode</p>
-                      <div className="grid grid-cols-2 gap-1.5 p-1 bg-stone-50 dark:bg-[#0D0C0B] rounded-2xl border border-[#EFECE6] dark:border-[#1F1F1C]">
-                        <button
-                          onClick={() => setDeliveryType("delivery")}
-                          className={`py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
-                            deliveryType === "delivery" ? "bg-white dark:bg-[#141412] shadow-sm font-black" : "text-[#7A7368]"
-                          }`}
-                          style={deliveryType === "delivery" ? { color: primary } : {}}
-                        >
-                          Doorstep Delivery
-                        </button>
-                        <button
-                          onClick={() => setDeliveryType("pickup")}
-                          className={`py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
-                            deliveryType === "pickup" ? "bg-white dark:bg-[#141412] shadow-sm font-black" : "text-[#7A7368]"
-                          }`}
-                          style={deliveryType === "pickup" ? { color: primary } : {}}
-                        >
-                          Takeaway Pickup
-                        </button>
+                      <div className={`grid gap-1.5 p-1 bg-stone-50 dark:bg-[#0D0C0B] rounded-2xl border border-[#EFECE6] dark:border-[#1F1F1C] ${restaurant.deliveryEnabled && restaurant.pickupEnabled ? "grid-cols-2" : "grid-cols-1"}`}>
+                        {restaurant.deliveryEnabled && (
+                          <button
+                            onClick={() => setDeliveryType("delivery")}
+                            className={`py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                              deliveryType === "delivery" ? "bg-white dark:bg-[#141412] shadow-sm" : "text-[#7A7368]"
+                            }`}
+                            style={deliveryType === "delivery" ? { color: primary } : {}}
+                          >
+                            Doorstep Delivery
+                          </button>
+                        )}
+                        {restaurant.pickupEnabled && (
+                          <button
+                            onClick={() => setDeliveryType("pickup")}
+                            className={`py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                              deliveryType === "pickup" ? "bg-white dark:bg-[#141412] shadow-sm" : "text-[#7A7368]"
+                            }`}
+                            style={deliveryType === "pickup" ? { color: primary } : {}}
+                          >
+                            Takeaway Pickup
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1679,6 +1740,12 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                           <div className="flex justify-between text-xs text-[#7A7368] dark:text-[#A19B91]">
                             <span>Fulfillment Dispatch Fee</span>
                             <span>{fmt(restaurant.deliveryFee)}</span>
+                          </div>
+                        )}
+                        {deliveryType === "dine_in" && (
+                          <div className="flex justify-between text-xs text-emerald-600 dark:text-emerald-500 font-bold">
+                            <span>Dine In — No delivery fee</span>
+                            <span>Free</span>
                           </div>
                         )}
                         <div className="flex justify-between font-black text-base pt-3 border-t border-[#EFECE6] dark:border-[#1F1F1C]">

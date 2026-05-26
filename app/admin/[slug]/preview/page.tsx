@@ -86,6 +86,7 @@ export default async function PreviewPage({
     address?: string;
     deliveryEnabled?: boolean;
     pickupEnabled?: boolean;
+    dineInEnabled?: boolean;
     primaryColor?: string;
     accentColor?: string;
     promoBanner?: string;
@@ -112,6 +113,7 @@ export default async function PreviewPage({
     isOpen: checkIsOpen(rData.openingHours),
     deliveryEnabled: rData.deliveryEnabled !== false,
     pickupEnabled: rData.pickupEnabled !== false,
+    dineInEnabled: rData.dineInEnabled === true,
     todayHoursLabel,
     primaryColor: rData.primaryColor ?? "",
     accentColor: rData.accentColor ?? "",

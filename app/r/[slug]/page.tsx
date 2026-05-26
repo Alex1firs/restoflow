@@ -113,11 +113,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function RestaurantPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>,
+  searchParams: Promise<{ table?: string }>,
 }) {
-  const resolvedParams = await params;
+  const [resolvedParams, resolvedSearch] = await Promise.all([params, searchParams]);
   const slug = resolvedParams.slug;
+  const initialTable = resolvedSearch.table ?? "";
 
   const [seoData, docSnap] = await Promise.all([
     fetchSEOData(slug),
@@ -188,6 +191,7 @@ export default async function RestaurantPage({
     address?: string;
     deliveryEnabled?: boolean;
     pickupEnabled?: boolean;
+    dineInEnabled?: boolean;
     primaryColor?: string;
     accentColor?: string;
     promoBanner?: string;
@@ -216,6 +220,7 @@ export default async function RestaurantPage({
     isOpen: checkIsOpen(rData.openingHours),
     deliveryEnabled: rData.deliveryEnabled !== false,
     pickupEnabled: rData.pickupEnabled !== false,
+    dineInEnabled: rData.dineInEnabled === true,
     todayHoursLabel,
     primaryColor: rData.primaryColor ?? "",
     accentColor: rData.accentColor ?? "",
@@ -239,6 +244,7 @@ export default async function RestaurantPage({
           <RestaurantClient
             restaurant={restaurantProps}
             menuItems={menuItems}
+            initialTable={initialTable}
             seo={{
               seoTitle: seoData?.seoTitle,
               seoDescription: seoData?.seoDescription,

@@ -18,7 +18,7 @@ export interface CustomerOrderData {
   total: number;
   itemsSummary: string;
   paymentMethod: "online" | "cash";
-  deliveryType?: "delivery" | "pickup";
+  deliveryType?: "delivery" | "pickup" | "dine_in";
 }
 
 const TEMPLATE_ENV_KEY: Record<CustomerEventType, string> = {

@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { restaurantId, customerName, phone, address, note, items, deliveryType, orderType, scheduledFor } =
+  const { restaurantId, customerName, phone, address, note, items, deliveryType, orderType, scheduledFor, serviceMode, tableLabel } =
     body as Record<string, unknown>;
 
   if (
@@ -108,8 +108,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const resolvedDeliveryType = deliveryType === "pickup" ? "pickup" : "delivery";
+    const isDineIn = serviceMode === "dine_in" || deliveryType === "dine_in";
+    const resolvedDeliveryType = isDineIn ? "dine_in" : deliveryType === "pickup" ? "pickup" : "delivery";
     const deliveryFee = resolvedDeliveryType === "delivery" ? ((rData.deliveryFee as number) ?? 0) : 0;
+
     const minimumOrder = (rData.minimumOrder as number) ?? 0;
 
     const menuSnap = await db
@@ -167,6 +169,7 @@ export async function POST(request: NextRequest) {
       status: isScheduled ? "scheduled" : "pending",
       deliveryType: resolvedDeliveryType,
       orderType: isScheduled ? "scheduled" : "normal",
+      ...(isDineIn ? { serviceMode: "dine_in", tableLabel: typeof tableLabel === "string" ? tableLabel.trim() : "" } : {}),
       ...(isScheduled ? { scheduledFor } : {}),
       trackingToken,
       createdAt: FieldValue.serverTimestamp(),

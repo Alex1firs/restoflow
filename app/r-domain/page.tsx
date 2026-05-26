@@ -210,6 +210,7 @@ export default async function RDomainPage({
     address?: string;
     deliveryEnabled?: boolean;
     pickupEnabled?: boolean;
+    dineInEnabled?: boolean;
   };
 
   const todayH = todayHours(rData.openingHours);
@@ -252,6 +253,7 @@ export default async function RDomainPage({
     isOpen: checkIsOpen(rData.openingHours),
     deliveryEnabled: rData.deliveryEnabled !== false,
     pickupEnabled: rData.pickupEnabled !== false,
+    dineInEnabled: rData.dineInEnabled === true,
     todayHoursLabel,
     hidePrices: (restaurantDoc.data().hidePrices as boolean) ?? false,
   };

@@ -12,6 +12,9 @@ type Props = {
 export default function QRClient({ slug, restaurantName, appUrl }: Props) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
+  const [tableCount, setTableCount] = useState(5);
+  const [selectedTable, setSelectedTable] = useState<number | null>(null);
+  const tableCanvasRef = useRef<HTMLDivElement>(null);
   const publicUrl = `${appUrl}/r/${slug}`;
 
   function handleDownload() {
@@ -21,6 +24,16 @@ export default function QRClient({ slug, restaurantName, appUrl }: Props) {
     const a = document.createElement("a");
     a.href = url;
     a.download = `${slug}-qr-code.png`;
+    a.click();
+  }
+
+  function handleTableDownload(tableNum: number) {
+    const canvas = tableCanvasRef.current?.querySelector("canvas");
+    if (!canvas) return;
+    const url = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${slug}-table-${tableNum}-qr.png`;
     a.click();
   }
 
@@ -106,6 +119,67 @@ export default function QRClient({ slug, restaurantName, appUrl }: Props) {
             </li>
           ))}
         </ol>
+      </div>
+
+      {/* Table-Specific QR Codes */}
+      <div className="mt-6 bg-white border border-gray-200 rounded-2xl p-6 space-y-5">
+        <div>
+          <h2 className="text-sm font-black text-gray-900 uppercase tracking-tight">Table QR Codes</h2>
+          <p className="text-sm text-gray-400 mt-1">
+            Generate per-table QR codes. Customers who scan these automatically get the Dine In mode pre-selected with their table number.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Number of tables</label>
+          <input
+            type="number"
+            min={1}
+            max={100}
+            value={tableCount}
+            onChange={(e) => { setTableCount(Math.max(1, Math.min(100, Number(e.target.value)))); setSelectedTable(null); }}
+            className="w-20 border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-900 focus:outline-none focus:border-orange-500"
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {Array.from({ length: tableCount }, (_, i) => i + 1).map((n) => (
+            <button
+              key={n}
+              onClick={() => setSelectedTable(n)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-colors ${
+                selectedTable === n
+                  ? "bg-orange-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              Table {n}
+            </button>
+          ))}
+        </div>
+
+        {selectedTable !== null && (
+          <div className="border-t border-gray-100 pt-5 flex flex-col items-center gap-4">
+            <div ref={tableCanvasRef} className="p-4 bg-white rounded-xl border-2 border-gray-100">
+              <QRCodeCanvas
+                value={`${publicUrl}?table=${selectedTable}`}
+                size={180}
+                bgColor="#ffffff"
+                fgColor="#111111"
+                level="H"
+                marginSize={2}
+              />
+            </div>
+            <p className="font-black text-gray-900">Table {selectedTable}</p>
+            <p className="text-xs text-gray-400 font-mono">{publicUrl}?table={selectedTable}</p>
+            <button
+              onClick={() => handleTableDownload(selectedTable)}
+              className="bg-gray-900 hover:bg-black text-white font-black text-sm py-2.5 px-6 rounded-xl transition"
+            >
+              Download Table {selectedTable} QR
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

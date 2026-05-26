@@ -53,6 +53,7 @@ export default async function SettingsPage({ params }: Props) {
     ordersToday: (data.ordersToday as number) ?? null,
     deliveryTime: (data.deliveryTime as string) ?? "",
     hidePrices: (data.hidePrices as boolean) ?? false,
+    dineInEnabled: (data.dineInEnabled as boolean) ?? false,
   };
 
   return (

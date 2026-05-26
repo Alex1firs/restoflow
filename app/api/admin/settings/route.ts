@@ -38,6 +38,7 @@ export async function PUT(req: NextRequest) {
     ordersToday,
     deliveryTime,
     hidePrices,
+    dineInEnabled,
   } = body as {
     name?: string;
     description?: string;
@@ -61,6 +62,7 @@ export async function PUT(req: NextRequest) {
     ordersToday?: number | string;
     deliveryTime?: string;
     hidePrices?: boolean;
+    dineInEnabled?: boolean;
   };
 
   if (!name?.trim()) {
@@ -95,6 +97,7 @@ export async function PUT(req: NextRequest) {
       ordersToday: typeof ordersToday === "number" ? ordersToday : null,
       deliveryTime: (deliveryTime ?? "").trim(),
       hidePrices: hidePrices === true,
+      dineInEnabled: dineInEnabled === true,
     });
 
   return NextResponse.json({ success: true });

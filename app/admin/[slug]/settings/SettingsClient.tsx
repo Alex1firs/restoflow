@@ -35,6 +35,7 @@ type Props = {
     ordersToday: number | null;
     deliveryTime: string;
     hidePrices: boolean;
+    dineInEnabled: boolean;
   };
 };
 
@@ -61,6 +62,7 @@ export default function SettingsClient({ restaurant }: Props) {
     ordersToday: restaurant.ordersToday || "",
     deliveryTime: restaurant.deliveryTime || "20–35 min",
     hidePrices: restaurant.hidePrices,
+    dineInEnabled: restaurant.dineInEnabled,
   });
 
   const [openingHours, setOpeningHours] = useState<OpeningHours>(
@@ -347,6 +349,12 @@ export default function SettingsClient({ restaurant }: Props) {
               description="Customers collect from your location"
               enabled={form.pickupEnabled}
               onToggle={() => setField("pickupEnabled", !form.pickupEnabled)}
+            />
+            <Toggle
+              label="Dine In"
+              description="Customers order from their table via QR code"
+              enabled={form.dineInEnabled}
+              onToggle={() => setField("dineInEnabled", !form.dineInEnabled)}
             />
           </div>
 
