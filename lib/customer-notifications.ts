@@ -1,5 +1,3 @@
-import { sendWhatsAppTemplate, normalizeWhatsAppPhone } from "./whatsapp";
-
 export type CustomerEventType =
   | "created"
   | "paid"
@@ -21,41 +19,8 @@ export interface CustomerOrderData {
   deliveryType?: "delivery" | "pickup" | "dine_in";
 }
 
-const TEMPLATE_ENV_KEY: Record<CustomerEventType, string> = {
-  created:        "WHATSAPP_TEMPLATE_CUSTOMER_ORDER_CREATED",
-  paid:           "WHATSAPP_TEMPLATE_CUSTOMER_PAYMENT_CONFIRMED",
-  preparing:      "WHATSAPP_TEMPLATE_CUSTOMER_ORDER_PREPARING",
-  ready_pickup:   "WHATSAPP_TEMPLATE_CUSTOMER_ORDER_READY_PICKUP",
-  ready_delivery: "WHATSAPP_TEMPLATE_CUSTOMER_ORDER_READY_DELIVERY",
-  completed:      "WHATSAPP_TEMPLATE_CUSTOMER_ORDER_COMPLETED",
-  cancelled:      "WHATSAPP_TEMPLATE_CUSTOMER_ORDER_CANCELLED",
-};
-
 function totalFmt(total: number) {
   return `₦${total.toLocaleString("en-NG")}`;
-}
-
-function getBodyParams(
-  event: CustomerEventType,
-  data: CustomerOrderData,
-  trackingLink: string
-): string[] {
-  switch (event) {
-    case "created":
-      return [data.customerName, data.restaurantName, data.itemsSummary, totalFmt(data.total), trackingLink];
-    case "paid":
-      return [totalFmt(data.total), data.restaurantName];
-    case "preparing":
-      return [data.restaurantName];
-    case "ready_pickup":
-      return [data.restaurantName, data.restaurantAddress ?? ""];
-    case "ready_delivery":
-      return [];
-    case "completed":
-      return [data.restaurantName];
-    case "cancelled":
-      return [];
-  }
 }
 
 function buildSMS(event: CustomerEventType, data: CustomerOrderData, trackingLink: string): string {
@@ -99,27 +64,15 @@ export async function sendCustomerNotification(
   event: CustomerEventType,
   data: CustomerOrderData
 ): Promise<void> {
+  if (!data.customerPhone || data.customerPhone.length < 10) return;
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const trackingLink = `${appUrl}/track/${data.orderId}`;
-  const normalizedPhone = normalizeWhatsAppPhone(data.customerPhone);
-
-  if (!normalizedPhone || normalizedPhone.length < 10) return;
 
   try {
-    const templateName = process.env[TEMPLATE_ENV_KEY[event]];
-
-    if (templateName) {
-      const result = await sendWhatsAppTemplate({
-        to: normalizedPhone,
-        templateName,
-        bodyParameters: getBodyParams(event, data, trackingLink),
-      });
-      if (result.success) return;
-    }
-
-    // Fallback: SMS
+    // Send direct SMS notification via Termii
     await sendSMS(data.customerPhone, buildSMS(event, data, trackingLink));
-  } catch {
-    console.error("[customer-notifications] notification dispatch failed");
+  } catch (err: any) {
+    console.error("[customer-notifications] SMS dispatch failed:", err.message);
   }
 }

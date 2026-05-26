@@ -5,7 +5,7 @@ import Link from "next/link";
 import ImageUpload from "@/app/components/ImageUpload";
 import { DAYS, DEFAULT_DAY_HOURS, defaultOpeningHours, type OpeningHours } from "@/lib/restaurant-utils";
 
-type AlertPreference = "whatsapp" | "sms" | "both";
+type AlertPreference = "telegram" | "sms" | "both";
 
 type Props = {
   restaurant: {
@@ -16,14 +16,14 @@ type Props = {
     coverImage: string;
     phone: string;
     address: string;
-    whatsappPhone: string;
+    telegramChatId: string;
     notificationPhone: string;
     deliveryFee: number;
     minimumOrder: number;
     deliveryEnabled: boolean;
     pickupEnabled: boolean;
     openingHours: OpeningHours | null;
-    whatsappEnabled: boolean;
+    telegramEnabled: boolean;
     alertPreference: AlertPreference;
     paymentConfigured: boolean;
     paymentAccountName: string;
@@ -47,13 +47,13 @@ export default function SettingsClient({ restaurant }: Props) {
     coverImage: restaurant.coverImage,
     phone: restaurant.phone,
     address: restaurant.address,
-    whatsappPhone: restaurant.whatsappPhone,
+    telegramChatId: restaurant.telegramChatId,
     notificationPhone: restaurant.notificationPhone,
     deliveryFee: restaurant.deliveryFee,
     minimumOrder: restaurant.minimumOrder,
     deliveryEnabled: restaurant.deliveryEnabled,
     pickupEnabled: restaurant.pickupEnabled,
-    whatsappEnabled: restaurant.whatsappEnabled,
+    telegramEnabled: restaurant.telegramEnabled,
     alertPreference: restaurant.alertPreference as AlertPreference,
     primaryColor: restaurant.primaryColor || "#ea580c",
     accentColor: restaurant.accentColor || "#f97316",
@@ -90,29 +90,26 @@ export default function SettingsClient({ restaurant }: Props) {
     setStatus("idle");
   }
 
-  async function handleWhatsAppTest() {
-    if (!form.whatsappPhone.trim()) {
+  async function handleTelegramTest() {
+    if (!form.telegramChatId.trim()) {
       setTestStatus("error");
-      setTestError("Enter a WhatsApp number first.");
+      setTestError("Enter a Telegram Chat ID first.");
       return;
     }
     setTestStatus("testing");
     setTestError("");
     try {
-      const res = await fetch("/api/admin/whatsapp/test", {
+      const res = await fetch("/api/admin/telegram/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ whatsappPhone: form.whatsappPhone }),
+        body: JSON.stringify({ telegramChatId: form.telegramChatId }),
       });
       const data = await res.json();
       if (!res.ok) {
         setTestStatus("error");
         setTestError(data.error ?? "Test failed.");
-        setFallbackUsed(false);
       } else {
-        setField("whatsappEnabled", true);
-        if (data.normalizedPhone) setField("whatsappPhone", data.normalizedPhone);
-        setFallbackUsed(data.fallbackUsed === true);
+        setField("telegramEnabled", true);
         setTestStatus("success");
       }
     } catch {
@@ -275,28 +272,16 @@ export default function SettingsClient({ restaurant }: Props) {
               className={inputCls}
             />
           </Field>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Phone Number">
-              <input
-                type="tel"
-                value={form.phone}
-                onChange={(e) => setField("phone", e.target.value)}
-                placeholder="08012345678"
-                className={inputCls}
-              />
-              <p className="text-xs text-gray-400 mt-1">Shown publicly on your store page</p>
-            </Field>
-            <Field label="WhatsApp Number">
-              <input
-                type="tel"
-                value={form.whatsappPhone}
-                onChange={(e) => { setField("whatsappPhone", e.target.value); setTestStatus("idle"); }}
-                placeholder="2348012345678"
-                className={inputCls}
-              />
-              <p className="text-xs text-gray-400 mt-1">For order alerts & customer contact</p>
-            </Field>
-          </div>
+          <Field label="Phone Number">
+            <input
+              type="tel"
+              value={form.phone}
+              onChange={(e) => setField("phone", e.target.value)}
+              placeholder="08012345678"
+              className={inputCls}
+            />
+            <p className="text-xs text-gray-400 mt-1">Shown publicly on your store page</p>
+          </Field>
 
           {/* Opening Hours */}
           <div>
@@ -450,9 +435,9 @@ export default function SettingsClient({ restaurant }: Props) {
           {/* Preference */}
           <Field label="Alert Preference">
             <div className="flex gap-2 flex-wrap">
-              {(["whatsapp", "sms", "both"] as AlertPreference[]).map((pref) => {
+              {(["telegram", "sms", "both"] as AlertPreference[]).map((pref) => {
                 const labels: Record<AlertPreference, string> = {
-                  whatsapp: "WhatsApp",
+                  telegram: "Telegram",
                   sms: "SMS",
                   both: "Both",
                 };
@@ -475,85 +460,76 @@ export default function SettingsClient({ restaurant }: Props) {
             </div>
           </Field>
 
-          {/* WhatsApp */}
-          {(form.alertPreference === "whatsapp" || form.alertPreference === "both") && (
-            <div className="border border-gray-100 rounded-2xl p-5 space-y-4 bg-gray-50">
+          {/* Telegram */}
+          {(form.alertPreference === "telegram" || form.alertPreference === "both") && (
+            <div className="border border-gray-100 rounded-2xl p-5 space-y-4 bg-gray-50/50">
               <div className="flex items-center gap-2">
-                <svg viewBox="0 0 24 24" className="w-5 h-5 text-green-600 fill-current flex-shrink-0">
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                <svg viewBox="0 0 24 24" className="w-5 h-5 text-sky-500 fill-current flex-shrink-0">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15.82-.67 3.85-.94 5.34-.11.63-.35.84-.57.86-.49.04-.86-.33-1.33-.64-.74-.48-1.16-.78-1.88-1.25-.83-.54-.29-.84.18-1.33.12-.13 2.25-2.06 2.29-2.23.01-.02.01-.1-.04-.15-.05-.05-.12-.03-.17-.02-.07.02-1.22.78-3.44 2.28-.32.22-.62.33-.89.32-.3-.01-.88-.17-1.31-.31-.53-.17-.95-.26-.91-.55.02-.15.22-.3.6-.47 2.34-1.02 3.9-1.69 4.68-2.01.78-.32 1.62-.46 1.82-.46.04 0 .15 0 .22.06.06.05.08.12.09.18.01.07.01.21-.01.31z" />
                 </svg>
-                <span className="text-sm font-black text-gray-800">WhatsApp Alerts</span>
-                {form.whatsappEnabled && (
+                <span className="text-sm font-black text-gray-800">Telegram Alerts</span>
+                {form.telegramEnabled && (
                   <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Active</span>
                 )}
               </div>
 
-              <Field label="WhatsApp Number">
+              <div className="bg-orange-50 border border-orange-100 rounded-xl p-3.5 text-xs text-orange-850 space-y-1.5 leading-relaxed">
+                <div className="font-bold flex items-center gap-1.5 text-orange-950">
+                  <span>💡</span> How to link Telegram Alerts:
+                </div>
+                <ol className="list-decimal pl-4 space-y-1 text-orange-900">
+                  <li>Open Telegram and search for <a href="https://t.me/RestoFlowBot" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-orange-950">@RestoFlowBot</a>.</li>
+                  <li>Click <strong>Start</strong> or send the message <code>/start</code>.</li>
+                  <li>The bot will immediately reply with your numeric <strong>Chat ID</strong>.</li>
+                  <li>Copy that number and paste it in the field below, then click &quot;Verify &amp; Link Bot&quot;.</li>
+                </ol>
+              </div>
+
+              <Field label="Telegram Chat ID">
                 <input
-                  type="tel"
-                  value={form.whatsappPhone}
-                  onChange={(e) => { setField("whatsappPhone", e.target.value); setTestStatus("idle"); }}
-                  placeholder="2348012345678 or 08012345678"
+                  type="text"
+                  value={form.telegramChatId}
+                  onChange={(e) => { setField("telegramChatId", e.target.value); setTestStatus("idle"); }}
+                  placeholder="e.g. 573829104"
                   className={inputCls}
                 />
                 <p className="text-xs text-gray-400 mt-1">
-                  Nigerian local (08012345678) is auto-converted.
+                  Your unique Telegram identifier (usually 9 to 10 digits).
                 </p>
               </Field>
 
               <div className="flex items-center gap-3 flex-wrap">
                 <button
                   type="button"
-                  onClick={handleWhatsAppTest}
-                  disabled={testStatus === "testing" || !form.whatsappPhone.trim()}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest transition-all"
+                  onClick={handleTelegramTest}
+                  disabled={testStatus === "testing" || !form.telegramChatId.trim()}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 hover:bg-black disabled:opacity-50 text-white font-black text-xs uppercase tracking-widest transition-all"
                 >
                   {testStatus === "testing" ? (
-                    <><span className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />Sending…</>
-                  ) : "Send Test Message"}
+                    <><span className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />Connecting…</>
+                  ) : "Verify & Link Bot"}
                 </button>
                 {testStatus === "success" && (
-                  <div className="space-y-3 w-full">
-                    <span className="text-sm font-bold text-green-600 flex items-center gap-1.5">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                      </svg>
-                      {fallbackUsed ? "Connection verified! Alerts enabled." : "Test sent — alerts enabled!"}
-                    </span>
-
-                    {fallbackUsed && (
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-800 space-y-2 mt-2 w-full">
-                        <div className="flex items-center gap-2 font-bold text-amber-900">
-                          <svg className="w-4 h-4 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          Meta Dashboard Warning (new_order_alert is paused)
-                        </div>
-                        <p className="leading-relaxed">
-                          Your credentials and phone connection are <strong>healthy and active</strong> (we successfully sent a fallback verification message to you!). However, your custom WhatsApp template <code>new_order_alert</code> is currently <strong>paused, disabled, or rejected</strong> by Meta.
-                        </p>
-                        <div className="pl-4 list-decimal space-y-1">
-                          <div>1. Go to your <a href="https://business.facebook.com/wa/manage/templates" target="_blank" rel="noopener noreferrer" className="underline font-bold hover:text-amber-950">WhatsApp Manager (Templates)</a>.</div>
-                          <div>2. Locate <code>new_order_alert</code> and check its quality status. If it's paused, edit and resubmit it for approval.</div>
-                          <div>3. Alternatively, delete and recreate a new template with the same name.</div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <span className="text-sm font-bold text-green-600 flex items-center gap-1.5">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Bot linked successfully! Alerts enabled.
+                  </span>
                 )}
                 {testStatus === "error" && (
                   <span className="text-sm font-bold text-red-500">{testError}</span>
                 )}
               </div>
 
-              <label className="flex items-center gap-3 cursor-pointer w-fit">
+              <label className="flex items-center gap-3 cursor-pointer w-fit pt-2">
                 <div
-                  onClick={() => setField("whatsappEnabled", !form.whatsappEnabled)}
-                  className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer ${form.whatsappEnabled ? "bg-green-500" : "bg-gray-200"}`}
+                  onClick={() => setField("telegramEnabled", !form.telegramEnabled)}
+                  className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer ${form.telegramEnabled ? "bg-green-500" : "bg-gray-200"}`}
                 >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.whatsappEnabled ? "translate-x-4" : "translate-x-0.5"}`} />
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.telegramEnabled ? "translate-x-4" : "translate-x-0.5"}`} />
                 </div>
-                <span className="text-sm font-bold text-gray-700">Enable WhatsApp alerts</span>
+                <span className="text-sm font-bold text-gray-700">Enable Telegram Alerts</span>
               </label>
             </div>
           )}

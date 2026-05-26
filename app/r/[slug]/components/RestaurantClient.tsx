@@ -1558,7 +1558,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                 <span>•</span>
                 <span className="flex items-center gap-1">⚡ Instant dispatch</span>
                 <span>•</span>
-                <span className="flex items-center gap-1">💬 WhatsApp Update</span>
+                <span className="flex items-center gap-1">💬 SMS Update</span>
               </div>
             </div>
           </div>

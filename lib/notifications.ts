@@ -1,7 +1,7 @@
 import { getAdminDb } from "./firebase-admin";
-import { sendWhatsAppTemplate, normalizeWhatsAppPhone } from "./whatsapp";
+import { sendTelegramAlert } from "./telegram";
 
-export type AlertPreference = "whatsapp" | "sms" | "both";
+export type AlertPreference = "telegram" | "sms" | "both";
 
 export interface NewOrderAlertParams {
   restaurantSlug: string;
@@ -23,8 +23,8 @@ export async function sendNewOrderAlert(params: NewOrderAlertParams): Promise<vo
     const restaurantName = (data.name as string) ?? params.restaurantSlug;
     const alertPreference: AlertPreference =
       (data.alertPreference as AlertPreference | undefined) ?? "sms";
-    const whatsappEnabled = data.whatsappEnabled === true;
-    const rawWhatsappPhone = (data.whatsappPhone as string | undefined)?.trim() ?? "";
+    const telegramEnabled = data.telegramEnabled === true;
+    const telegramChatId = (data.telegramChatId as string | undefined)?.trim() ?? "";
     const notificationPhone = (data.notificationPhone as string | undefined)?.trim() ?? "";
 
     const tasks: Promise<void>[] = [];
@@ -36,17 +36,17 @@ export async function sendNewOrderAlert(params: NewOrderAlertParams): Promise<vo
       }));
     }
 
-    // WhatsApp is secondary — only fires if explicitly enabled
-    const sendWhatsApp =
-      whatsappEnabled &&
-      rawWhatsappPhone &&
-      (alertPreference === "whatsapp" || alertPreference === "both");
+    // Telegram is secondary — only fires if explicitly enabled
+    const sendTelegram =
+      telegramEnabled &&
+      telegramChatId &&
+      (alertPreference === "telegram" || alertPreference === "both");
 
-    if (sendWhatsApp) {
+    if (sendTelegram) {
       tasks.push(
-        dispatchWhatsApp({ ...params, restaurantName, whatsappPhone: rawWhatsappPhone })
-          .catch(() => {
-            console.error("[notifications] WhatsApp alert failed");
+        dispatchTelegram({ ...params, restaurantName, telegramChatId })
+          .catch((err: any) => {
+            console.error("[notifications] Telegram alert failed:", err.message);
           })
       );
     }
@@ -57,39 +57,28 @@ export async function sendNewOrderAlert(params: NewOrderAlertParams): Promise<vo
   }
 }
 
-async function dispatchWhatsApp(
-  params: NewOrderAlertParams & { restaurantName: string; whatsappPhone: string }
+async function dispatchTelegram(
+  params: NewOrderAlertParams & { restaurantName: string; telegramChatId: string }
 ): Promise<void> {
-  const templateName = process.env.WHATSAPP_TEMPLATE_NEW_ORDER;
-  if (!templateName) {
-    console.error("[notifications] WHATSAPP_TEMPLATE_NEW_ORDER not configured");
-    return;
-  }
-
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
-  const normalizedPhone = normalizeWhatsAppPhone(params.whatsappPhone);
   const paymentMethodLabel =
     params.paymentMethod === "online" ? "Online" : "Cash on Delivery";
   const paymentStatusLabel = params.paymentStatus === "paid" ? "Paid ✓" : "Pending";
   const totalFormatted = `₦${params.total.toLocaleString("en-NG")}`;
   const link = `${appUrl}/admin/${params.restaurantSlug}/orders`;
 
-  const result = await sendWhatsAppTemplate({
-    to: normalizedPhone,
-    templateName,
-    bodyParameters: [
-      params.restaurantName,
-      totalFormatted,
-      paymentMethodLabel,
-      paymentStatusLabel,
-      params.customerName,
-      link,
-    ],
-  });
+  const message =
+    `🍽️ <b>New Order Received!</b> — <b>${params.restaurantName}</b>\n\n` +
+    `👤 <b>Customer:</b> ${params.customerName || "N/A"}\n` +
+    `💰 <b>Total:</b> ${totalFormatted}\n` +
+    `💳 <b>Payment:</b> ${paymentMethodLabel} (${paymentStatusLabel})\n\n` +
+    `⚡ <a href="${link}">View Order on Dashboard</a>`;
+
+  const result = await sendTelegramAlert(params.telegramChatId, message);
 
   if (!result.success) {
-    console.error(`[notifications] WhatsApp alert failed for template "${templateName}":`, result.error);
-    throw new Error(result.error ?? "WhatsApp send failed");
+    console.error(`[notifications] Telegram alert failed:`, result.error);
+    throw new Error(result.error ?? "Telegram send failed");
   }
 }
 

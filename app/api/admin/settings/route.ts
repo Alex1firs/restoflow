@@ -22,14 +22,14 @@ export async function PUT(req: NextRequest) {
     coverImage,
     phone,
     address,
-    whatsappPhone,
+    telegramChatId,
     notificationPhone,
     deliveryFee,
     minimumOrder,
     deliveryEnabled,
     pickupEnabled,
     openingHours,
-    whatsappEnabled,
+    telegramEnabled,
     alertPreference,
     primaryColor,
     accentColor,
@@ -46,15 +46,15 @@ export async function PUT(req: NextRequest) {
     coverImage?: string;
     phone?: string;
     address?: string;
-    whatsappPhone?: string;
+    telegramChatId?: string;
     notificationPhone?: string;
     deliveryFee?: number;
     minimumOrder?: number;
     deliveryEnabled?: boolean;
     pickupEnabled?: boolean;
     openingHours?: Record<string, { open: boolean; from: string; to: string }>;
-    whatsappEnabled?: boolean;
-    alertPreference?: "whatsapp" | "sms" | "both";
+    telegramEnabled?: boolean;
+    alertPreference?: "telegram" | "sms" | "both";
     primaryColor?: string;
     accentColor?: string;
     promoBanner?: string;
@@ -79,15 +79,15 @@ export async function PUT(req: NextRequest) {
       coverImage: (coverImage ?? "").trim(),
       phone: (phone ?? "").trim(),
       address: (address ?? "").trim(),
-      whatsappPhone: (whatsappPhone ?? "").trim(),
+      telegramChatId: (telegramChatId ?? "").trim(),
       notificationPhone: (notificationPhone ?? "").trim(),
       deliveryFee: typeof deliveryFee === "number" && deliveryFee >= 0 ? deliveryFee : 0,
       minimumOrder: typeof minimumOrder === "number" && minimumOrder >= 0 ? minimumOrder : 0,
       deliveryEnabled: deliveryEnabled !== false,
       pickupEnabled: pickupEnabled !== false,
       ...(openingHours && typeof openingHours === "object" ? { openingHours } : {}),
-      whatsappEnabled: whatsappEnabled === true,
-      alertPreference: ["whatsapp", "sms", "both"].includes(alertPreference ?? "")
+      telegramEnabled: telegramEnabled === true,
+      alertPreference: ["telegram", "sms", "both"].includes(alertPreference ?? "")
         ? alertPreference
         : "sms",
       primaryColor: (primaryColor ?? "").trim(),
