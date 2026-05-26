@@ -30,7 +30,7 @@ export default function StaffClient({ slug }: { slug: string }) {
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [newStaff, setNewStaff] = useState({ email: "", displayName: "", role: "staff" });
-  const [inviteResult, setInviteResult] = useState<{ resetLink: string; email: string } | null>(null);
+  const [inviteResult, setInviteResult] = useState<{ email: string } | null>(null);
 
   const fetchStaff = useCallback(async () => {
     setLoading(true);
@@ -56,7 +56,7 @@ export default function StaffClient({ slug }: { slug: string }) {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Failed to create"); return; }
-      setInviteResult({ resetLink: data.resetLink, email: newStaff.email });
+      setInviteResult({ email: newStaff.email });
       setNewStaff({ email: "", displayName: "", role: "staff" });
       setShowCreate(false);
       fetchStaff();
@@ -122,17 +122,8 @@ export default function StaffClient({ slug }: { slug: string }) {
       {inviteResult && (
         <div className="bg-green-50 border border-green-200 rounded-2xl p-5">
           <p className="font-bold text-green-800 mb-1">Staff account created for {inviteResult.email}</p>
-          <p className="text-sm text-green-700 mb-3">Share this password reset link with the staff member so they can set their password:</p>
-          <div className="bg-white rounded-xl border border-green-200 p-3 flex items-center justify-between gap-3">
-            <p className="font-mono text-xs text-gray-700 break-all">{inviteResult.resetLink}</p>
-            <button
-              onClick={() => { navigator.clipboard.writeText(inviteResult.resetLink); }}
-              className="flex-shrink-0 text-xs font-bold px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-500"
-            >
-              Copy
-            </button>
-          </div>
-          <button onClick={() => setInviteResult(null)} className="text-xs text-green-600 mt-2 hover:underline">Dismiss</button>
+          <p className="text-sm text-green-700">A password setup email has been sent to {inviteResult.email}. They can use it to set their password and log in.</p>
+          <button onClick={() => setInviteResult(null)} className="text-xs text-green-600 mt-3 hover:underline">Dismiss</button>
         </div>
       )}
 
