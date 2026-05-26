@@ -119,7 +119,7 @@ export async function sendCustomerNotification(
 
     // Fallback: SMS
     await sendSMS(data.customerPhone, buildSMS(event, data, trackingLink));
-  } catch (err) {
-    console.error(`sendCustomerNotification [${event}] failed:`, err);
+  } catch {
+    console.error("[customer-notifications] notification dispatch failed");
   }
 }

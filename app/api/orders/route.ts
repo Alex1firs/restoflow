@@ -6,6 +6,7 @@ import { checkIsOpen } from "@/lib/restaurant-utils";
 import { sendNewOrderAlert } from "@/lib/notifications";
 import { sendCustomerNotification } from "@/lib/customer-notifications";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { GRACE_DAYS } from "@/lib/constants";
 
 export async function POST(request: NextRequest) {
   const { allowed } = await checkRateLimit(`orders:${getClientIp(request)}`, 10, 60_000);
@@ -60,7 +61,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Subscription guard — inline to reuse the already-fetched restaurant doc
-    const GRACE_DAYS = 3;
     const subEndRaw = rData.subscriptionEndDate as { toDate?: () => Date; seconds?: number } | undefined;
     if (subEndRaw) {
       const subEnd = subEndRaw.toDate ? subEndRaw.toDate() : new Date((subEndRaw.seconds ?? 0) * 1000);

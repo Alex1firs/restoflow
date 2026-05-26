@@ -25,7 +25,11 @@ function encryptToken(plaintext: string): string {
 function decryptToken(encrypted: string): string {
   const key = getEncKey();
   const parts = encrypted.split(":");
-  if (parts.length !== 3) throw new Error("Token format invalid — reconnect Google account");
+  if (parts.length !== 3) {
+    // Stored value is not in iv:tag:cipher format — likely a plaintext token from
+    // before encryption was introduced. Restaurant must disconnect and reconnect.
+    throw new Error("RECONNECT_REQUIRED: Google account token is not encrypted — disconnect and reconnect Google Business");
+  }
   const [ivHex, tagHex, cipherHex] = parts;
   const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(ivHex, "hex"));
   decipher.setAuthTag(Buffer.from(tagHex, "hex"));

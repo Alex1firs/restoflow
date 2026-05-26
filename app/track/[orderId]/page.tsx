@@ -36,6 +36,7 @@ export default async function TrackPage({ params, searchParams }: Props) {
   return (
     <TrackOrderClient
       orderId={orderId}
+      token={token}
       initial={{
         restaurantId: d.restaurantId as string,
         items: (d.items as { name: string; quantity: number; price: number }[]) ?? [],

@@ -3,6 +3,7 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { checkIsOpen } from "@/lib/restaurant-utils";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { GRACE_DAYS } from "@/lib/constants";
 
 export async function POST(req: NextRequest) {
   const { allowed } = await checkRateLimit(`orders_init:${getClientIp(req)}`, 10, 60_000);
@@ -53,7 +54,6 @@ export async function POST(req: NextRequest) {
     const rData = restaurantDoc.data()!;
 
     // Subscription guard — inline to reuse the already-fetched restaurant doc
-    const GRACE_DAYS = 3;
     const subEndRaw = rData.subscriptionEndDate as { toDate?: () => Date; seconds?: number } | undefined;
     if (subEndRaw) {
       const subEnd = subEndRaw.toDate ? subEndRaw.toDate() : new Date((subEndRaw.seconds ?? 0) * 1000);

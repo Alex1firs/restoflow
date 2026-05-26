@@ -1,8 +1,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { getAdminDb } from "./firebase-admin";
-
-const GRACE_DAYS = 3;
+import { GRACE_DAYS } from "./constants";
 
 /**
  * Checks whether a restaurant's subscription allows operational access.

@@ -1,5 +1,6 @@
 import "server-only";
 import { getAdminDb } from "./firebase-admin";
+import { GRACE_DAYS } from "./constants";
 
 export type SubscriptionStatus = "trialing" | "active" | "grace_period" | "expired";
 
@@ -24,8 +25,6 @@ export type SubscriptionInfo = {
   isOperational: boolean;             // false only when expired — blocks operational APIs
   isOrdering: boolean;                // same as isOperational (kept for backward compat)
 };
-
-const GRACE_DAYS = 3;
 
 /**
  * Derives the effective subscription state for a restaurant document.

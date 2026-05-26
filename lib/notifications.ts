@@ -31,8 +31,8 @@ export async function sendNewOrderAlert(params: NewOrderAlertParams): Promise<vo
 
     // SMS is always primary — fires for every new order if notificationPhone is set
     if (notificationPhone) {
-      tasks.push(dispatchSMS({ ...params, restaurantName, notificationPhone }).catch((err) => {
-        console.error("SMS alert failed:", err);
+      tasks.push(dispatchSMS({ ...params, restaurantName, notificationPhone }).catch(() => {
+        console.error("[notifications] SMS alert failed");
       }));
     }
 
@@ -45,15 +45,15 @@ export async function sendNewOrderAlert(params: NewOrderAlertParams): Promise<vo
     if (sendWhatsApp) {
       tasks.push(
         dispatchWhatsApp({ ...params, restaurantName, whatsappPhone: rawWhatsappPhone })
-          .catch((err) => {
-            console.error("WhatsApp alert failed:", err);
+          .catch(() => {
+            console.error("[notifications] WhatsApp alert failed");
           })
       );
     }
 
     if (tasks.length > 0) await Promise.allSettled(tasks);
-  } catch (err) {
-    console.error("sendNewOrderAlert failed (non-fatal):", err);
+  } catch {
+    console.error("[notifications] alert dispatch failed");
   }
 }
 
@@ -62,7 +62,7 @@ async function dispatchWhatsApp(
 ): Promise<void> {
   const templateName = process.env.WHATSAPP_TEMPLATE_NEW_ORDER;
   if (!templateName) {
-    console.error("WHATSAPP_TEMPLATE_NEW_ORDER env var not set — skipping WhatsApp alert");
+    console.error("[notifications] WHATSAPP_TEMPLATE_NEW_ORDER not configured");
     return;
   }
 
@@ -123,11 +123,10 @@ async function dispatchSMS(
       }),
     });
     if (!res.ok) {
-      const text = await res.text();
-      console.error(`Termii SMS error ${res.status}:`, text);
+      console.error("[notifications] Termii SMS error", res.status);
     }
-  } catch (err) {
-    console.error("Termii SMS send failed:", err);
+  } catch {
+    console.error("[notifications] Termii SMS send failed");
   }
 }
 

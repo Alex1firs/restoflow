@@ -42,9 +42,12 @@ service cloud.firestore {
     }
 
     // ─── Orders ─────────────────────────────────────────────────────────────────
+    // Direct client reads are restricted to restaurant members only.
+    // Public order tracking goes through /api/track/[orderId]/status which validates
+    // the tracking token server-side and returns only {status, paymentStatus}.
     match /orders/{orderId} {
       allow create: if false;
-      allow get:    if true;
+      allow get:    if isMemberOf(resource.data.restaurantId);
       allow list:   if isMemberOf(resource.data.restaurantId);
       allow update: if isManagerOrOwner(resource.data.restaurantId)
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'rejectionReason'])

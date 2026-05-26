@@ -8,6 +8,7 @@ import { CartProvider } from './components/CartContext';
 import Link from 'next/link';
 import { checkIsOpen, todayHours, type OpeningHours } from '@/lib/restaurant-utils';
 import { buildPageTitle, buildPageDescription, buildJsonLd, buildCanonicalUrl, type RestaurantSEOData } from '@/lib/seo-utils';
+import { GRACE_DAYS } from '@/lib/constants';
 
 function formatTodayHours(from: string, to: string): string {
   const fmt = (t: string) => {
@@ -27,8 +28,6 @@ interface RestaurantData extends DocumentData {
   subscriptionEndDate?: { toDate?: () => Date; seconds?: number };
   status?: string;
 }
-
-const GRACE_DAYS = 3;
 
 function isExpired(restaurant: RestaurantData): boolean {
   if (restaurant.subscriptionEndDate) {

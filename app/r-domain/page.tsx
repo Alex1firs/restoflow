@@ -18,6 +18,7 @@ import {
   type OpeningHours,
 } from "@/lib/restaurant-utils";
 import { buildPageTitle, buildPageDescription, buildJsonLd, type RestaurantSEOData } from "@/lib/seo-utils";
+import { GRACE_DAYS } from "@/lib/constants";
 
 export const revalidate = 0;
 
@@ -79,8 +80,6 @@ interface RestaurantData extends DocumentData {
   subscriptionStatus?: string;
   subscriptionEndDate?: { toDate?: () => Date; seconds?: number };
 }
-
-const GRACE_DAYS = 3;
 
 function isExpired(restaurant: RestaurantData): boolean {
   if (restaurant.subscriptionEndDate) {

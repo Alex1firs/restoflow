@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 
 type OrderStatus = "pending" | "scheduled" | "preparing" | "ready" | "completed" | "rejected";
 
@@ -41,28 +39,43 @@ function stepIndex(status: OrderStatus): number {
 
 export default function TrackOrderClient({
   orderId,
+  token,
   initial,
 }: {
   orderId: string;
+  token: string;
   initial: SafeOrder;
 }) {
   const [order, setOrder] = useState<SafeOrder>(initial);
 
-  // Subscribe to real-time status updates. Phone and customerName are not
-  // included in SafeOrder so they are never exposed to this client component.
+  // Poll the server-validated status endpoint every 5 s.
+  // Direct Firestore reads are blocked on orders to prevent PII exposure.
   useEffect(() => {
-    const ref = doc(db, "orders", orderId);
-    const unsub = onSnapshot(ref, (snap) => {
-      if (!snap.exists()) return;
-      const d = snap.data();
-      setOrder((prev) => ({
-        ...prev,
-        status: (d.status as OrderStatus) ?? prev.status,
-        paymentStatus: (d.paymentStatus as "paid" | "pending") ?? prev.paymentStatus,
-      }));
-    });
-    return () => unsub();
-  }, [orderId]);
+    let active = true;
+
+    const poll = async () => {
+      if (!active) return;
+      try {
+        const res = await fetch(`/api/track/${orderId}/status?t=${token}`);
+        if (res.ok) {
+          const data = (await res.json()) as { status?: OrderStatus; paymentStatus?: "paid" | "pending" };
+          setOrder((prev) => ({
+            ...prev,
+            status: data.status ?? prev.status,
+            paymentStatus: data.paymentStatus ?? prev.paymentStatus,
+          }));
+        }
+      } catch {
+        // silent — next poll will retry
+      }
+    };
+
+    const id = setInterval(poll, 5000);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, [orderId, token]);
 
   const isCancelled = order.status === "rejected";
   const currentStep = stepIndex(order.status);
@@ -138,7 +151,7 @@ export default function TrackOrderClient({
           </div>
         </div>
 
-        <p className="text-center text-xs text-gray-300 mt-4">Updates appear in real-time</p>
+        <p className="text-center text-xs text-gray-300 mt-4">Updates appear automatically</p>
       </div>
     </div>
   );

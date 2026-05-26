@@ -66,7 +66,7 @@ export default async function SuperAdminOverview() {
     });
   }
 
-  recentPayments.sort((a, b) => b.amount - a.amount).splice(10);
+  const displayPayments = [...recentPayments].sort((a, b) => b.amount - a.amount).slice(0, 10);
 
   const recentSignups = restaurantsSnap.docs
     .map((d) => ({ name: d.data().name as string, slug: d.id, date: fmtDate(d.data().createdAt as Parameters<typeof fmtDate>[0]), plan: d.data().planId as string }))
@@ -117,7 +117,7 @@ export default async function SuperAdminOverview() {
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
           <h2 className="text-sm font-black text-gray-700 uppercase tracking-widest mb-4">Recent Payments</h2>
           <div className="space-y-3">
-            {recentPayments.map((p, i) => (
+            {displayPayments.map((p, i) => (
               <div key={i} className="flex items-center justify-between">
                 <div>
                   <p className="font-bold text-sm text-gray-900">{p.restaurant}</p>
@@ -131,7 +131,7 @@ export default async function SuperAdminOverview() {
                 </div>
               </div>
             ))}
-            {recentPayments.length === 0 && <p className="text-sm text-gray-400">No payments yet.</p>}
+            {displayPayments.length === 0 && <p className="text-sm text-gray-400">No payments yet.</p>}
           </div>
         </div>
       </div>

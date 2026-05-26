@@ -127,6 +127,17 @@ Enable automatic cleanup of rate-limit documents:
 - [ ] Firebase Console → Firestore → Indexes → TTL → Add field
   - Collection: `rate_limits`, Field: `expiresAt`, Mode: Timestamp
 
+**To verify TTL is active after configuration:**
+1. In Firebase Console → Firestore → Indexes → TTL, the `rate_limits / expiresAt` entry should appear with status **Enabled**.
+2. Wait 10–15 minutes after enabling, then check whether old `rate_limits` documents (those with `expiresAt` in the past) are being deleted automatically.
+3. Alternatively, run this check from the Firebase CLI (requires `jq`):
+   ```
+   firebase firestore:get rate_limits --project YOUR_PROJECT_ID | jq '.[].fields.expiresAt'
+   ```
+   If TTL is working, documents past their `expiresAt` timestamp will no longer appear within ~24 hours of expiry.
+
+> Without TTL enabled the `rate_limits` collection will grow unboundedly. Rate limiting still works correctly; only the cleanup does not happen automatically.
+
 ---
 
 ## 7. Post-Deploy Verification
@@ -142,16 +153,48 @@ Enable automatic cleanup of rate-limit documents:
 
 ---
 
-## 8. Known Gaps (Schedule for first sprint after launch)
+## 8. Google Business Token Migration (post-deploy — required for any early adopters)
+
+Restaurants that connected Google Business **before** this deploy have plaintext OAuth tokens stored in Firestore. The new deploy encrypts all tokens at rest (AES-256-GCM).
+
+**What happens without migration:** Calls to the Google Business API will return HTTP 401 with `{ "reconnect": true }` for those restaurants. No data is corrupted.
+
+**Required action per affected restaurant:**
+1. Admin user goes to **Dashboard → Google Business → Disconnect**
+2. Reconnects via **Connect Google Business** — this stores new encrypted tokens
+3. Verify the Google Business panel shows "Connected" with the correct email
+
+There is no automated migration script — the reconnect flow is the migration.
+
+---
+
+## 9. Reset Link Delivery (pre-launch — manual workflow)
+
+Password reset links are currently **not emailed automatically**. They are stored in Firestore and must be delivered manually by an admin.
+
+**Onboarding reset links** (new restaurant owners):
+- Stored at: `onboardings/{id}.resetLink`
+- Retrieve: Firebase Console → Firestore → `onboardings` → find by restaurant slug → copy `resetLink`
+- Send to the owner via email or WhatsApp manually
+
+**Staff account reset links**:
+- Stored at: `users/{uid}.pendingResetLink`
+- Retrieve: Firebase Console → Firestore → `users` → find by UID → copy `pendingResetLink`
+- Send to the staff member manually
+- Clear the field after delivery: set `pendingResetLink` to `FieldValue.delete()`
+
+**Security note:** Reset links are single-use Firebase Auth links. They are never returned in API responses. Access is restricted to the Firebase Admin SDK (`onboardings` rules block all client reads).
+
+**Future sprint:** Implement email delivery via SendGrid or Resend to automate this workflow.
+
+---
+
+## 10. Known Gaps (Schedule for first sprint after launch)
 
 These were audited and accepted as P2 — not launch blockers, but must be tracked:
 
-- [ ] **Google re-connect required** — restaurants that connected Google Business before this deploy have plaintext tokens in Firestore. They must disconnect and reconnect after the deploy to encrypt their tokens.
-- [ ] Implement email delivery for onboarding reset links (currently stored in `onboardings/` doc — retrieve via Firebase Console or super-admin script)
-- [ ] Implement email delivery for staff account reset links (currently stored in `users/{uid}.pendingResetLink`)
+- [ ] Implement email delivery for onboarding reset links (currently manual — see §9)
+- [ ] Implement email delivery for staff account reset links (currently manual — see §9)
 - [ ] Add cursor-based pagination to loyalty customer list (currently hard-capped at 100)
 - [ ] Reconcile Terms of Service vs. Refund Policy (Terms says "non-refundable", Refund Policy lists exceptions)
 - [ ] Implement Google OAuth token refresh (1-hour expiry — users must re-connect after expiry)
-- [ ] Fix `super-admin/overview` `.splice()` bug (audit finding #16)
-- [ ] Replace all `console.error` calls with structured logging
-- [ ] Deduplicate `GRACE_DAYS` constant (currently in 4 files)

@@ -35,8 +35,14 @@ export async function GET() {
 
     return NextResponse.json({ accounts: result });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to fetch locations";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    if (err instanceof Error && err.message.startsWith("RECONNECT_REQUIRED")) {
+      return NextResponse.json(
+        { error: "Reconnect required", reconnect: true },
+        { status: 401 }
+      );
+    }
+    console.error("[google-business] locations fetch failed");
+    return NextResponse.json({ error: "Failed to fetch locations" }, { status: 500 });
   }
 }
 
@@ -131,14 +137,20 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({ success: true, locationName: location.name });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Submission failed";
+      if (err instanceof Error && err.message.startsWith("RECONNECT_REQUIRED")) {
+        return NextResponse.json(
+          { error: "Reconnect required", reconnect: true },
+          { status: 401 }
+        );
+      }
+      const safeMsg = err instanceof Error ? err.message : "Submission failed";
 
       await db.collection("restaurants").doc(user.restaurantSlug).update({
         "googleBusiness.profileStatus": "sync_failed",
-        "googleBusiness.lastSyncError": msg,
+        "googleBusiness.lastSyncError": safeMsg,
       });
 
-      return NextResponse.json({ error: msg }, { status: 500 });
+      return NextResponse.json({ error: safeMsg }, { status: 500 });
     }
   }
 

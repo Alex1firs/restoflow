@@ -20,11 +20,10 @@ async function sendSMS(phone: string, message: string): Promise<void> {
       }),
     });
     if (!res.ok) {
-      const text = await res.text();
-      console.error(`Termii restaurant-notification error ${res.status}:`, text);
+      console.error("[restaurant-notifications] Termii SMS error", res.status);
     }
-  } catch (err) {
-    console.error("restaurant-notifications sendSMS failed:", err);
+  } catch {
+    console.error("[restaurant-notifications] SMS send failed");
   }
 }
 
