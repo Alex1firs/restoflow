@@ -205,6 +205,7 @@ export default function GoogleBusinessClient({
   const [disconnecting, setDisconnecting] = useState(false);
   const [accounts, setAccounts] = useState<GbpAccount[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [accountsLoaded, setAccountsLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<{ success: boolean; error?: string } | null>(null);
@@ -310,6 +311,7 @@ export default function GoogleBusinessClient({
         return;
       }
       setAccounts(data.accounts ?? []);
+      setAccountsLoaded(true);
       if (data.accounts && data.accounts.length > 0 && !details.accountName) {
         setDetails((d) => ({
           ...d,
@@ -463,6 +465,7 @@ export default function GoogleBusinessClient({
             setDetail={setDetail}
             accounts={accounts}
             loadingAccounts={loadingAccounts}
+            accountsLoaded={accountsLoaded}
             connecting={connecting}
             disconnecting={disconnecting}
             saving={saving}
@@ -686,6 +689,7 @@ function OAuthWizard({
   setDetail,
   accounts,
   loadingAccounts,
+  accountsLoaded,
   connecting,
   disconnecting,
   saving,
@@ -707,6 +711,7 @@ function OAuthWizard({
   setDetail: (k: keyof BusinessDetails) => (v: string) => void;
   accounts: GbpAccount[];
   loadingAccounts: boolean;
+  accountsLoaded: boolean;
   connecting: boolean;
   disconnecting: boolean;
   saving: boolean;
@@ -937,13 +942,34 @@ function OAuthWizard({
             </div>
           )}
 
-          {accounts.length === 0 && !loadingAccounts && (
+          {accounts.length === 0 && !loadingAccounts && !accountsLoaded && (
             <button
               onClick={onLoadAccounts}
               className="w-full py-2.5 border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold text-sm rounded-xl transition-colors"
             >
               Load my Google Business accounts
             </button>
+          )}
+          {accounts.length === 0 && !loadingAccounts && accountsLoaded && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+              <p className="font-bold mb-1">No Google Business account found</p>
+              <p className="mb-3">You need a Google Business Profile account before you can submit here. It&apos;s free and takes a few minutes.</p>
+              <a
+                href="https://business.google.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors"
+              >
+                Create Google Business Profile →
+              </a>
+              <p className="mt-3 text-xs text-amber-700">After creating your profile, come back here and click &quot;Load my Google Business accounts&quot; again.</p>
+              <button
+                onClick={onLoadAccounts}
+                className="mt-2 text-xs text-amber-700 hover:underline font-bold"
+              >
+                Try loading again
+              </button>
+            </div>
           )}
           {loadingAccounts && (
             <p className="text-sm text-gray-400 text-center py-2">Loading accounts...</p>

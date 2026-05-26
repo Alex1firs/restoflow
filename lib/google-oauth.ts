@@ -199,6 +199,8 @@ export async function listGbpAccounts(
     "https://mybusinessaccountmanagement.googleapis.com/v1/accounts",
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
+  // 403 / 404 means the Google account has no Business Profile account yet
+  if (res.status === 403 || res.status === 404) return [];
   if (!res.ok) throw new Error(`GBP accounts fetch failed: ${res.status}`);
   const data = (await res.json()) as {
     accounts?: { name: string; accountName: string; type: string }[];
