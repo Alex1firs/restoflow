@@ -1,16 +1,8 @@
-/**
- * Seeds the three subscription plans into Firestore.
- * Safe to run multiple times — uses set() which overwrites.
- *
- * Usage:
- *   npx tsx scripts/seed-plans.ts
- */
+// Plain JS — run with: node scripts/seed-plans.js
+require("dotenv").config({ path: ".env.local" });
 
-import * as dotenv from "dotenv";
-dotenv.config({ path: ".env.local" });
-
-import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+const { initializeApp, cert } = require("firebase-admin/app");
+const { getFirestore } = require("firebase-admin/firestore");
 
 const app = initializeApp({
   credential: cert({
@@ -22,9 +14,9 @@ const app = initializeApp({
 
 const db = getFirestore(app);
 
-const plans = [
-  {
-    id: "pro",
+async function run() {
+  const ref = db.collection("plans").doc("pro");
+  await ref.set({
     name: "Restaflow Pro",
     monthlyPrice: 19999,
     setupFee: 0,
@@ -41,20 +33,8 @@ const plans = [
       "Priority support",
     ],
     isActive: true,
-  },
-];
-
-async function run() {
-  const batch = db.batch();
-
-  for (const { id, ...data } of plans) {
-    const ref = db.collection("plans").doc(id);
-    batch.set(ref, data);
-    console.log(`  Queued: plans/${id} — ₦${data.monthlyPrice.toLocaleString()}/mo`);
-  }
-
-  await batch.commit();
-  console.log("\n✓ Plans seeded successfully");
+  });
+  console.log("Done: plans/pro seeded");
   process.exit(0);
 }
 
