@@ -65,6 +65,14 @@ All of these must be set for **Production** (and optionally Preview/Development)
 
 Point your Paystack **Live Webhook URL** at `https://your-domain.com/api/webhooks/relay`.
 
+### Email delivery (Resend)
+| Variable | Value |
+|---|---|
+| `RESEND_API_KEY` | Resend dashboard → API Keys → create key scoped to restoflow.org |
+| `EMAIL_FROM` | Sender address, e.g. `noreply@restoflow.org` (must be on a verified Resend domain). Defaults to `noreply@restoflow.org` if omitted. |
+
+If `RESEND_API_KEY` is not set the app still works — reset links fall back to manual delivery (see §9).
+
 ### Optional integrations
 | Variable | Value |
 |---|---|
@@ -168,24 +176,25 @@ There is no automated migration script — the reconnect flow is the migration.
 
 ---
 
-## 9. Reset Link Delivery (pre-launch — manual workflow)
+## 9. Reset Link Delivery
 
-Password reset links are currently **not emailed automatically**. They are stored in Firestore and must be delivered manually by an admin.
+Password reset links are sent automatically via Resend when `RESEND_API_KEY` is set.
 
-**Onboarding reset links** (new restaurant owners):
-- Stored at: `onboardings/{id}.resetLink`
-- Retrieve: Firebase Console → Firestore → `onboardings` → find by restaurant slug → copy `resetLink`
-- Send to the owner via email or WhatsApp manually
+**Onboarding** (new restaurant owner): email is sent from `processOnboarding()` immediately after the batch commits. Subject: "Welcome to RestoFlow — activate your {restaurant} account".
 
-**Staff account reset links**:
-- Stored at: `users/{uid}.pendingResetLink`
-- Retrieve: Firebase Console → Firestore → `users` → find by UID → copy `pendingResetLink`
-- Send to the staff member manually
-- Clear the field after delivery: set `pendingResetLink` to `FieldValue.delete()`
+**Staff accounts**: email is sent from `POST /api/admin/staff` immediately after the user is created. Subject: "Your RestoFlow staff account is ready".
 
-**Security note:** Reset links are single-use Firebase Auth links. They are never returned in API responses. Access is restricted to the Firebase Admin SDK (`onboardings` rules block all client reads).
+Both emails include a single "Set my password" button linking to the Firebase Auth password reset URL.
 
-**Future sprint:** Implement email delivery via SendGrid or Resend to automate this workflow.
+**Fallback (if RESEND_API_KEY is not set or email delivery fails):**
+
+- Onboarding reset links → `onboardings/{id}.resetLink` (Admin-SDK only read)
+- Staff reset links → `users/{uid}.pendingResetLink`
+- Retrieve via Firebase Console → Firestore → find the document → copy the field
+- Deliver manually via email or WhatsApp
+- For staff links: clear the field after delivery (set to `FieldValue.delete()`)
+
+**Security note:** Reset links are single-use Firebase Auth links. They are never returned in API responses.
 
 ---
 
@@ -193,8 +202,6 @@ Password reset links are currently **not emailed automatically**. They are store
 
 These were audited and accepted as P2 — not launch blockers, but must be tracked:
 
-- [ ] Implement email delivery for onboarding reset links (currently manual — see §9)
-- [ ] Implement email delivery for staff account reset links (currently manual — see §9)
 - [ ] Add cursor-based pagination to loyalty customer list (currently hard-capped at 100)
 - [ ] Reconcile Terms of Service vs. Refund Policy (Terms says "non-refundable", Refund Policy lists exceptions)
 - [ ] Implement Google OAuth token refresh (1-hour expiry — users must re-connect after expiry)

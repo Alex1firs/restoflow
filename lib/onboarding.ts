@@ -2,6 +2,7 @@ import "server-only";
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb, getAdminAuth } from "./firebase-admin";
 import { getPlan } from "./plans";
+import { sendOnboardingEmail } from "./email";
 
 export type OnboardingRecord = {
   restaurantName: string;
@@ -139,6 +140,11 @@ export async function processOnboarding(
   });
 
   await batch.commit();
+
+  // Non-fatal — if email delivery fails the reset link is still in onboardings/{id}.resetLink
+  sendOnboardingEmail(email, restaurantName, resetLink).catch(() => {
+    console.error("[onboarding] email delivery failed");
+  });
 
   return {
     success: true,

@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { getAdminAuth, getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { sendStaffSetupEmail } from "@/lib/email";
 
 export async function GET() {
   let user: Awaited<ReturnType<typeof getAuthenticatedUser>>;
@@ -74,6 +75,15 @@ export async function POST(req: NextRequest) {
       createdBy: user.uid,
       pendingResetLink: resetLink,
       createdAt: FieldValue.serverTimestamp(),
+    });
+
+    // Fetch restaurant name for the email subject
+    const restaurantDoc = await getAdminDb().collection("restaurants").doc(user.restaurantSlug).get();
+    const restaurantName = (restaurantDoc.data()?.name as string | undefined) ?? user.restaurantSlug;
+
+    // Non-fatal — reset link is also stored in users/{uid}.pendingResetLink as fallback
+    sendStaffSetupEmail(email.trim(), displayName?.trim() ?? "", restaurantName, resetLink).catch(() => {
+      console.error("[staff] email delivery failed");
     });
 
     return NextResponse.json({ uid: authUser.uid }, { status: 201 });
