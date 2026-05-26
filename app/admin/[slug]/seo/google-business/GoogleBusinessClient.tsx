@@ -162,7 +162,7 @@ function Input({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       maxLength={maxLength}
-      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-orange-500 bg-white"
+      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-orange-500 bg-white"
     />
   );
 }
@@ -894,7 +894,7 @@ function OAuthWizard({
               placeholder="Describe your restaurant, cuisine type, specialties..."
               rows={4}
               maxLength={750}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-orange-500 resize-none"
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-orange-500 resize-none"
             />
             <p className="text-xs text-gray-400 mt-1">{details.description.length}/750 characters</p>
           </div>
