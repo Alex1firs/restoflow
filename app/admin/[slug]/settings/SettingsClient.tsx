@@ -75,6 +75,7 @@ export default function SettingsClient({ restaurant }: Props) {
 
   const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [testError, setTestError] = useState("");
+  const [fallbackUsed, setFallbackUsed] = useState(false);
 
   function setField<K extends keyof typeof form>(field: K, value: (typeof form)[K]) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -107,9 +108,11 @@ export default function SettingsClient({ restaurant }: Props) {
       if (!res.ok) {
         setTestStatus("error");
         setTestError(data.error ?? "Test failed.");
+        setFallbackUsed(false);
       } else {
         setField("whatsappEnabled", true);
         if (data.normalizedPhone) setField("whatsappPhone", data.normalizedPhone);
+        setFallbackUsed(data.fallbackUsed === true);
         setTestStatus("success");
       }
     } catch {
@@ -510,12 +513,33 @@ export default function SettingsClient({ restaurant }: Props) {
                   ) : "Send Test Message"}
                 </button>
                 {testStatus === "success" && (
-                  <span className="text-sm font-bold text-green-600 flex items-center gap-1.5">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Test sent — alerts enabled!
-                  </span>
+                  <div className="space-y-3 w-full">
+                    <span className="text-sm font-bold text-green-600 flex items-center gap-1.5">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                      {fallbackUsed ? "Connection verified! Alerts enabled." : "Test sent — alerts enabled!"}
+                    </span>
+
+                    {fallbackUsed && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-800 space-y-2 mt-2 w-full">
+                        <div className="flex items-center gap-2 font-bold text-amber-900">
+                          <svg className="w-4 h-4 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Meta Dashboard Warning (new_order_alert is paused)
+                        </div>
+                        <p className="leading-relaxed">
+                          Your credentials and phone connection are <strong>healthy and active</strong> (we successfully sent a fallback verification message to you!). However, your custom WhatsApp template <code>new_order_alert</code> is currently <strong>paused, disabled, or rejected</strong> by Meta.
+                        </p>
+                        <div className="pl-4 list-decimal space-y-1">
+                          <div>1. Go to your <a href="https://business.facebook.com/wa/manage/templates" target="_blank" rel="noopener noreferrer" className="underline font-bold hover:text-amber-950">WhatsApp Manager (Templates)</a>.</div>
+                          <div>2. Locate <code>new_order_alert</code> and check its quality status. If it's paused, edit and resubmit it for approval.</div>
+                          <div>3. Alternatively, delete and recreate a new template with the same name.</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
                 {testStatus === "error" && (
                   <span className="text-sm font-bold text-red-500">{testError}</span>

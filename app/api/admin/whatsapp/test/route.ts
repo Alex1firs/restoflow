@@ -47,7 +47,8 @@ export async function POST(req: NextRequest) {
   const restaurantName = (snap.data()?.name as string | undefined) ?? restaurantSlug;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
 
-  const result = await sendWhatsAppTemplate({
+  let fallbackUsed = false;
+  let result = await sendWhatsAppTemplate({
     to: normalizedPhone,
     templateName,
     bodyParameters: [
@@ -59,6 +60,21 @@ export async function POST(req: NextRequest) {
       `${appUrl}/admin/${restaurantSlug}/orders`,
     ],
   });
+
+  if (!result.success && (result.error?.includes("135000") || result.error?.includes("Generic user error"))) {
+    console.warn(`[whatsapp-test] Primary template "${templateName}" failed with 135000. Attempting fallback...`);
+    const fallbackTemplateName = process.env.WHATSAPP_TEMPLATE_CUSTOMER_ORDER_PREPARING || "customer_order_preparing";
+    const fallbackResult = await sendWhatsAppTemplate({
+      to: normalizedPhone,
+      templateName: fallbackTemplateName,
+      bodyParameters: [restaurantName],
+    });
+
+    if (fallbackResult.success) {
+      result = fallbackResult;
+      fallbackUsed = true;
+    }
+  }
 
   if (!result.success) {
     let errorMsg = result.error ?? "Failed to send test message.";
@@ -80,5 +96,5 @@ export async function POST(req: NextRequest) {
       whatsappEnabled: true,
     });
 
-  return NextResponse.json({ success: true, normalizedPhone });
+  return NextResponse.json({ success: true, normalizedPhone, fallbackUsed });
 }

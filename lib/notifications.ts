@@ -88,6 +88,7 @@ async function dispatchWhatsApp(
   });
 
   if (!result.success) {
+    console.error(`[notifications] WhatsApp alert failed for template "${templateName}":`, result.error);
     throw new Error(result.error ?? "WhatsApp send failed");
   }
 }
