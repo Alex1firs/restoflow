@@ -499,21 +499,29 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
                       : "Our team can walk you through completing your store. Click below to request a setup call."}
                   </p>
                 </div>
-                {!helpAlreadyOpen && (
-                  <button
-                    type="button"
-                    onClick={requestSetupHelp}
-                    disabled={isRequestingHelp || helpRequestSent}
-                    className="shrink-0 bg-white border border-gray-300 hover:border-gray-400 text-gray-700 text-xs font-black px-5 py-2.5 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                <div className="shrink-0 flex items-center gap-2 flex-wrap">
+                  {!helpAlreadyOpen && (
+                    <button
+                      type="button"
+                      onClick={requestSetupHelp}
+                      disabled={isRequestingHelp || helpRequestSent}
+                      className="bg-white border border-gray-300 hover:border-gray-400 text-gray-700 text-xs font-black px-5 py-2.5 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isRequestingHelp ? "Sending…" : helpRequestSent ? "Request Sent ✓" : "Request Setup Help"}
+                    </button>
+                  )}
+                  {helpAlreadyOpen && (
+                    <span className="text-xs font-black text-blue-600 bg-blue-50 border border-blue-100 px-4 py-2.5 rounded-xl">
+                      Request open ✓
+                    </span>
+                  )}
+                  <a
+                    href={`/admin/${slug}/help`}
+                    className="text-xs font-black text-gray-500 hover:text-gray-800 px-4 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
                   >
-                    {isRequestingHelp ? "Sending…" : helpRequestSent ? "Request Sent ✓" : "Request Setup Help"}
-                  </button>
-                )}
-                {helpAlreadyOpen && (
-                  <span className="shrink-0 text-xs font-black text-blue-600 bg-blue-50 border border-blue-100 px-4 py-2.5 rounded-xl">
-                    Request open ✓
-                  </span>
-                )}
+                    Help Center →
+                  </a>
+                </div>
                 {helpRequestError && (
                   <p className="text-xs font-bold text-red-500 sm:text-right">{helpRequestError}</p>
                 )}
