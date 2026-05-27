@@ -47,32 +47,57 @@ export default async function SuperAdminPaymentsPage() {
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr>
-              {["Restaurant", "Reference", "Amount", "Type", "Status", "Date"].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">{h}</th>
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                {["Restaurant", "Reference", "Amount", "Type", "Status", "Date"].map((h) => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {payments.map((p) => (
+                <tr key={p.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 font-bold text-gray-900">{p.restaurant}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-gray-500">{p.ref}</td>
+                  <td className="px-4 py-3 font-bold text-gray-900">₦{p.amount.toLocaleString("en-NG")}</td>
+                  <td className="px-4 py-3 text-gray-500 capitalize">{p.type}</td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs font-bold uppercase px-2 py-1 rounded-full ${
+                      p.status === "completed" || p.status === "success" ? "bg-green-100 text-green-700" :
+                      p.status === "failed" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
+                    }`}>{p.status}</span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">{p.date}</td>
+                </tr>
               ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {payments.map((p) => (
-              <tr key={p.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-bold text-gray-900">{p.restaurant}</td>
-                <td className="px-4 py-3 font-mono text-xs text-gray-500">{p.ref}</td>
-                <td className="px-4 py-3 font-bold text-gray-900">₦{p.amount.toLocaleString("en-NG")}</td>
-                <td className="px-4 py-3 text-gray-500 capitalize">{p.type}</td>
-                <td className="px-4 py-3">
-                  <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${
+            </tbody>
+          </table>
+        </div>
+        {/* Mobile cards */}
+        <div className="md:hidden divide-y divide-gray-50">
+          {payments.map((p) => (
+            <div key={p.id} className="p-4 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-bold text-gray-900">{p.restaurant}</p>
+                <p className="text-xs text-gray-400 shrink-0">{p.date}</p>
+              </div>
+              <p className="font-mono text-xs text-gray-500">{p.ref}</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-bold text-gray-900">₦{p.amount.toLocaleString("en-NG")}</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 capitalize">{p.type}</span>
+                  <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full ${
                     p.status === "completed" || p.status === "success" ? "bg-green-100 text-green-700" :
                     p.status === "failed" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
                   }`}>{p.status}</span>
-                </td>
-                <td className="px-4 py-3 text-gray-500 text-xs">{p.date}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
         {payments.length === 0 && (
           <div className="py-16 text-center text-gray-400 text-sm">No payments recorded yet.</div>
         )}

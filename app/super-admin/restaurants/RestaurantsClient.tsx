@@ -97,116 +97,219 @@ export default function RestaurantsClient({ restaurants }: { restaurants: Restau
       )}
 
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr>
-              {["Restaurant", "Plan", "Status", "End Date", "Joined", "Actions"].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {filtered.map((r) => (
-              <>
-                <tr key={r.slug} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3">
-                    <p className="font-bold text-gray-900">{r.name}</p>
-                    <p className="text-xs text-gray-400">{r.slug}</p>
-                    {r.email && <p className="text-xs text-gray-400">{r.email}</p>}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600 font-medium">{r.planName}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${STATUS_COLORS[r.status] ?? "bg-gray-100 text-gray-600"}`}>
-                      {r.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500">{fmtDate(r.endDate)}</td>
-                  <td className="px-4 py-3 text-gray-500">{fmtDate(r.createdAt)}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1 flex-wrap">
-                      <button
-                        onClick={() => setExpandedSlug(expandedSlug === r.slug ? null : r.slug)}
-                        className="text-xs font-bold px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                      >
-                        {expandedSlug === r.slug ? "Close" : "Manage"}
-                      </button>
-                      <a
-                        href={`/r/${r.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs font-bold px-2 py-1 bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-lg transition-colors"
-                      >
-                        View ↗
-                      </a>
-                      <a
-                        href={`/admin/${r.slug}/dashboard`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs font-bold px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors"
-                      >
-                        Admin ↗
-                      </a>
-                    </div>
-                  </td>
-                </tr>
-                {expandedSlug === r.slug && (
-                  <tr key={`${r.slug}-expanded`}>
-                    <td colSpan={6} className="px-4 py-4 bg-gray-50 border-b border-gray-100">
-                      <div className="flex flex-wrap gap-3 items-center">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            value={extendDays}
-                            onChange={(e) => setExtendDays(Number(e.target.value))}
-                            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-20 outline-none"
-                            min={1}
-                            max={365}
-                          />
-                          <button
-                            disabled={!!loading}
-                            onClick={() => doAction(r.slug, "extend", { days: extendDays })}
-                            className="text-xs font-bold px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-500 disabled:opacity-50 transition-colors"
-                          >
-                            {loading === `${r.slug}-extend` ? "…" : "Extend"}
-                          </button>
-                        </div>
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                {["Restaurant", "Plan", "Status", "End Date", "Joined", "Actions"].map((h) => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filtered.map((r) => (
+                <>
+                  <tr key={r.slug} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <p className="font-bold text-gray-900">{r.name}</p>
+                      <p className="text-xs text-gray-400">{r.slug}</p>
+                      {r.email && <p className="text-xs text-gray-400">{r.email}</p>}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 font-medium">{r.planName}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${STATUS_COLORS[r.status] ?? "bg-gray-100 text-gray-600"}`}>
+                        {r.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">{fmtDate(r.endDate)}</td>
+                    <td className="px-4 py-3 text-gray-500">{fmtDate(r.createdAt)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1 flex-wrap">
                         <button
-                          disabled={!!loading}
-                          onClick={() => doAction(r.slug, "activate")}
-                          className="text-xs font-bold px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50 transition-colors"
+                          onClick={() => setExpandedSlug(expandedSlug === r.slug ? null : r.slug)}
+                          className="text-xs font-bold px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                         >
-                          {loading === `${r.slug}-activate` ? "…" : "Set Active"}
+                          {expandedSlug === r.slug ? "Close" : "Manage"}
                         </button>
-                        <button
-                          disabled={!!loading}
-                          onClick={() => doAction(r.slug, "suspend")}
-                          className="text-xs font-bold px-3 py-1.5 bg-gray-700 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 transition-colors"
+                        <a
+                          href={`/r/${r.slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-bold px-2 py-1 bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-lg transition-colors"
                         >
-                          {loading === `${r.slug}-suspend` ? "…" : "Suspend"}
-                        </button>
-                        <button
-                          disabled={!!loading}
-                          onClick={() => doAction(r.slug, "expire")}
-                          className="text-xs font-bold px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-500 disabled:opacity-50 transition-colors"
+                          View ↗
+                        </a>
+                        <a
+                          href={`/admin/${r.slug}/dashboard`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-bold px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors"
                         >
-                          {loading === `${r.slug}-expire` ? "…" : "Mark Expired"}
-                        </button>
-                        <select
-                          defaultValue={r.planId}
-                          onChange={(e) => doAction(r.slug, "changePlan", { planId: e.target.value })}
-                          className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white outline-none text-xs font-bold"
-                        >
-                          <option value="" disabled>Change plan…</option>
-                          <option value="pro">Restaflow Pro</option>
-                        </select>
+                          Admin ↗
+                        </a>
                       </div>
                     </td>
                   </tr>
-                )}
-              </>
-            ))}
-          </tbody>
-        </table>
+                  {expandedSlug === r.slug && (
+                    <tr key={`${r.slug}-expanded`}>
+                      <td colSpan={6} className="px-4 py-4 bg-gray-50 border-b border-gray-100">
+                        <div className="flex flex-wrap gap-3 items-center">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              value={extendDays}
+                              onChange={(e) => setExtendDays(Number(e.target.value))}
+                              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-20 outline-none"
+                              min={1}
+                              max={365}
+                            />
+                            <button
+                              disabled={!!loading}
+                              onClick={() => doAction(r.slug, "extend", { days: extendDays })}
+                              className="text-xs font-bold px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-500 disabled:opacity-50 transition-colors"
+                            >
+                              {loading === `${r.slug}-extend` ? "…" : "Extend"}
+                            </button>
+                          </div>
+                          <button
+                            disabled={!!loading}
+                            onClick={() => doAction(r.slug, "activate")}
+                            className="text-xs font-bold px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50 transition-colors"
+                          >
+                            {loading === `${r.slug}-activate` ? "…" : "Set Active"}
+                          </button>
+                          <button
+                            disabled={!!loading}
+                            onClick={() => doAction(r.slug, "suspend")}
+                            className="text-xs font-bold px-3 py-1.5 bg-gray-700 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 transition-colors"
+                          >
+                            {loading === `${r.slug}-suspend` ? "…" : "Suspend"}
+                          </button>
+                          <button
+                            disabled={!!loading}
+                            onClick={() => doAction(r.slug, "expire")}
+                            className="text-xs font-bold px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-500 disabled:opacity-50 transition-colors"
+                          >
+                            {loading === `${r.slug}-expire` ? "…" : "Mark Expired"}
+                          </button>
+                          <select
+                            defaultValue={r.planId}
+                            onChange={(e) => doAction(r.slug, "changePlan", { planId: e.target.value })}
+                            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white outline-none text-xs font-bold"
+                          >
+                            <option value="" disabled>Change plan…</option>
+                            <option value="pro">Restaflow Pro</option>
+                          </select>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {/* Mobile cards */}
+        <div className="md:hidden divide-y divide-gray-100">
+          {filtered.map((r) => (
+            <div key={r.slug}>
+              <div className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-gray-900">{r.name}</p>
+                    <p className="text-xs text-gray-400">{r.slug}</p>
+                    {r.email && <p className="text-xs text-gray-400 truncate">{r.email}</p>}
+                  </div>
+                  <span className={`text-xs font-medium px-2 py-1 rounded-full shrink-0 ${STATUS_COLORS[r.status] ?? "bg-gray-100 text-gray-600"}`}>
+                    {r.status}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                  <span>Plan: <span className="font-medium text-gray-700">{r.planName}</span></span>
+                  <span>Ends: <span className="font-medium text-gray-700">{fmtDate(r.endDate)}</span></span>
+                  <span>Joined: <span className="font-medium text-gray-700">{fmtDate(r.createdAt)}</span></span>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    onClick={() => setExpandedSlug(expandedSlug === r.slug ? null : r.slug)}
+                    className="text-xs font-bold px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  >
+                    {expandedSlug === r.slug ? "Close" : "Manage"}
+                  </button>
+                  <a
+                    href={`/r/${r.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-bold px-3 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-lg transition-colors"
+                  >
+                    View ↗
+                  </a>
+                  <a
+                    href={`/admin/${r.slug}/dashboard`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-bold px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors"
+                  >
+                    Admin ↗
+                  </a>
+                </div>
+              </div>
+              {expandedSlug === r.slug && (
+                <div className="px-4 pb-4 pt-2 bg-gray-50 border-t border-gray-100">
+                  <div className="flex flex-wrap gap-3 items-center">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={extendDays}
+                        onChange={(e) => setExtendDays(Number(e.target.value))}
+                        className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-20 outline-none"
+                        min={1}
+                        max={365}
+                      />
+                      <button
+                        disabled={!!loading}
+                        onClick={() => doAction(r.slug, "extend", { days: extendDays })}
+                        className="text-xs font-bold px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-500 disabled:opacity-50 transition-colors"
+                      >
+                        {loading === `${r.slug}-extend` ? "…" : "Extend"}
+                      </button>
+                    </div>
+                    <button
+                      disabled={!!loading}
+                      onClick={() => doAction(r.slug, "activate")}
+                      className="text-xs font-bold px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50 transition-colors"
+                    >
+                      {loading === `${r.slug}-activate` ? "…" : "Set Active"}
+                    </button>
+                    <button
+                      disabled={!!loading}
+                      onClick={() => doAction(r.slug, "suspend")}
+                      className="text-xs font-bold px-3 py-1.5 bg-gray-700 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50 transition-colors"
+                    >
+                      {loading === `${r.slug}-suspend` ? "…" : "Suspend"}
+                    </button>
+                    <button
+                      disabled={!!loading}
+                      onClick={() => doAction(r.slug, "expire")}
+                      className="text-xs font-bold px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-500 disabled:opacity-50 transition-colors"
+                    >
+                      {loading === `${r.slug}-expire` ? "…" : "Mark Expired"}
+                    </button>
+                    <select
+                      defaultValue={r.planId}
+                      onChange={(e) => doAction(r.slug, "changePlan", { planId: e.target.value })}
+                      className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white outline-none text-xs font-bold"
+                    >
+                      <option value="" disabled>Change plan…</option>
+                      <option value="pro">Restaflow Pro</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
         {filtered.length === 0 && (
           <div className="py-16 text-center text-gray-400 text-sm font-medium">No restaurants match your filters.</div>
         )}

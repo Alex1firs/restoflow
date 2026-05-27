@@ -182,69 +182,121 @@ export default function StaffClient({ slug }: { slug: string }) {
         {loading ? (
           <div className="py-16 text-center text-gray-400 text-sm">Loading staff…</div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                {["Member", "Role", "Status", "Added", "Actions"].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {staff.map((s) => (
-                <tr key={s.uid} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <p className="font-bold text-gray-900">{s.displayName || s.email}</p>
-                    {s.displayName && <p className="text-xs text-gray-400">{s.email}</p>}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${ROLE_COLORS[s.role] ?? "bg-gray-100 text-gray-600"}`}>
-                      {ROLE_LABELS[s.role] ?? s.role}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${s.disabled ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
-                      {s.disabled ? "Disabled" : "Active"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(s.createdAt)}</td>
-                  <td className="px-4 py-3">
-                    {s.role === "owner" ? (
-                      <span className="text-xs text-gray-400">—</span>
-                    ) : (
-                      <div className="flex gap-1.5 flex-wrap">
-                        {s.role !== "owner" && (
-                          <select
-                            value={s.role}
-                            disabled={!!actionLoading}
-                            onChange={(e) => updateStaff(s.uid, { role: e.target.value })}
-                            className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white outline-none"
-                          >
-                            <option value="staff">Staff</option>
-                            <option value="manager">Manager</option>
-                          </select>
+          <>
+            <div className="hidden md:block">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-100">
+                  <tr>
+                    {["Member", "Role", "Status", "Added", "Actions"].map((h) => (
+                      <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {staff.map((s) => (
+                    <tr key={s.uid} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <p className="font-bold text-gray-900">{s.displayName || s.email}</p>
+                        {s.displayName && <p className="text-xs text-gray-400">{s.email}</p>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs font-bold uppercase px-2 py-1 rounded-full ${ROLE_COLORS[s.role] ?? "bg-gray-100 text-gray-600"}`}>
+                          {ROLE_LABELS[s.role] ?? s.role}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs font-bold uppercase px-2 py-1 rounded-full ${s.disabled ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+                          {s.disabled ? "Disabled" : "Active"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(s.createdAt)}</td>
+                      <td className="px-4 py-3">
+                        {s.role === "owner" ? (
+                          <span className="text-xs text-gray-400">—</span>
+                        ) : (
+                          <div className="flex gap-1.5 flex-wrap">
+                            {s.role !== "owner" && (
+                              <select
+                                value={s.role}
+                                disabled={!!actionLoading}
+                                onChange={(e) => updateStaff(s.uid, { role: e.target.value })}
+                                className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white outline-none"
+                              >
+                                <option value="staff">Staff</option>
+                                <option value="manager">Manager</option>
+                              </select>
+                            )}
+                            <button
+                              disabled={!!actionLoading}
+                              onClick={() => updateStaff(s.uid, { disabled: !s.disabled })}
+                              className={`text-xs font-bold px-2 py-1 rounded-lg transition-colors disabled:opacity-50 ${s.disabled ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-amber-100 text-amber-700 hover:bg-amber-200"}`}
+                            >
+                              {s.disabled ? "Enable" : "Disable"}
+                            </button>
+                            <button
+                              disabled={!!actionLoading}
+                              onClick={() => deleteStaff(s.uid)}
+                              className="text-xs font-bold px-2 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         )}
-                        <button
-                          disabled={!!actionLoading}
-                          onClick={() => updateStaff(s.uid, { disabled: !s.disabled })}
-                          className={`text-xs font-bold px-2 py-1 rounded-lg transition-colors disabled:opacity-50 ${s.disabled ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-amber-100 text-amber-700 hover:bg-amber-200"}`}
-                        >
-                          {s.disabled ? "Enable" : "Disable"}
-                        </button>
-                        <button
-                          disabled={!!actionLoading}
-                          onClick={() => deleteStaff(s.uid)}
-                          className="text-xs font-bold px-2 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="md:hidden divide-y divide-gray-50">
+              {staff.map((s) => (
+                <div key={s.uid} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-gray-900">{s.displayName || s.email}</p>
+                      {s.displayName && <p className="text-xs text-gray-400 truncate">{s.email}</p>}
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full ${ROLE_COLORS[s.role] ?? "bg-gray-100 text-gray-600"}`}>
+                        {ROLE_LABELS[s.role] ?? s.role}
+                      </span>
+                      <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full ${s.disabled ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+                        {s.disabled ? "Disabled" : "Active"}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400">Added: {fmtDate(s.createdAt)}</p>
+                  {s.role !== "owner" && (
+                    <div className="flex flex-wrap gap-2">
+                      <select
+                        value={s.role}
+                        disabled={!!actionLoading}
+                        onChange={(e) => updateStaff(s.uid, { role: e.target.value })}
+                        className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white outline-none"
+                      >
+                        <option value="staff">Staff</option>
+                        <option value="manager">Manager</option>
+                      </select>
+                      <button
+                        disabled={!!actionLoading}
+                        onClick={() => updateStaff(s.uid, { disabled: !s.disabled })}
+                        className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${s.disabled ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-amber-100 text-amber-700 hover:bg-amber-200"}`}
+                      >
+                        {s.disabled ? "Enable" : "Disable"}
+                      </button>
+                      <button
+                        disabled={!!actionLoading}
+                        onClick={() => deleteStaff(s.uid)}
+                        className="text-xs font-bold px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
         {!loading && staff.length === 0 && (
           <div className="py-16 text-center text-gray-400 text-sm">No staff members yet. Add your first one above.</div>

@@ -123,7 +123,7 @@ export default function ReviewsClient({ restaurants }: { restaurants: ReviewRest
                         Score {r.setupScore}/100
                       </div>
                     </div>
-                    <span className="text-[10px] font-black uppercase px-3 py-1 rounded-full bg-blue-100 text-blue-700 tracking-widest">
+                    <span className="text-xs font-black uppercase px-3 py-1 rounded-full bg-blue-100 text-blue-700 tracking-widest">
                       Pending Review
                     </span>
                   </div>
@@ -160,7 +160,7 @@ export default function ReviewsClient({ restaurants }: { restaurants: ReviewRest
                   />
                   <div>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Subscription</p>
-                    <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${SUB_STATUS_COLORS[r.subscriptionStatus] ?? "bg-gray-100 text-gray-600"}`}>
+                    <span className={`text-xs font-bold uppercase px-2 py-1 rounded-full ${SUB_STATUS_COLORS[r.subscriptionStatus] ?? "bg-gray-100 text-gray-600"}`}>
                       {r.subscriptionStatus}
                     </span>
                   </div>
@@ -272,7 +272,7 @@ export default function ReviewsClient({ restaurants }: { restaurants: ReviewRest
                           +{item.points}
                         </span>
                         {item.required && !item.passed && (
-                          <span className="shrink-0 text-[9px] font-black text-red-500 uppercase tracking-wide">req</span>
+                          <span className="shrink-0 text-xs font-black text-red-500 uppercase tracking-wide">req</span>
                         )}
                       </div>
                     ))}

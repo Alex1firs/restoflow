@@ -223,14 +223,14 @@ export default function ReportsClient({ slug }: { slug: string }) {
                 <div className="bg-white rounded-2xl border border-gray-100 p-4">
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Avg. Accept Time</p>
                   <p className="text-xl font-black text-blue-600">{summary.avgPrepMinutes}m</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">received → preparing</p>
+                  <p className="text-xs text-gray-400 mt-0.5">received → preparing</p>
                 </div>
               )}
               {summary.avgReadyMinutes !== null && (
                 <div className="bg-white rounded-2xl border border-gray-100 p-4">
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Avg. Prep Time</p>
                   <p className="text-xl font-black text-green-600">{summary.avgReadyMinutes}m</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">received → ready</p>
+                  <p className="text-xs text-gray-400 mt-0.5">received → ready</p>
                 </div>
               )}
             </div>
@@ -265,60 +265,103 @@ export default function ReportsClient({ slug }: { slug: string }) {
             {orders.length === 0 ? (
               <div className="py-16 text-center text-gray-400 text-sm">No orders in this period.</div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-100">
-                    <tr>
-                      {["Date", "Customer", "Items", "Total", "Payment", "Status", "Type", "Source", "Table"].map((h) => (
-                        <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-widest whitespace-nowrap">{h}</th>
+              <>
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-100">
+                      <tr>
+                        {["Date", "Customer", "Items", "Total", "Payment", "Status", "Type", "Source", "Table"].map((h) => (
+                          <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {orders.map((o) => (
+                        <tr key={o.orderId} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{o.date}</td>
+                          <td className="px-4 py-3">
+                            <p className="font-bold text-gray-900">{o.customerName || "—"}</p>
+                            {o.phone && <p className="text-xs text-gray-400">{o.phone}</p>}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 text-xs max-w-[200px] truncate" title={o.items}>{o.items || "—"}</td>
+                          <td className="px-4 py-3 font-bold text-gray-900 whitespace-nowrap">{fmt(o.total)}</td>
+                          <td className="px-4 py-3">
+                            <span className={`text-xs font-bold uppercase px-2 py-1 rounded-full ${o.paymentMethod === "online" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>
+                              {o.paymentMethod}
+                            </span>
+                            {o.paymentMethod === "online" && (
+                              <span className={`ml-1 text-xs font-bold uppercase px-2 py-1 rounded-full ${o.paymentStatus === "paid" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+                                {o.paymentStatus}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`text-xs font-bold uppercase px-2 py-1 rounded-full ${STATUS_COLORS[o.status] ?? "bg-gray-100 text-gray-600"}`}>
+                              {o.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-gray-500 capitalize">{o.deliveryType || "—"}</td>
+                          <td className="px-4 py-3">
+                            <span className={`text-xs font-bold uppercase px-2 py-1 rounded-full ${o.orderSource === "counter" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"}`}>
+                              {o.orderSource === "counter" ? "Counter" : "Online"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {o.serviceMode === "dine_in" && o.tableLabel ? (
+                              <span className="text-xs font-bold px-2 py-1 rounded-full bg-teal-100 text-teal-700">
+                                {o.tableLabel}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-300">—</span>
+                            )}
+                          </td>
+                        </tr>
                       ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {orders.map((o) => (
-                      <tr key={o.orderId} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{o.date}</td>
-                        <td className="px-4 py-3">
+                    </tbody>
+                  </table>
+                </div>
+                <div className="md:hidden divide-y divide-gray-50">
+                  {orders.map((o) => (
+                    <div key={o.orderId} className="p-4 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
                           <p className="font-bold text-gray-900">{o.customerName || "—"}</p>
                           {o.phone && <p className="text-xs text-gray-400">{o.phone}</p>}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 text-xs max-w-[200px] truncate" title={o.items}>{o.items || "—"}</td>
-                        <td className="px-4 py-3 font-bold text-gray-900 whitespace-nowrap">{fmt(o.total)}</td>
-                        <td className="px-4 py-3">
-                          <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${o.paymentMethod === "online" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>
+                        </div>
+                        <p className="text-xs text-gray-400 shrink-0">{o.date}</p>
+                      </div>
+                      {o.items && (
+                        <p className="text-xs text-gray-500 line-clamp-2">{o.items}</p>
+                      )}
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-bold text-gray-900">{fmt(o.total)}</p>
+                        <div className="flex flex-wrap gap-1 justify-end">
+                          <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full ${o.paymentMethod === "online" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>
                             {o.paymentMethod}
                           </span>
                           {o.paymentMethod === "online" && (
-                            <span className={`ml-1 text-[10px] font-bold uppercase px-2 py-1 rounded-full ${o.paymentStatus === "paid" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+                            <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full ${o.paymentStatus === "paid" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
                               {o.paymentStatus}
                             </span>
                           )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${STATUS_COLORS[o.status] ?? "bg-gray-100 text-gray-600"}`}>
+                          <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full ${STATUS_COLORS[o.status] ?? "bg-gray-100 text-gray-600"}`}>
                             {o.status}
                           </span>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-gray-500 capitalize">{o.deliveryType || "—"}</td>
-                        <td className="px-4 py-3">
-                          <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${o.orderSource === "counter" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"}`}>
-                            {o.orderSource === "counter" ? "Counter" : "Online"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          {o.serviceMode === "dine_in" && o.tableLabel ? (
-                            <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-teal-100 text-teal-700">
-                              {o.tableLabel}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-gray-300">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 items-center">
+                        {o.deliveryType && <span className="text-xs text-gray-400 capitalize">{o.deliveryType}</span>}
+                        <span className={`text-xs font-bold uppercase px-1.5 py-0.5 rounded ${o.orderSource === "counter" ? "bg-orange-50 text-orange-600" : "bg-blue-50 text-blue-600"}`}>
+                          {o.orderSource === "counter" ? "Counter" : "Online"}
+                        </span>
+                        {o.serviceMode === "dine_in" && o.tableLabel && (
+                          <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-teal-50 text-teal-700">{o.tableLabel}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </>

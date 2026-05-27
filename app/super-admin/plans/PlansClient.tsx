@@ -96,7 +96,7 @@ export default function PlansClient({ plans }: { plans: Plan[] }) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {plans.map((plan) => (
           <div key={plan.id} className={`bg-white rounded-2xl border p-6 ${plan.popular ? "border-orange-300 shadow-md" : "border-gray-100"}`}>
-            {plan.popular && <span className="text-[10px] font-black uppercase bg-orange-600 text-white px-2 py-0.5 rounded-full mb-3 inline-block">Popular</span>}
+            {plan.popular && <span className="text-xs font-black uppercase bg-orange-600 text-white px-2 py-0.5 rounded-full mb-3 inline-block">Popular</span>}
             {editing === plan.id ? (
               <div className="space-y-3">
                 <div><label className="text-xs font-bold text-gray-500">Name</label><input defaultValue={plan.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm mt-1 outline-none" /></div>
