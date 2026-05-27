@@ -27,7 +27,7 @@ async function run() {
       "POS & counter orders",
       "Table service & open dine-in tabs",
       "Direct Paystack payments",
-      "WhatsApp order notifications",
+      "Telegram order notifications",
       "Reports & analytics",
       "Custom restaurant branding",
       "Priority support",
