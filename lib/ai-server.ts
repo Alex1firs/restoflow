@@ -1,25 +1,18 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export const AI_MODEL = "claude-haiku-4-5-20251001";
-export const AI_MAX_TOKENS = 256;
+export const AI_MODEL = "gemini-1.5-flash";
 
-let _client: Anthropic | null = null;
+let _genai: GoogleGenerativeAI | null = null;
 
-export function getAnthropicClient(): Anthropic | null {
-  if (!process.env.ANTHROPIC_API_KEY?.trim()) return null;
-  if (!_client) _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  return _client;
+export function isAiConfigured(): boolean {
+  return !!process.env.GEMINI_API_KEY?.trim();
 }
 
 export async function generateText(prompt: string): Promise<string> {
-  const client = getAnthropicClient();
-  if (!client) throw new Error("AI not configured");
-  const msg = await client.messages.create({
-    model: AI_MODEL,
-    max_tokens: AI_MAX_TOKENS,
-    messages: [{ role: "user", content: prompt }],
-  });
-  const block = msg.content[0];
-  return block.type === "text" ? block.text.trim() : "";
+  if (!process.env.GEMINI_API_KEY?.trim()) throw new Error("AI not configured");
+  if (!_genai) _genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  const model = _genai.getGenerativeModel({ model: AI_MODEL });
+  const result = await model.generateContent(prompt);
+  return result.response.text().trim();
 }

@@ -82,7 +82,7 @@ If `RESEND_API_KEY` is not set the app still works — reset links fall back to 
 ### AI helpers (optional — Phase D)
 | Variable | Value |
 |---|---|
-| `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) → API Keys. Powers "Generate with AI" / "Improve with AI" buttons in the admin (restaurant description, menu descriptions, category suggestions, welcome text). If not set, all AI helper buttons are hidden and setup works normally without them. Uses `claude-haiku-4-5-20251001` (fast, low cost). |
+| `GEMINI_API_KEY` | [aistudio.google.com](https://aistudio.google.com) → Get API Key. Free tier available — no credit card required. Powers "Generate with AI" / "Improve with AI" buttons in the admin (restaurant description, menu descriptions, category suggestions, welcome text). If not set, all AI helper buttons are hidden and setup works normally without them. Uses `gemini-1.5-flash`. |
 
 ### Optional integrations
 | Variable | Value |

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-server";
-import { getAnthropicClient, generateText } from "@/lib/ai-server";
+import { isAiConfigured, generateText } from "@/lib/ai-server";
 
 export async function POST(req: NextRequest) {
-  if (!getAnthropicClient()) {
+  if (!isAiConfigured()) {
     return NextResponse.json({ error: "ai_not_configured" }, { status: 503 });
   }
 
