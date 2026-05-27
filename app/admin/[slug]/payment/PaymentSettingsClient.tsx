@@ -85,7 +85,7 @@ export default function PaymentSettingsClient({ current }: { current: CurrentSet
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-black text-gray-900">Payment Settings</h1>
+        <h1 className="text-2xl font-black text-gray-900">Payment Settings</h1>
         <p className="text-gray-500 font-medium mt-1">
           Connect your bank account to receive online payments directly from customers.
         </p>

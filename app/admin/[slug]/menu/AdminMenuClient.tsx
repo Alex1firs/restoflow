@@ -182,7 +182,7 @@ export default function AdminMenuClient({ restaurant, aiEnabled = false }: Props
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-black text-gray-900">Menu Management</h1>
+          <h1 className="text-2xl font-black text-gray-900">Menu Management</h1>
           <p className="text-gray-500 font-medium">{restaurant.name}</p>
         </div>
         {!showForm && (

@@ -31,7 +31,7 @@ export default async function SuperAdminPaymentsPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-black text-gray-900">Platform Payments</h1>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Total Payments</p>
           <p className="text-2xl font-black text-gray-900">{payments.length}</p>
