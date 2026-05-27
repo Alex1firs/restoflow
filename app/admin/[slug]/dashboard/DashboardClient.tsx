@@ -62,13 +62,63 @@ const STATUS_CONFIG: Record<OrderStatus, { label: string; dot: string; badge: st
 
 const ACTIVE_STATUSES: OrderStatus[] = ["pending", "preparing", "ready"];
 
+const ITEM_ACTION: Record<string, { actionUrl: (slug: string) => string; actionLabel: string; friendlyText: string }> = {
+  name: {
+    actionUrl: (s) => `/admin/${s}/settings#branding`,
+    actionLabel: "Set Name",
+    friendlyText: "Your restaurant name is the first thing customers see. Make it clear and memorable.",
+  },
+  description: {
+    actionUrl: (s) => `/admin/${s}/settings#branding`,
+    actionLabel: "Add Description",
+    friendlyText: "A short description helps customers understand what kind of food you offer and builds trust.",
+  },
+  phone: {
+    actionUrl: (s) => `/admin/${s}/settings#business-info`,
+    actionLabel: "Add Phone Number",
+    friendlyText: "Your phone number lets customers reach you and shows you're a real, accessible business.",
+  },
+  address: {
+    actionUrl: (s) => `/admin/${s}/settings#business-info`,
+    actionLabel: "Add Address",
+    friendlyText: "Your address is needed for delivery and helps customers find or verify your location.",
+  },
+  openingHours: {
+    actionUrl: (s) => `/admin/${s}/settings#business-info`,
+    actionLabel: "Set Opening Hours",
+    friendlyText: "Customers need to know when they can place orders. Set at least one open day.",
+  },
+  menuItems: {
+    actionUrl: (s) => `/admin/${s}/menu`,
+    actionLabel: "Add Menu Items",
+    friendlyText: "Start with your best-selling meals. Use clear names, fair prices, and good food photos.",
+  },
+  logo: {
+    actionUrl: (s) => `/admin/${s}/settings#branding`,
+    actionLabel: "Upload Logo",
+    friendlyText: "A logo makes your store look professional and helps customers recognize your brand.",
+  },
+  coverImage: {
+    actionUrl: (s) => `/admin/${s}/settings#branding`,
+    actionLabel: "Upload Cover Photo",
+    friendlyText: "Your cover photo is your restaurant's first impression. Use an appetizing food or restaurant shot.",
+  },
+  payment: {
+    actionUrl: (s) => `/admin/${s}/payment`,
+    actionLabel: "Set Up Payments",
+    friendlyText: "Add your bank details so online payments from customers are settled directly to your account.",
+  },
+};
+
 export default function DashboardClient({ slug, status = "draft", rejectionReason, setupChecklist }: Props) {
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [checklistExpanded, setChecklistExpanded] = useState(!setupChecklist?.canSubmit);
+  const [isRequestingHelp, setIsRequestingHelp] = useState(false);
+  const [helpRequestSent, setHelpRequestSent] = useState(false);
+  const [helpRequestError, setHelpRequestError] = useState<string | null>(null);
   const startOfDayRef = useRef(getLagosStartOfDay());
 
   useEffect(() => {
@@ -146,10 +196,32 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
     }
   };
 
+  const requestSetupHelp = async () => {
+    setIsRequestingHelp(true);
+    setHelpRequestError(null);
+    try {
+      const res = await fetch("/api/admin/restaurants/assistance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ setupScore: setupChecklist?.score ?? null }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error((d as { error?: string }).error ?? "Failed to send request");
+      }
+      setHelpRequestSent(true);
+      setTimeout(() => setHelpRequestSent(false), 8000);
+    } catch (e: unknown) {
+      setHelpRequestError(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      setIsRequestingHelp(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
 
-      {/* Success toast */}
+      {/* Submit success toast */}
       {submitSuccess && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4 pointer-events-none">
           <div className="bg-white border border-green-200 shadow-2xl rounded-2xl px-5 py-4 flex items-start gap-3 pointer-events-auto">
@@ -162,6 +234,25 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
               <p className="text-sm font-black text-gray-900">Submitted for review</p>
               <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
                 Your restaurant has been sent to the RestoFlow team. We&apos;ll notify you once it is approved.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Help request success toast */}
+      {helpRequestSent && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4 pointer-events-none">
+          <div className="bg-white border border-blue-200 shadow-2xl rounded-2xl px-5 py-4 flex items-start gap-3 pointer-events-auto">
+            <div className="shrink-0 w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-black text-gray-900">Help request sent</p>
+              <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                Setup assistance requested. Our team will reach out to help you complete your store.
               </p>
             </div>
           </div>
@@ -202,176 +293,210 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
           ))}
         </div>
 
-        {/* Setup Status Banner */}
-        {status !== "live" && (
-          <div className={`rounded-2xl border ${
-            status === "rejected"      ? "bg-red-50 border-red-200" :
-            status === "suspended"     ? "bg-red-50 border-red-200" :
-            status === "pending_review" ? "bg-blue-50 border-blue-200" :
-            "bg-orange-50 border-orange-200"
+        {/* ── Pending / Suspended: simple info banner ── */}
+        {(status === "pending_review" || status === "suspended") && (
+          <div className={`rounded-2xl border p-5 ${
+            status === "suspended" ? "bg-red-50 border-red-200" : "bg-blue-50 border-blue-200"
           }`}>
-            <div className="p-5">
+            <h3 className={`font-black text-lg ${status === "suspended" ? "text-red-800" : "text-blue-800"}`}>
+              {status === "pending_review" ? "Pending Review" : "Account Suspended"}
+            </h3>
+            <p className={`text-sm mt-1 font-medium ${status === "suspended" ? "text-red-600" : "text-blue-600"}`}>
+              {status === "pending_review"
+                ? "Your restaurant has been submitted and is waiting for administrator approval."
+                : "Your restaurant has been suspended. Please contact support."}
+            </p>
+          </div>
+        )}
+
+        {/* ── Store Launch Assistant — shown when draft or rejected ── */}
+        {setupChecklist && (status === "draft" || status === "rejected") && (
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+
+            {/* Header */}
+            <div className="px-6 pt-6 pb-5 border-b border-gray-100">
+              {status === "rejected" && (
+                <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-3">
+                  <svg className="w-4 h-4 text-red-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <p className="text-xs font-black text-red-700">Your last submission was rejected</p>
+                    <p className="text-xs text-red-600 mt-0.5">{rejectionReason || "Please review your setup and resubmit."}</p>
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <h3 className={`font-black text-lg ${
-                    status === "rejected"      ? "text-red-800" :
-                    status === "suspended"     ? "text-red-800" :
-                    status === "pending_review" ? "text-blue-800" :
-                    "text-orange-800"
-                  }`}>
-                    {status === "draft"          && "Complete your setup"}
-                    {status === "pending_review" && "Pending Review"}
-                    {status === "rejected"       && "Review Rejected"}
-                    {status === "suspended"      && "Account Suspended"}
-                  </h3>
-                  <p className={`text-sm mt-1 font-medium ${
-                    status === "rejected"      ? "text-red-600" :
-                    status === "suspended"     ? "text-red-600" :
-                    status === "pending_review" ? "text-blue-600" :
-                    "text-orange-600"
-                  }`}>
-                    {status === "draft"          && "Your restaurant is currently in draft mode. Complete the checklist below, then submit for review."}
-                    {status === "pending_review" && "Your restaurant has been submitted and is waiting for administrator approval."}
-                    {status === "rejected"       && `Your submission was rejected: ${rejectionReason || "Please contact support."}`}
-                    {status === "suspended"      && "Your restaurant has been suspended. Please contact support."}
+                  <h3 className="text-xl font-black text-gray-900">Launch Your Store</h3>
+                  <p className="text-sm text-gray-500 font-medium mt-1">
+                    Complete the steps below to open your store to customers.
                   </p>
 
-                  {/* Score bar — shown when draft or rejected */}
-                  {setupChecklist && (status === "draft" || status === "rejected") && (
-                    <div className="mt-4">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs font-bold text-gray-600">Setup score</span>
-                        <span className={`text-xs font-black ${
-                          setupChecklist.score >= 80 ? "text-green-700" :
-                          setupChecklist.score >= 50 ? "text-orange-700" : "text-red-600"
-                        }`}>{setupChecklist.score}/100</span>
-                      </div>
-                      <div className="h-2 bg-white/60 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${
-                            setupChecklist.score >= 80 ? "bg-green-500" :
-                            setupChecklist.score >= 50 ? "bg-orange-400" : "bg-red-400"
-                          }`}
-                          style={{ width: `${setupChecklist.score}%` }}
-                        />
-                      </div>
-                      {!setupChecklist.canSubmit && (
-                        <p className="text-xs font-semibold text-red-600 mt-1.5">
-                          Complete all required steps to enable submission.
-                        </p>
-                      )}
+                  {/* Progress percentage */}
+                  <div className="mt-4">
+                    <p className={`text-sm font-black mb-2 ${
+                      setupChecklist.score >= 80 ? "text-green-700" :
+                      setupChecklist.score >= 50 ? "text-orange-600" : "text-gray-800"
+                    }`}>
+                      Your store is {setupChecklist.score}% ready.
+                    </p>
+                    <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden max-w-xs">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          setupChecklist.score >= 80 ? "bg-green-500" :
+                          setupChecklist.score >= 50 ? "bg-orange-400" : "bg-red-400"
+                        }`}
+                        style={{ width: `${setupChecklist.score}%` }}
+                      />
                     </div>
-                  )}
-                </div>
-
-                <div className="shrink-0 flex flex-col items-end gap-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <a
-                      href={`/admin/${slug}/preview`}
-                      target="_blank"
-                      className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors"
-                    >
-                      Preview Website
-                    </a>
-                    {(status === "draft" || status === "rejected") && (
-                      <button
-                        onClick={submitForReview}
-                        disabled={isSubmittingReview || (setupChecklist != null && !setupChecklist.canSubmit)}
-                        className="bg-gray-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        {isSubmittingReview ? "Submitting…" : status === "rejected" ? "Resubmit for Review" : "Submit for Review"}
-                      </button>
+                    {!setupChecklist.canSubmit && (
+                      <p className="text-xs text-gray-500 mt-1.5">
+                        Complete all required steps to submit for review.
+                      </p>
                     )}
                   </div>
-                  {/* Blocked hint */}
-                  {(status === "draft" || status === "rejected") && setupChecklist && !setupChecklist.canSubmit && (
-                    <p className="text-[11px] font-semibold text-red-500 text-right">
-                      Complete required setup items before submitting.
-                    </p>
-                  )}
-                  {/* Inline submission error */}
-                  {submitError && (
-                    <div className="bg-white border border-red-200 rounded-xl px-4 py-3 max-w-xs text-right">
-                      <p className="text-xs font-black text-red-700">Could not submit for review</p>
-                      <p className="text-xs text-red-500 mt-0.5">{submitError}</p>
-                    </div>
-                  )}
+                </div>
+
+                <div className="shrink-0 flex flex-wrap gap-2 items-start">
+                  <a
+                    href={`/r/${slug}`}
+                    target="_blank"
+                    className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors"
+                  >
+                    Preview Store
+                  </a>
+                  <button
+                    onClick={submitForReview}
+                    disabled={isSubmittingReview || !setupChecklist.canSubmit}
+                    className="bg-gray-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {isSubmittingReview ? "Submitting…" : status === "rejected" ? "Resubmit for Review" : "Submit for Review"}
+                  </button>
                 </div>
               </div>
+
+              {submitError && (
+                <div className="mt-3 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5">
+                  <p className="text-xs font-black text-red-700">Could not submit: {submitError}</p>
+                </div>
+              )}
             </div>
 
-            {/* Collapsible checklist — shown when draft or rejected */}
-            {setupChecklist && (status === "draft" || status === "rejected") && (
-              <div className={`border-t ${
-                status === "rejected" ? "border-red-200" : "border-orange-200"
-              }`}>
-                <button
-                  onClick={() => setChecklistExpanded((v) => !v)}
-                  className={`w-full flex items-center justify-between px-5 py-3 text-xs font-bold uppercase tracking-wide transition-colors ${
-                    status === "rejected"
-                      ? "text-red-700 hover:bg-red-100/50"
-                      : "text-orange-700 hover:bg-orange-100/50"
-                  }`}
-                >
-                  <span>Setup checklist</span>
-                  <svg
-                    className={`w-4 h-4 transition-transform ${checklistExpanded ? "rotate-180" : ""}`}
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
+            <div className="p-5 space-y-5">
 
-                {checklistExpanded && (
-                  <div className="px-5 pb-5 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {setupChecklist.items.map((item) => (
+              {/* Next recommended step */}
+              {(() => {
+                const nextStep =
+                  setupChecklist.items.find((i) => !i.passed && i.required) ??
+                  setupChecklist.items.find((i) => !i.passed);
+                if (!nextStep) return null;
+                const config = ITEM_ACTION[nextStep.key];
+                if (!config) return null;
+                return (
+                  <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5">
+                    <p className="text-[11px] font-black text-orange-500 uppercase tracking-widest mb-2">Next Recommended Step</p>
+                    <p className="text-sm font-black text-gray-900 mb-1">{nextStep.label}</p>
+                    <p className="text-xs text-gray-600 leading-relaxed mb-3">{config.friendlyText}</p>
+                    <a
+                      href={config.actionUrl(slug)}
+                      className="inline-flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-black px-4 py-2.5 rounded-xl transition-colors"
+                    >
+                      {config.actionLabel}
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </a>
+                  </div>
+                );
+              })()}
+
+              {/* All setup steps */}
+              <div>
+                <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3">All Setup Steps</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {setupChecklist.items.map((item) => {
+                    const config = ITEM_ACTION[item.key];
+                    return (
                       <div
                         key={item.key}
-                        className={`flex items-start gap-3 p-3 rounded-xl border ${
+                        className={`flex items-start gap-3 p-4 rounded-2xl border ${
                           item.passed
-                            ? "bg-white/70 border-gray-100"
+                            ? "bg-gray-50 border-gray-100"
                             : item.required
-                            ? "bg-red-50 border-red-200"
-                            : "bg-white/50 border-gray-100"
+                            ? "bg-white border-orange-100"
+                            : "bg-white border-gray-100"
                         }`}
                       >
                         <div className={`mt-0.5 shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
-                          item.passed ? "bg-green-100" : item.required ? "bg-red-100" : "bg-gray-100"
+                          item.passed ? "bg-green-100" : item.required ? "bg-orange-50 border border-orange-200" : "bg-gray-100"
                         }`}>
                           {item.passed ? (
                             <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                             </svg>
                           ) : (
-                            <svg className={`w-3 h-3 ${item.required ? "text-red-500" : "text-gray-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                            <svg className={`w-2.5 h-2.5 ${item.required ? "text-orange-400" : "text-gray-300"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                             </svg>
                           )}
                         </div>
-                        <div className="min-w-0">
-                          <p className={`text-xs font-bold ${
-                            item.passed ? "text-gray-700" : item.required ? "text-red-700" : "text-gray-500"
-                          }`}>
-                            {item.label}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className={`text-xs font-bold ${item.passed ? "text-gray-400 line-through" : "text-gray-900"}`}>
+                              {item.label}
+                            </p>
                             {item.required && !item.passed && (
-                              <span className="ml-1 text-[10px] font-black text-red-500 uppercase tracking-wide">Required</span>
+                              <span className="text-[10px] font-black text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded uppercase tracking-wide">Required</span>
                             )}
-                          </p>
-                          {!item.passed && (
-                            <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">{item.hint}</p>
+                          </div>
+                          {!item.passed && config && (
+                            <>
+                              <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">{config.friendlyText}</p>
+                              <a
+                                href={config.actionUrl(slug)}
+                                className="mt-2 inline-flex items-center gap-1 text-xs font-black text-orange-600 hover:text-orange-700 transition-colors"
+                              >
+                                {config.actionLabel}
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                                </svg>
+                              </a>
+                            </>
                           )}
                         </div>
-                        <span className={`ml-auto shrink-0 text-[10px] font-black ${
-                          item.passed ? "text-green-600" : "text-gray-400"
-                        }`}>
+                        <span className={`ml-auto shrink-0 text-[10px] font-black ${item.passed ? "text-green-500" : "text-gray-200"}`}>
                           +{item.points}
                         </span>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Request Setup Help */}
+              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-black text-gray-900">Need help setting up?</p>
+                  <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                    Our team can walk you through completing your store. Click below to request a setup call.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={requestSetupHelp}
+                  disabled={isRequestingHelp || helpRequestSent}
+                  className="shrink-0 bg-white border border-gray-300 hover:border-gray-400 text-gray-700 text-xs font-black px-5 py-2.5 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isRequestingHelp ? "Sending…" : helpRequestSent ? "Request Sent ✓" : "Request Setup Help"}
+                </button>
+                {helpRequestError && (
+                  <p className="text-xs font-bold text-red-500 sm:text-right">{helpRequestError}</p>
                 )}
               </div>
-            )}
+
+            </div>
           </div>
         )}
 

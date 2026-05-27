@@ -155,7 +155,16 @@ export default function SettingsClient({ restaurant }: Props) {
       <form onSubmit={handleSubmit} className="space-y-6">
 
         {/* ── SECTION 1: BRANDING ─────────────────────────────────── */}
-        <Section title="Branding" hint="This is what customers see on your ordering page">
+        <Section title="Branding" hint="This is what customers see on your ordering page" id="branding">
+          {/* Contextual help */}
+          <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-start gap-3">
+            <svg className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-xs text-blue-700 font-medium leading-relaxed">
+              Your logo and cover photo help customers recognize your restaurant. A professional look builds trust and encourages more orders.
+            </p>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <ImageUpload
               label="Logo"
@@ -262,7 +271,16 @@ export default function SettingsClient({ restaurant }: Props) {
         </Section>
 
         {/* ── SECTION 2: BUSINESS INFORMATION ─────────────────────── */}
-        <Section title="Business Information" hint="Helps customers find and trust you">
+        <Section title="Business Information" hint="Helps customers find and trust you" id="business-info">
+          {/* Contextual help */}
+          <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-start gap-3">
+            <svg className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-xs text-blue-700 font-medium leading-relaxed">
+              Your address and phone number help customers find you and place delivery orders. Set your opening hours so customers know when they can order.
+            </p>
+          </div>
           <Field label="Address">
             <input
               type="text"
@@ -583,14 +601,16 @@ const inputCls =
 function Section({
   title,
   hint,
+  id,
   children,
 }: {
   title: string;
   hint?: string;
+  id?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+    <section id={id} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm scroll-mt-6">
       <div className="mb-5">
         <h2 className="text-sm font-black text-gray-900 uppercase tracking-tight">{title}</h2>
         {hint && <p className="text-xs text-gray-400 mt-0.5">{hint}</p>}

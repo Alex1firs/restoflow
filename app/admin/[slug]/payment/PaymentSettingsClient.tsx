@@ -91,6 +91,16 @@ export default function PaymentSettingsClient({ current }: { current: CurrentSet
         </p>
       </div>
 
+      {/* Contextual help */}
+      <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-start gap-3 mb-6">
+        <svg className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <p className="text-xs text-blue-700 font-medium leading-relaxed">
+          Add your bank/payment details so online payments can be settled correctly to your account. Customers can still pay on delivery without this, but online payment unlocks more orders.
+        </p>
+      </div>
+
       {/* Status */}
       {subaccountCode ? (
         <div className="bg-green-50 border border-green-200 rounded-2xl p-5 mb-8 flex items-start gap-4">

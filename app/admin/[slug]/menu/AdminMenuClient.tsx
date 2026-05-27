@@ -155,7 +155,7 @@ export default function AdminMenuClient({ restaurant }: Props) {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-10">
+      <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-black text-gray-900">Menu Management</h1>
           <p className="text-gray-500 font-medium">{restaurant.name}</p>
@@ -170,6 +170,18 @@ export default function AdminMenuClient({ restaurant }: Props) {
           </button>
         )}
       </div>
+
+      {/* Contextual help */}
+      {!showForm && (
+        <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-start gap-3 mb-8">
+          <svg className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-xs text-blue-700 font-medium leading-relaxed">
+            Start with your best-selling meals. Use clear names, accurate prices, and good food images — customers are more likely to order when they can see what they&apos;re getting.
+          </p>
+        </div>
+      )}
 
       {showForm && (
         <div className="bg-white border rounded-3xl p-8 shadow-sm mb-12 animate-in fade-in slide-in-from-top-4 duration-300">
