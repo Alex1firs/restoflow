@@ -48,6 +48,7 @@ export default async function DashboardPage({ params }: Props) {
         status={(data.status as string) || "draft"}
         rejectionReason={data.rejectionReason as string | undefined}
         setupChecklist={setupChecklist}
+        assistanceStatus={(data.assistanceStatus as string) || undefined}
       />
     </div>
   );

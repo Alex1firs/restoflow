@@ -29,6 +29,7 @@ interface Props {
   status?: string;
   rejectionReason?: string;
   setupChecklist?: SetupChecklist;
+  assistanceStatus?: string;
 }
 
 function getLagosStartOfDay(): Date {
@@ -110,7 +111,7 @@ const ITEM_ACTION: Record<string, { actionUrl: (slug: string) => string; actionL
   },
 };
 
-export default function DashboardClient({ slug, status = "draft", rejectionReason, setupChecklist }: Props) {
+export default function DashboardClient({ slug, status = "draft", rejectionReason, setupChecklist, assistanceStatus }: Props) {
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
@@ -118,7 +119,7 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [isRequestingHelp, setIsRequestingHelp] = useState(false);
   const [helpRequestSent, setHelpRequestSent] = useState(false);
-  const [helpAlreadyOpen, setHelpAlreadyOpen] = useState(false);
+  const [helpAlreadyOpen, setHelpAlreadyOpen] = useState(assistanceStatus === "open");
   const [helpRequestError, setHelpRequestError] = useState<string | null>(null);
   const startOfDayRef = useRef(getLagosStartOfDay());
 
@@ -495,7 +496,9 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
                   <p className="text-sm font-black text-gray-900">Need help setting up?</p>
                   <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
                     {helpAlreadyOpen
-                      ? "Setup assistance has already been requested. Our team will reach out soon."
+                      ? "Setup assistance requested. Our team will reach out soon."
+                      : assistanceStatus === "resolved"
+                      ? "Your last setup assistance request was resolved. Need more help? Request again."
                       : "Our team can walk you through completing your store. Click below to request a setup call."}
                   </p>
                 </div>

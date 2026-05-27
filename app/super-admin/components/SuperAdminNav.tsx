@@ -13,6 +13,7 @@ const NAV = [
   { label: "Payments", href: "/super-admin/payments" },
   { label: "Plans", href: "/super-admin/plans" },
   { label: "Onboarding", href: "/super-admin/onboarding" },
+  { label: "Assistance", href: "/super-admin/assistance" },
 ];
 
 export default function SuperAdminNav() {
