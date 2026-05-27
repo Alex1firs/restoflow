@@ -478,7 +478,7 @@ export default function SettingsClient({ restaurant }: Props) {
                   <span>💡</span> How to link Telegram Alerts:
                 </div>
                 <ol className="list-decimal pl-4 space-y-1 text-orange-900">
-                  <li>Open Telegram and search for <a href="https://t.me/RestoFlowBot" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-orange-950">@RestoFlowBot</a>.</li>
+                  <li>Open Telegram and search for <a href="https://t.me/RestoFlowAlertBot" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-orange-950">@RestoFlowAlertBot</a>.</li>
                   <li>Click <strong>Start</strong> or send the message <code>/start</code>.</li>
                   <li>The bot will immediately reply with your numeric <strong>Chat ID</strong>.</li>
                   <li>Copy that number and paste it in the field below, then click &quot;Verify &amp; Link Bot&quot;.</li>
