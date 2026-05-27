@@ -44,7 +44,8 @@ export async function POST(req: NextRequest) {
         .slice(0, 8);
     }
     return NextResponse.json({ suggestions });
-  } catch {
+  } catch (e) {
+    console.error("[AI] category-suggestions failed:", e);
     return NextResponse.json({ error: "AI generation failed" }, { status: 500 });
   }
 }

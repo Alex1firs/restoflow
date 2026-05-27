@@ -27,7 +27,8 @@ export async function POST(req: NextRequest) {
   try {
     const suggestion = await generateText(prompt);
     return NextResponse.json({ suggestion });
-  } catch {
+  } catch (e) {
+    console.error("[AI] welcome-text failed:", e);
     return NextResponse.json({ error: "AI generation failed" }, { status: 500 });
   }
 }
