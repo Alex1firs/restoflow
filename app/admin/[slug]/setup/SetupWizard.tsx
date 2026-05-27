@@ -510,17 +510,17 @@ function StepGuidePanel({
       )}
 
       <div>
-        <p className="text-[11px] font-black text-blue-600 uppercase tracking-widest mb-1.5">What this step covers</p>
+        <p className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-1.5">What this step covers</p>
         <p className="text-sm text-gray-600 leading-relaxed">{guide.what}</p>
       </div>
 
       <div>
-        <p className="text-[11px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Why it matters</p>
+        <p className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-1.5">Why it matters</p>
         <p className="text-sm text-gray-600 leading-relaxed">{guide.why}</p>
       </div>
 
       <div>
-        <p className="text-[11px] font-black text-blue-600 uppercase tracking-widest mb-2">What to prepare</p>
+        <p className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">What to prepare</p>
         <ul className="space-y-1.5">
           {guide.prepare.map((item, i) => (
             <li key={i} className="flex items-start gap-2.5 text-sm text-gray-600">
@@ -532,7 +532,7 @@ function StepGuidePanel({
       </div>
 
       <div>
-        <p className="text-[11px] font-black text-blue-600 uppercase tracking-widest mb-2">Common mistakes to avoid</p>
+        <p className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">Common mistakes to avoid</p>
         <ul className="space-y-1.5">
           {guide.mistakes.map((item, i) => (
             <li key={i} className="flex items-start gap-2.5 text-sm text-gray-600">
@@ -630,7 +630,7 @@ function ReadinessGate({
 
       {/* Readiness checklist */}
       <div>
-        <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2">
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
           {allRequiredPassed ? "All required steps complete" : "Required steps"}
         </p>
         <div className="space-y-2">
@@ -675,7 +675,7 @@ function ReadinessGate({
 
       {/* Recommended (optional) items */}
       <div>
-        <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2">
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
           Recommended
         </p>
         <div className="space-y-2">
@@ -713,7 +713,7 @@ function ReadinessGate({
                     {item.label}
                   </span>
                   {!passed && (
-                    <span className="ml-auto text-[10px] font-black text-gray-400 uppercase tracking-wide">
+                    <span className="ml-auto text-xs font-medium text-gray-400">
                       Optional
                     </span>
                   )}

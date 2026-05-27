@@ -179,18 +179,18 @@ export default function AssistanceClient({ requests }: { requests: AssistanceReq
                   <div className="flex flex-wrap items-center gap-2 mb-1">
                     <h3 className="font-black text-gray-900">{r.name}</h3>
                     <span
-                      className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                      className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                         RESTAURANT_STATUS_COLORS[r.restaurantStatus] ?? "bg-gray-100 text-gray-600"
                       }`}
                     >
                       {r.restaurantStatus.replace(/_/g, " ")}
                     </span>
                     {r.assistanceStatus === "resolved" ? (
-                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">
                         Resolved
                       </span>
                     ) : (
-                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
                         Open
                       </span>
                     )}

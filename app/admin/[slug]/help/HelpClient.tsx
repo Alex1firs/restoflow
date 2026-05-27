@@ -108,7 +108,7 @@ export default function HelpClient({ slug }: { slug: string }) {
 
                   {/* What */}
                   <div>
-                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
                       What this step covers
                     </p>
                     <p className="text-sm text-gray-600 leading-relaxed">{guide.what}</p>
@@ -116,7 +116,7 @@ export default function HelpClient({ slug }: { slug: string }) {
 
                   {/* Why */}
                   <div>
-                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
                       Why it matters
                     </p>
                     <p className="text-sm text-gray-600 leading-relaxed">{guide.why}</p>
@@ -124,7 +124,7 @@ export default function HelpClient({ slug }: { slug: string }) {
 
                   {/* Prepare */}
                   <div>
-                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
                       What to prepare
                     </p>
                     <ul className="space-y-2">
@@ -139,7 +139,7 @@ export default function HelpClient({ slug }: { slug: string }) {
 
                   {/* Mistakes */}
                   <div>
-                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
                       Common mistakes to avoid
                     </p>
                     <ul className="space-y-2">

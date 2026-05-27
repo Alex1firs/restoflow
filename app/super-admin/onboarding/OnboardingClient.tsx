@@ -80,7 +80,7 @@ export default function OnboardingClient({ onboardings }: { onboardings: Onboard
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="font-black text-gray-900">{o.restaurantName}</h3>
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${STATUS_COLORS[o.status] ?? "bg-gray-100 text-gray-600"}`}>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[o.status] ?? "bg-gray-100 text-gray-600"}`}>
                     {o.status}
                   </span>
                 </div>

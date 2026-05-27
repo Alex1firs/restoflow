@@ -99,7 +99,7 @@ export default async function SuperAdminOverview() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
-          <h2 className="text-sm font-black text-gray-700 uppercase tracking-widest mb-4">Recent Signups</h2>
+          <h2 className="text-base font-semibold text-gray-800 mb-4">Recent Signups</h2>
           <div className="space-y-3">
             {recentSignups.map((r) => (
               <div key={r.slug} className="flex items-center justify-between">
@@ -115,7 +115,7 @@ export default async function SuperAdminOverview() {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
-          <h2 className="text-sm font-black text-gray-700 uppercase tracking-widest mb-4">Recent Payments</h2>
+          <h2 className="text-base font-semibold text-gray-800 mb-4">Recent Payments</h2>
           <div className="space-y-3">
             {displayPayments.map((p, i) => (
               <div key={i} className="flex items-center justify-between">
@@ -125,7 +125,7 @@ export default async function SuperAdminOverview() {
                 </div>
                 <div className="text-right">
                   <p className="font-bold text-sm text-gray-900">{fmtMoney(p.amount)}</p>
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${p.status === "completed" || p.status === "success" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${p.status === "completed" || p.status === "success" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
                     {p.status}
                   </span>
                 </div>

@@ -253,7 +253,7 @@ export default function AdminOrdersClient({ restaurant }: Props) {
                     <div className="flex justify-between items-start mb-4">
                       <div>
                         <span className="font-mono text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded font-bold">{order.id.slice(0, 8).toUpperCase()}</span>
-                        <p className="text-[10px] text-gray-400 mt-1 font-bold">{fmt(order.createdAt)}</p>
+                        <p className="text-xs text-gray-400 mt-1 font-medium">{fmt(order.createdAt)}</p>
                       </div>
                       <span className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase border ${cfg.badge}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
@@ -265,7 +265,7 @@ export default function AdminOrdersClient({ restaurant }: Props) {
                       <div className="bg-cyan-50 border border-cyan-100 px-3 py-2 rounded-xl mb-4 flex items-center gap-2">
                         <span className="text-cyan-600">🗓️</span>
                         <div>
-                          <p className="text-[10px] font-black text-cyan-700 uppercase mb-0.5">Scheduled For</p>
+                          <p className="text-xs font-bold text-cyan-700 uppercase mb-0.5">Scheduled For</p>
                           <p className="text-sm text-cyan-800 font-bold">
                             {typeof order.scheduledFor === "string" 
                               ? new Date(order.scheduledFor).toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" })
@@ -277,13 +277,13 @@ export default function AdminOrdersClient({ restaurant }: Props) {
 
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Customer</p>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Customer</p>
                         <p className="font-bold text-gray-900">{order.customerName}</p>
                         <p className="text-sm text-gray-500">{order.phone}</p>
                         <p className="text-xs text-gray-400 italic mt-0.5 leading-relaxed">{order.address}</p>
                       </div>
                       <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Items</p>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Items</p>
                         <div className="space-y-1">
                           {order.items.map((item, i) => (
                             <p key={i} className="text-sm text-gray-700">
@@ -296,7 +296,7 @@ export default function AdminOrdersClient({ restaurant }: Props) {
 
                     {order.note && (
                       <div className="bg-amber-50 border border-amber-100 px-3 py-2 rounded-xl">
-                        <p className="text-[10px] font-black text-amber-700 uppercase mb-0.5">Note</p>
+                        <p className="text-xs font-bold text-amber-700 uppercase mb-0.5">Note</p>
                         <p className="text-sm text-amber-800">{order.note}</p>
                       </div>
                     )}
@@ -308,13 +308,13 @@ export default function AdminOrdersClient({ restaurant }: Props) {
                     <div className="space-y-1.5">
                       <div className="flex justify-between text-xs">
                         <span className="text-gray-400 font-bold uppercase">Payment</span>
-                        <span className={`font-black uppercase px-2 py-0.5 rounded-full text-[10px] ${order.paymentMethod === "online" ? "bg-blue-100 text-blue-700" : "bg-gray-200 text-gray-600"}`}>
+                        <span className={`font-bold uppercase px-2 py-0.5 rounded-full text-xs ${order.paymentMethod === "online" ? "bg-blue-100 text-blue-700" : "bg-gray-200 text-gray-600"}`}>
                           {order.paymentMethod === "online" ? "Online" : "Cash"}
                         </span>
                       </div>
                       <div className="flex justify-between text-xs">
                         <span className="text-gray-400 font-bold uppercase">Status</span>
-                        <span className={`font-black uppercase px-2 py-0.5 rounded-full text-[10px] ${order.paymentStatus === "paid" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+                        <span className={`font-bold uppercase px-2 py-0.5 rounded-full text-xs ${order.paymentStatus === "paid" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
                           {order.paymentStatus === "paid" ? "Paid" : "Pending"}
                         </span>
                       </div>
@@ -405,7 +405,7 @@ function StatCard({ label, value, color }: { label: string; value: string; color
   };
   return (
     <div className={`border rounded-2xl p-4 ${colors[color]}`}>
-      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{label}</p>
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">{label}</p>
       <p className={`text-xl font-black ${textColors[color]}`}>{value}</p>
     </div>
   );

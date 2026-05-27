@@ -272,7 +272,7 @@ export default function AdminMenuClient({ restaurant, aiEnabled = false }: Props
                   )}
                   {categorySuggestions && categorySuggestions.length > 0 && (
                     <div className="mt-2 space-y-1.5">
-                      <p className="text-[11px] font-black text-orange-500 uppercase tracking-widest">Suggestions — tap to use</p>
+                      <p className="text-xs font-bold text-orange-500 uppercase tracking-wide">Suggestions — tap to use</p>
                       <div className="flex flex-wrap gap-1.5">
                         {categorySuggestions.map((cat) => (
                           <button
@@ -372,7 +372,7 @@ export default function AdminMenuClient({ restaurant, aiEnabled = false }: Props
                   </div>
                 )}
                 <div className="absolute top-4 left-4">
-                  <span className="bg-white/90 backdrop-blur-sm text-[10px] font-black uppercase px-2 py-1 rounded-lg text-gray-600 border border-white">
+                  <span className="bg-white/90 backdrop-blur-sm text-xs font-bold uppercase px-2 py-1 rounded-lg text-gray-600 border border-white">
                     {item.category}
                   </span>
                 </div>
@@ -387,7 +387,7 @@ export default function AdminMenuClient({ restaurant, aiEnabled = false }: Props
 
                 <div className="mt-auto space-y-4">
                   <div className="flex justify-between items-center bg-gray-50 p-2 rounded-xl">
-                    <span className={`text-[10px] font-black uppercase px-2 ${item.available ? 'text-green-600' : 'text-red-400'}`}>
+                    <span className={`text-xs font-bold uppercase px-2 ${item.available ? 'text-green-600' : 'text-red-400'}`}>
                       {item.available ? "Available" : "Sold Out"}
                     </span>
                     <button
@@ -401,13 +401,13 @@ export default function AdminMenuClient({ restaurant, aiEnabled = false }: Props
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       onClick={() => handleEdit(item)}
-                      className="text-xs font-bold py-2 border rounded-xl hover:bg-gray-50 transition-colors"
+                      className="text-sm font-bold py-2.5 border rounded-xl hover:bg-gray-50 transition-colors"
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => handleDelete(item.id)}
-                      className="text-xs font-bold py-2 border border-red-100 text-red-500 hover:bg-red-50 transition-colors rounded-xl"
+                      className="text-sm font-bold py-2.5 border border-red-100 text-red-500 hover:bg-red-50 transition-colors rounded-xl"
                     >
                       Delete
                     </button>

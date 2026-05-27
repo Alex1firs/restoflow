@@ -116,7 +116,7 @@ export default function RestaurantsClient({ restaurants }: { restaurants: Restau
                   </td>
                   <td className="px-4 py-3 text-gray-600 font-medium">{r.planName}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${STATUS_COLORS[r.status] ?? "bg-gray-100 text-gray-600"}`}>
+                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${STATUS_COLORS[r.status] ?? "bg-gray-100 text-gray-600"}`}>
                       {r.status}
                     </span>
                   </td>

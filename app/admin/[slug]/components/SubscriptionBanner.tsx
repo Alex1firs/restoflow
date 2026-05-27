@@ -21,7 +21,7 @@ export default function SubscriptionBanner({ subscription }: Props) {
       <div className="bg-red-50 border-b border-red-200 px-4 py-3">
         <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
-            <span className="bg-red-600 text-white text-[10px] font-black uppercase px-2 py-1 rounded shrink-0">
+            <span className="bg-red-600 text-white text-xs font-bold uppercase px-2 py-1 rounded shrink-0">
               Subscription Expired
             </span>
             <p className="text-sm font-medium text-red-800">
@@ -55,7 +55,7 @@ export default function SubscriptionBanner({ subscription }: Props) {
       <div className="bg-orange-50 border-b border-orange-300 px-4 py-3">
         <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
-            <span className="bg-orange-600 text-white text-[10px] font-black uppercase px-2 py-1 rounded shrink-0">
+            <span className="bg-orange-600 text-white text-xs font-bold uppercase px-2 py-1 rounded shrink-0">
               Grace Period
             </span>
             <p className="text-sm font-medium text-orange-900">
@@ -88,7 +88,7 @@ export default function SubscriptionBanner({ subscription }: Props) {
       <div className="bg-amber-50 border-b border-amber-200 px-4 py-3">
         <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
-            <span className="bg-amber-500 text-white text-[10px] font-black uppercase px-2 py-1 rounded shrink-0">
+            <span className="bg-amber-500 text-white text-xs font-bold uppercase px-2 py-1 rounded shrink-0">
               Free Trial
             </span>
             <p className="text-sm font-medium text-amber-800">
@@ -111,7 +111,7 @@ export default function SubscriptionBanner({ subscription }: Props) {
     <div className="bg-white border-b border-gray-100 px-4 py-2">
       <div className="max-w-6xl mx-auto flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="bg-green-100 text-green-700 text-[10px] font-black uppercase px-2 py-1 rounded">
+          <span className="bg-green-100 text-green-700 text-xs font-bold uppercase px-2 py-1 rounded">
             Active
           </span>
           <p className="text-xs font-medium text-gray-500">

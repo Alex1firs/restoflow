@@ -411,7 +411,7 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
                 if (!config) return null;
                 return (
                   <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5">
-                    <p className="text-[11px] font-black text-orange-500 uppercase tracking-widest mb-2">Next Recommended Step</p>
+                    <p className="text-xs font-bold text-orange-500 uppercase tracking-wide mb-2">Next Recommended Step</p>
                     <p className="text-sm font-black text-gray-900 mb-1">{nextStep.label}</p>
                     <p className="text-xs text-gray-600 leading-relaxed mb-3">{config.friendlyText}</p>
                     <a
@@ -429,7 +429,7 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
 
               {/* All setup steps */}
               <div>
-                <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3">All Setup Steps</p>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">All Setup Steps</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {setupChecklist.items.map((item) => {
                     const config = ITEM_ACTION[item.key];
@@ -463,12 +463,12 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
                               {item.label}
                             </p>
                             {item.required && !item.passed && (
-                              <span className="text-[10px] font-black text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded uppercase tracking-wide">Required</span>
+                              <span className="text-xs font-bold text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded uppercase tracking-wide">Required</span>
                             )}
                           </div>
                           {!item.passed && config && (
                             <>
-                              <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">{config.friendlyText}</p>
+                              <p className="text-xs text-gray-500 mt-0.5 leading-snug">{config.friendlyText}</p>
                               <a
                                 href={config.actionUrl(slug)}
                                 className="mt-2 inline-flex items-center gap-1 text-xs font-black text-orange-600 hover:text-orange-700 transition-colors"
@@ -481,7 +481,7 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
                             </>
                           )}
                         </div>
-                        <span className={`ml-auto shrink-0 text-[10px] font-black ${item.passed ? "text-green-500" : "text-gray-200"}`}>
+                        <span className={`ml-auto shrink-0 text-xs font-bold ${item.passed ? "text-green-500" : "text-gray-300"}`}>
                           +{item.points}
                         </span>
                       </div>
