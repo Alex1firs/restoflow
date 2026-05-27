@@ -13,6 +13,7 @@ import {
   doc
 } from "firebase/firestore";
 import ImageUpload from "@/app/components/ImageUpload";
+import AiTextHelper from "@/app/components/AiTextHelper";
 
 type MenuItem = {
   id: string;
@@ -25,6 +26,7 @@ type MenuItem = {
 };
 
 type Props = {
+  aiEnabled?: boolean;
   restaurant: {
     id: string;
     name: string;
@@ -36,7 +38,7 @@ function newImageId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export default function AdminMenuClient({ restaurant }: Props) {
+export default function AdminMenuClient({ restaurant, aiEnabled = false }: Props) {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -52,6 +54,8 @@ export default function AdminMenuClient({ restaurant }: Props) {
     available: true,
   });
   const [error, setError] = useState<string | null>(null);
+  const [categorySuggestions, setCategorySuggestions] = useState<string[] | null>(null);
+  const [fetchingCategories, setFetchingCategories] = useState(false);
 
   useEffect(() => {
     const q = query(
@@ -77,7 +81,28 @@ export default function AdminMenuClient({ restaurant }: Props) {
     setShowForm(false);
     setError(null);
     setImageId(newImageId());
+    setCategorySuggestions(null);
   };
+
+  async function suggestCategories() {
+    if (fetchingCategories) return;
+    setFetchingCategories(true);
+    setCategorySuggestions(null);
+    try {
+      const res = await fetch("/api/admin/ai/category-suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemNames: items.slice(0, 20).map((i) => i.name) }),
+      });
+      if (res.status === 503 || !res.ok) return;
+      const data = await res.json() as { suggestions?: string[] };
+      setCategorySuggestions(data.suggestions ?? []);
+    } catch {
+      // silently fail — setup still works without AI
+    } finally {
+      setFetchingCategories(false);
+    }
+  }
 
   const handleEdit = (item: MenuItem) => {
     setEditingItem(item);
@@ -219,10 +244,56 @@ export default function AdminMenuClient({ restaurant }: Props) {
                   <input
                     type="text"
                     value={formData.category}
-                    onChange={(e) => setFormData({...formData, category: e.target.value})}
+                    onChange={(e) => { setFormData({...formData, category: e.target.value}); setCategorySuggestions(null); }}
                     placeholder="e.g. Mains, Appetizers, Drinks"
                     className="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none"
                   />
+                  {aiEnabled && !categorySuggestions && (
+                    <button
+                      type="button"
+                      onClick={suggestCategories}
+                      disabled={fetchingCategories}
+                      className="inline-flex items-center gap-1.5 text-xs font-black text-orange-600 hover:text-orange-700 transition-colors mt-1.5 disabled:opacity-50"
+                    >
+                      {fetchingCategories ? (
+                        <>
+                          <div className="w-3.5 h-3.5 rounded-full border-2 border-orange-400 border-t-transparent animate-spin" />
+                          Suggesting…
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          Suggest categories with AI
+                        </>
+                      )}
+                    </button>
+                  )}
+                  {categorySuggestions && categorySuggestions.length > 0 && (
+                    <div className="mt-2 space-y-1.5">
+                      <p className="text-[11px] font-black text-orange-500 uppercase tracking-widest">Suggestions — tap to use</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {categorySuggestions.map((cat) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => { setFormData((f) => ({ ...f, category: cat })); setCategorySuggestions(null); }}
+                            className="text-xs font-black bg-orange-50 border border-orange-200 text-orange-700 hover:bg-orange-100 px-2.5 py-1 rounded-lg transition-colors"
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setCategorySuggestions(null)}
+                          className="text-xs font-black text-gray-400 hover:text-gray-600 px-2 py-1 transition-colors"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Description</label>
@@ -233,6 +304,17 @@ export default function AdminMenuClient({ restaurant }: Props) {
                     rows={4}
                     className="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none resize-none"
                   />
+                  {aiEnabled && (
+                    <AiTextHelper
+                      triggerLabel={formData.description ? "Improve with AI" : "Generate with AI"}
+                      endpoint="/api/admin/ai/menu-description"
+                      payload={() => ({
+                        itemName: formData.name,
+                        category: formData.category || undefined,
+                      })}
+                      onAccept={(text) => setFormData((f) => ({ ...f, description: text }))}
+                    />
+                  )}
                 </div>
               </div>
               <div className="space-y-4">

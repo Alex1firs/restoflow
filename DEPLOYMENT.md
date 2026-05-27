@@ -79,6 +79,11 @@ If `RESEND_API_KEY` is not set the app still works — reset links fall back to 
 | `TELEGRAM_BOT_TOKEN` | From @BotFather on Telegram. Required for per-restaurant order alerts. |
 | `ADMIN_TELEGRAM_CHAT_ID` | **Optional.** Telegram chat ID of the RestoFlow ops account or group. When set, the admin receives a Telegram alert whenever a restaurant owner clicks **"Request Setup Help"** on their dashboard. If not set, help requests are still saved to Firestore (`assistanceStatus: "open"`) but no Telegram message is sent. Find your chat ID by messaging @userinfobot on Telegram. |
 
+### AI helpers (optional — Phase D)
+| Variable | Value |
+|---|---|
+| `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) → API Keys. Powers "Generate with AI" / "Improve with AI" buttons in the admin (restaurant description, menu descriptions, category suggestions, welcome text). If not set, all AI helper buttons are hidden and setup works normally without them. Uses `claude-haiku-4-5-20251001` (fast, low cost). |
+
 ### Optional integrations
 | Variable | Value |
 |---|---|

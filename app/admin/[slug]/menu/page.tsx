@@ -44,7 +44,7 @@ export default async function AdminMenuPage({ params }: Props) {
     <div className="bg-gray-100 min-h-screen">
       <AdminNav slug={slug} role={user.role as "owner" | "manager" | "staff"} />
       <SubscriptionBanner subscription={subscription} />
-      <AdminMenuClient restaurant={restaurant} />
+      <AdminMenuClient restaurant={restaurant} aiEnabled={!!process.env.ANTHROPIC_API_KEY} />
     </div>
   );
 }

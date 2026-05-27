@@ -60,7 +60,7 @@ export default async function SettingsPage({ params }: Props) {
     <div className="bg-gray-100 min-h-screen">
       <AdminNav slug={slug} role="owner" />
       <SubscriptionBanner subscription={subscription} />
-      <SettingsClient restaurant={restaurant} />
+      <SettingsClient restaurant={restaurant} aiEnabled={!!process.env.ANTHROPIC_API_KEY} />
     </div>
   );
 }

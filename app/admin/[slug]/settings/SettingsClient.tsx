@@ -3,11 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import ImageUpload from "@/app/components/ImageUpload";
+import AiTextHelper from "@/app/components/AiTextHelper";
 import { DAYS, DEFAULT_DAY_HOURS, defaultOpeningHours, type OpeningHours } from "@/lib/restaurant-utils";
 
 type AlertPreference = "telegram" | "sms" | "both";
 
 type Props = {
+  aiEnabled?: boolean;
   restaurant: {
     slug: string;
     name: string;
@@ -39,7 +41,7 @@ type Props = {
   };
 };
 
-export default function SettingsClient({ restaurant }: Props) {
+export default function SettingsClient({ restaurant, aiEnabled = false }: Props) {
   const [form, setForm] = useState({
     name: restaurant.name,
     description: restaurant.description,
@@ -200,6 +202,18 @@ export default function SettingsClient({ restaurant }: Props) {
               className={`${inputCls} resize-none`}
             />
             <p className="text-xs text-gray-400 mt-1">Shown below your name on the ordering page</p>
+            {aiEnabled && (
+              <AiTextHelper
+                triggerLabel={form.description ? "Improve with AI" : "Generate with AI"}
+                endpoint="/api/admin/ai/restaurant-description"
+                payload={() => ({
+                  restaurantName: form.name,
+                  existingDescription: form.description || undefined,
+                  action: form.description ? "improve" : "generate",
+                })}
+                onAccept={(text) => setField("description", text)}
+              />
+            )}
           </Field>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Primary Color">
@@ -232,6 +246,17 @@ export default function SettingsClient({ restaurant }: Props) {
               className={inputCls}
             />
             <p className="text-xs text-gray-400 mt-1">Appears at the top of the ordering page if set</p>
+            {aiEnabled && (
+              <AiTextHelper
+                triggerLabel="Generate welcome text with AI"
+                endpoint="/api/admin/ai/welcome-text"
+                payload={() => ({
+                  restaurantName: form.name,
+                  description: form.description || undefined,
+                })}
+                onAccept={(text) => setField("promoBanner", text)}
+              />
+            )}
           </Field>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Field label="Display Rating">
