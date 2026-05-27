@@ -26,14 +26,16 @@ export default async function QRPage({ params }: Props) {
   const subscription = await getSubscriptionInfo(data as Record<string, unknown>);
 
   return (
-    <div className="bg-gray-100 min-h-screen">
+    <div className="flex min-h-screen bg-gray-100">
       <AdminNav slug={slug} role="owner" />
-      <SubscriptionBanner subscription={subscription} />
-      <QRClient
-        slug={slug}
-        restaurantName={data.name as string}
-        appUrl={process.env.NEXT_PUBLIC_APP_URL ?? ""}
-      />
+      <div className="flex-1 min-w-0 pt-14 pb-16 lg:pt-0 lg:pb-0">
+        <SubscriptionBanner subscription={subscription} />
+        <QRClient
+          slug={slug}
+          restaurantName={data.name as string}
+          appUrl={process.env.NEXT_PUBLIC_APP_URL ?? ""}
+        />
+      </div>
     </div>
   );
 }

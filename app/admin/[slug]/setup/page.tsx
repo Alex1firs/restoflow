@@ -39,15 +39,17 @@ export default async function SetupPage({ params, searchParams }: Props) {
   const initialStep = Number.isFinite(rawStep) ? Math.min(Math.max(rawStep, 1), 7) : 1;
 
   return (
-    <div className="bg-gray-50 min-h-screen">
+    <div className="flex min-h-screen bg-gray-50">
       <AdminNav slug={slug} role={user.role as "owner" | "manager" | "staff"} />
-      <SetupWizard
-        slug={slug}
-        status={(data.status as string) || "draft"}
-        setupChecklist={setupChecklist}
-        menuItemCount={menuItemCount}
-        initialStep={initialStep}
-      />
+      <div className="flex-1 min-w-0 pt-14 pb-16 lg:pt-0 lg:pb-0">
+        <SetupWizard
+          slug={slug}
+          status={(data.status as string) || "draft"}
+          setupChecklist={setupChecklist}
+          menuItemCount={menuItemCount}
+          initialStep={initialStep}
+        />
+      </div>
     </div>
   );
 }

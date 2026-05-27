@@ -57,10 +57,12 @@ export default async function SettingsPage({ params }: Props) {
   };
 
   return (
-    <div className="bg-gray-100 min-h-screen">
+    <div className="flex min-h-screen bg-gray-100">
       <AdminNav slug={slug} role="owner" />
-      <SubscriptionBanner subscription={subscription} />
-      <SettingsClient restaurant={restaurant} aiEnabled={!!process.env.GEMINI_API_KEY} />
+      <div className="flex-1 min-w-0 pt-14 pb-16 lg:pt-0 lg:pb-0">
+        <SubscriptionBanner subscription={subscription} />
+        <SettingsClient restaurant={restaurant} aiEnabled={!!process.env.GEMINI_API_KEY} />
+      </div>
     </div>
   );
 }

@@ -61,16 +61,18 @@ export default async function POSPage({ params }: Props) {
   const subscription = await getSubscriptionInfo(data as Record<string, unknown>);
 
   return (
-    <div className="bg-gray-100 min-h-screen flex flex-col">
+    <div className="flex min-h-screen bg-gray-100">
       <AdminNav slug={slug} role={user.role as "owner" | "manager" | "staff"} />
-      <SubscriptionBanner subscription={subscription} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <POSClient
-          restaurant={restaurant}
-          menuItems={menuItems}
-          staffName={staffName}
-          staffId={user.uid}
-        />
+      <div className="flex-1 min-w-0 flex flex-col pt-14 lg:pt-0">
+        <SubscriptionBanner subscription={subscription} />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <POSClient
+            restaurant={restaurant}
+            menuItems={menuItems}
+            staffName={staffName}
+            staffId={user.uid}
+          />
+        </div>
       </div>
     </div>
   );

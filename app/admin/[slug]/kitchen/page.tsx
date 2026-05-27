@@ -30,9 +30,11 @@ export default async function KitchenPage({ params }: Props) {
   };
 
   return (
-    <div className="flex flex-col" style={{ height: "100dvh" }}>
+    <div className="flex" style={{ height: "100dvh" }}>
       <AdminNav slug={slug} role={user.role as "owner" | "manager" | "staff"} />
-      <KitchenClient restaurant={restaurant} role={user.role} />
+      <div className="flex-1 min-w-0 flex flex-col pt-14 lg:pt-0 overflow-hidden">
+        <KitchenClient restaurant={restaurant} role={user.role} />
+      </div>
     </div>
   );
 }

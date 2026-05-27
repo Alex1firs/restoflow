@@ -23,9 +23,11 @@ export default async function HelpPage({ params }: Props) {
   if (!snap.exists) return notFound();
 
   return (
-    <div className="bg-gray-50 min-h-screen">
+    <div className="flex min-h-screen bg-gray-50">
       <AdminNav slug={slug} role={user.role as "owner" | "manager" | "staff"} />
-      <HelpClient slug={slug} />
+      <div className="flex-1 min-w-0 pt-14 pb-16 lg:pt-0 lg:pb-0">
+        <HelpClient slug={slug} />
+      </div>
     </div>
   );
 }
