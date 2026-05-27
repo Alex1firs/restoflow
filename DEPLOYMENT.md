@@ -73,6 +73,12 @@ Point your Paystack **Live Webhook URL** at `https://your-domain.com/api/webhook
 
 If `RESEND_API_KEY` is not set the app still works — reset links fall back to manual delivery (see §9).
 
+### Telegram notifications
+| Variable | Value |
+|---|---|
+| `TELEGRAM_BOT_TOKEN` | From @BotFather on Telegram. Required for per-restaurant order alerts. |
+| `ADMIN_TELEGRAM_CHAT_ID` | **Optional.** Telegram chat ID of the RestoFlow ops account or group. When set, the admin receives a Telegram alert whenever a restaurant owner clicks **"Request Setup Help"** on their dashboard. If not set, help requests are still saved to Firestore (`assistanceStatus: "open"`) but no Telegram message is sent. Find your chat ID by messaging @userinfobot on Telegram. |
+
 ### Optional integrations
 | Variable | Value |
 |---|---|

@@ -118,6 +118,7 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [isRequestingHelp, setIsRequestingHelp] = useState(false);
   const [helpRequestSent, setHelpRequestSent] = useState(false);
+  const [helpAlreadyOpen, setHelpAlreadyOpen] = useState(false);
   const [helpRequestError, setHelpRequestError] = useState<string | null>(null);
   const startOfDayRef = useRef(getLagosStartOfDay());
 
@@ -205,6 +206,10 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ setupScore: setupChecklist?.score ?? null }),
       });
+      if (res.status === 409) {
+        setHelpAlreadyOpen(true);
+        return;
+      }
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         throw new Error((d as { error?: string }).error ?? "Failed to send request");
@@ -480,17 +485,26 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-black text-gray-900">Need help setting up?</p>
                   <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
-                    Our team can walk you through completing your store. Click below to request a setup call.
+                    {helpAlreadyOpen
+                      ? "Setup assistance has already been requested. Our team will reach out soon."
+                      : "Our team can walk you through completing your store. Click below to request a setup call."}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={requestSetupHelp}
-                  disabled={isRequestingHelp || helpRequestSent}
-                  className="shrink-0 bg-white border border-gray-300 hover:border-gray-400 text-gray-700 text-xs font-black px-5 py-2.5 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isRequestingHelp ? "Sending…" : helpRequestSent ? "Request Sent ✓" : "Request Setup Help"}
-                </button>
+                {!helpAlreadyOpen && (
+                  <button
+                    type="button"
+                    onClick={requestSetupHelp}
+                    disabled={isRequestingHelp || helpRequestSent}
+                    className="shrink-0 bg-white border border-gray-300 hover:border-gray-400 text-gray-700 text-xs font-black px-5 py-2.5 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isRequestingHelp ? "Sending…" : helpRequestSent ? "Request Sent ✓" : "Request Setup Help"}
+                  </button>
+                )}
+                {helpAlreadyOpen && (
+                  <span className="shrink-0 text-xs font-black text-blue-600 bg-blue-50 border border-blue-100 px-4 py-2.5 rounded-xl">
+                    Request open ✓
+                  </span>
+                )}
                 {helpRequestError && (
                   <p className="text-xs font-bold text-red-500 sm:text-right">{helpRequestError}</p>
                 )}

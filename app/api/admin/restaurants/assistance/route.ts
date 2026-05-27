@@ -31,6 +31,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    if (data.assistanceStatus === "open") {
+      return NextResponse.json(
+        { error: "already_open", message: "Setup assistance has already been requested. Our team will reach out soon." },
+        { status: 409 }
+      );
+    }
+
     await docRef.update({
       assistanceRequested: true,
       assistanceRequestedAt: FieldValue.serverTimestamp(),
