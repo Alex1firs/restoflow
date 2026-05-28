@@ -28,6 +28,8 @@ export interface HeroSettings {
   showSubtitle: boolean;
   showTags: boolean;
   showOpenBadge: boolean;
+  navbarSticky: boolean;
+  navbarBgStyle: "transparent" | "solid-brand" | "glass-blur" | "dark-tint";
 }
 
 export const DEFAULT_HERO_SETTINGS: HeroSettings = {
@@ -60,4 +62,6 @@ export const DEFAULT_HERO_SETTINGS: HeroSettings = {
   showSubtitle: true,
   showTags: true,
   showOpenBadge: true,
+  navbarSticky: false,
+  navbarBgStyle: "transparent",
 };

@@ -539,6 +539,60 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
           ? "rounded-none"
           : "rounded-xl";
 
+        const isSticky = hs.navbarSticky;
+        const isScrolled = scrollY > 50;
+        const navbarPosClass = isSticky
+          ? "fixed top-0 left-0 right-0 z-[100] transition-all duration-300"
+          : "absolute top-0 left-0 right-0 z-20";
+
+        const getNavbarStorefrontStyle = () => {
+          const activeBgStyle = isSticky && isScrolled ? hs.navbarBgStyle : (hs.navbarBgStyle === "transparent" ? "transparent" : hs.navbarBgStyle);
+          switch (activeBgStyle) {
+            case "solid-brand":
+              return {
+                background: primary,
+                color: "#ffffff",
+                boxShadow: isScrolled ? "0 4px 20px rgba(0,0,0,0.08)" : "none",
+                paddingTop: isScrolled ? "1rem" : "1.25rem",
+                paddingBottom: isScrolled ? "1rem" : "1.25rem",
+              };
+            case "glass-blur":
+              return {
+                background: isScrolled ? "rgba(255, 255, 255, 0.75)" : "rgba(255, 255, 255, 0.15)",
+                backdropFilter: "blur(12px)",
+                color: isScrolled ? "#1c1917" : "#ffffff",
+                borderBottom: isScrolled ? "1px solid rgba(0, 0, 0, 0.05)" : "1px solid rgba(255, 255, 255, 0.1)",
+                boxShadow: isScrolled ? "0 4px 20px rgba(0,0,0,0.05)" : "none",
+                paddingTop: isScrolled ? "1rem" : "1.25rem",
+                paddingBottom: isScrolled ? "1rem" : "1.25rem",
+              };
+            case "dark-tint":
+              return {
+                background: isScrolled ? "rgba(15, 15, 15, 0.85)" : "rgba(0, 0, 0, 0.3)",
+                backdropFilter: "blur(8px)",
+                color: "#ffffff",
+                borderBottom: isScrolled ? "1px solid rgba(255, 255, 255, 0.05)" : "none",
+                boxShadow: isScrolled ? "0 4px 20px rgba(0,0,0,0.2)" : "none",
+                paddingTop: isScrolled ? "1rem" : "1.25rem",
+                paddingBottom: isScrolled ? "1rem" : "1.25rem",
+              };
+            default: // transparent
+              return {
+                background: isScrolled
+                  ? "rgba(0, 0, 0, 0.6)"
+                  : "linear-gradient(to bottom, rgba(0, 0, 0, 0.5), transparent)",
+                backdropFilter: isScrolled ? "blur(8px)" : "none",
+                color: "#ffffff",
+                boxShadow: isScrolled ? "0 4px 20px rgba(0,0,0,0.1)" : "none",
+                paddingTop: isScrolled ? "1rem" : "1.25rem",
+                paddingBottom: isScrolled ? "1rem" : "1.25rem",
+              };
+          }
+        };
+
+        const navStyle = getNavbarStorefrontStyle();
+        const isLightNav = isSticky && isScrolled && hs.navbarBgStyle === "glass-blur";
+
         return (
           <section
             className={`relative flex flex-col bg-stone-100 dark:bg-stone-900 overflow-hidden ${
@@ -568,11 +622,14 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
             )}
 
             {/* Top Navbar */}
-            <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 py-5 bg-gradient-to-b from-black/50 to-transparent">
+            <div
+              style={navStyle}
+              className={`${navbarPosClass} flex items-center justify-between px-6 py-5`}
+            >
               <div className="flex items-center gap-3">
                 {hs.showLogo !== false && restaurant.logo ? (
                   <div
-                    className="overflow-hidden border border-white/20 shadow-md flex-shrink-0"
+                    className={`overflow-hidden flex-shrink-0 ${isLightNav ? "border border-stone-900/10 shadow-sm bg-white" : "border border-white/20 shadow-md"}`}
                     style={{
                       width: hs.logoWidth,
                       height: hs.logoHeight,
@@ -591,15 +648,16 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                   </div>
                 ) : hs.showLogo !== false ? (
                   <div
-                    className="bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/25 flex-shrink-0"
+                    className={`backdrop-blur-md flex items-center justify-center border flex-shrink-0 ${
+                      isLightNav ? "bg-stone-900/10 border-stone-900/10 text-stone-850" : "bg-white/10 border-white/25 text-white"
+                    }`}
                     style={{ width: hs.logoWidth, height: hs.logoHeight, borderRadius: hs.logoBorderRadius }}
                   >
-                    <span className="text-white font-extrabold text-sm tracking-tight">
+                    <span className={`font-extrabold text-sm tracking-tight ${isLightNav ? "text-stone-850" : "text-white"}`}>
                       {restaurant.name.slice(0, 2).toUpperCase()}
                     </span>
                   </div>
                 ) : null}
-                <span className="text-white font-black text-lg tracking-tight drop-shadow-sm select-none">{restaurant.name}</span>
               </div>
 
               <div className="hidden md:flex items-center gap-8">
@@ -607,7 +665,9 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                   <button
                     key={s.id}
                     onClick={() => scrollTo(s.id)}
-                    className="text-white/80 hover:text-white text-[11px] font-bold uppercase tracking-widest transition-all hover:scale-105 active:scale-95"
+                    className={`text-[11px] font-bold uppercase tracking-widest transition-all hover:scale-105 active:scale-95 ${
+                      isLightNav ? "text-stone-600 hover:text-stone-950" : "text-white/80 hover:text-white"
+                    }`}
                   >
                     {s.label}
                   </button>
@@ -617,13 +677,21 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
               <div className="flex items-center gap-3">
                 {hs.showOpenBadge !== false && (
                   restaurant.isOpen ? (
-                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-400/30 text-emerald-400 text-[10px] font-bold uppercase tracking-wider shadow-sm">
-                      <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                    <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-wider shadow-sm backdrop-blur-md ${
+                      isLightNav
+                        ? "bg-emerald-50 border-emerald-250 text-emerald-600"
+                        : "bg-emerald-500/20 border-emerald-400/30 text-emerald-400"
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isLightNav ? "bg-emerald-500 animate-pulse" : "bg-emerald-400 animate-pulse"}`} />
                       Open Now
                     </span>
                   ) : (
-                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500/20 backdrop-blur-md border border-rose-400/30 text-rose-400 text-[10px] font-bold uppercase tracking-wider shadow-sm">
-                      <span className="w-1.5 h-1.5 bg-rose-400/60 rounded-full" />
+                    <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-wider shadow-sm backdrop-blur-md ${
+                      isLightNav
+                        ? "bg-rose-50 border-rose-250 text-rose-600"
+                        : "bg-rose-500/20 border-rose-400/30 text-rose-400"
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isLightNav ? "bg-rose-500" : "bg-rose-400/60"}`} />
                       Closed
                     </span>
                   )
