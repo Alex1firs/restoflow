@@ -30,6 +30,10 @@ export interface HeroSettings {
   showOpenBadge: boolean;
   navbarSticky: boolean;
   navbarBgStyle: "transparent" | "solid-brand" | "glass-blur" | "dark-tint";
+  navbarFontSize: number;
+  navbarMenuTextMenu: string;
+  navbarMenuTextReviews: string;
+  navbarMenuTextInfo: string;
 }
 
 export const DEFAULT_HERO_SETTINGS: HeroSettings = {
@@ -64,4 +68,8 @@ export const DEFAULT_HERO_SETTINGS: HeroSettings = {
   showOpenBadge: true,
   navbarSticky: false,
   navbarBgStyle: "transparent",
+  navbarFontSize: 11,
+  navbarMenuTextMenu: "Menu",
+  navbarMenuTextReviews: "Reviews",
+  navbarMenuTextInfo: "Info",
 };

@@ -524,6 +524,42 @@ export default function VisualCustomizer({
                     onChange={(v) => set("navbarBgStyle", v as any)}
                   />
                 </div>
+                
+                <Slider label="Menu Font Size" min={9} max={20} value={settings.navbarFontSize} onChange={(v) => set("navbarFontSize", v)} suffix="px" />
+
+                <div className="border-t border-gray-100 pt-3 space-y-3.5">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Navigation Labels</label>
+                  <div>
+                    <label className="block text-[9px] font-bold text-gray-450 uppercase mb-1">Menu Link Label</label>
+                    <input
+                      type="text"
+                      value={settings.navbarMenuTextMenu}
+                      onChange={(e) => set("navbarMenuTextMenu", e.target.value)}
+                      placeholder="e.g. Menu"
+                      className="w-full border border-gray-250 rounded-xl px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-orange-500 transition bg-white font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-gray-450 uppercase mb-1">Reviews Link Label</label>
+                    <input
+                      type="text"
+                      value={settings.navbarMenuTextReviews}
+                      onChange={(e) => set("navbarMenuTextReviews", e.target.value)}
+                      placeholder="e.g. Reviews"
+                      className="w-full border border-gray-250 rounded-xl px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-orange-500 transition bg-white font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-gray-450 uppercase mb-1">Info Link Label</label>
+                    <input
+                      type="text"
+                      value={settings.navbarMenuTextInfo}
+                      onChange={(e) => set("navbarMenuTextInfo", e.target.value)}
+                      placeholder="e.g. Info"
+                      className="w-full border border-gray-250 rounded-xl px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-orange-500 transition bg-white font-medium"
+                    />
+                  </div>
+                </div>
               </div>
             </AccordionItem>
 
@@ -647,6 +683,29 @@ export default function VisualCustomizer({
                       </div>
                     ) : null}
                   </div>
+
+                  {/* Mockup Desktop/Tablet Menu Links */}
+                  {viewport !== "mobile" && (
+                    <div className="flex items-center gap-6">
+                      {[
+                        { label: settings.navbarMenuTextMenu || "Menu" },
+                        { label: settings.navbarMenuTextReviews || "Reviews" },
+                        { label: settings.navbarMenuTextInfo || "Info" },
+                      ].map((link, idx) => (
+                        <span
+                          key={idx}
+                          className={`uppercase tracking-widest font-black transition ${
+                            isLightNav ? "text-stone-600 hover:text-stone-900" : "text-white/80 hover:text-white"
+                          }`}
+                          style={{
+                            fontSize: `${Math.round(settings.navbarFontSize * 0.75)}px`,
+                          }}
+                        >
+                          {link.label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="flex items-center gap-2">
                     {settings.showOpenBadge && (

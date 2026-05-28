@@ -466,9 +466,9 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   }
 
   const navSections = [
-    { id: "menu", label: "Menu" },
-    { id: "about", label: "About" },
-    ...(popularItems.length > 0 ? [{ id: "popular", label: "Top Picks" }] : []),
+    { id: "menu", label: hs.navbarMenuTextMenu || "Menu" },
+    { id: "about", label: hs.navbarMenuTextInfo || "About" },
+    ...(popularItems.length > 0 ? [{ id: "popular", label: hs.navbarMenuTextReviews || "Top Picks" }] : []),
     { id: "faq", label: "FAQ" },
   ];
 
@@ -665,7 +665,8 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                   <button
                     key={s.id}
                     onClick={() => scrollTo(s.id)}
-                    className={`text-[11px] font-bold uppercase tracking-widest transition-all hover:scale-105 active:scale-95 ${
+                    style={{ fontSize: `${hs.navbarFontSize || 11}px` }}
+                    className={`font-bold uppercase tracking-widest transition-all hover:scale-105 active:scale-95 ${
                       isLightNav ? "text-stone-600 hover:text-stone-950" : "text-white/80 hover:text-white"
                     }`}
                   >
