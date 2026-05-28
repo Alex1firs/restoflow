@@ -94,7 +94,7 @@ const STEPS: StepDef[] = [
       "See exactly what customers see when they visit your store. Check that your name, menu, and photos all look right before you go live.",
     note: "The preview opens in a new tab. Come back here when you are done.",
     checklistKeys: [],
-    actionUrl: (s) => `/r/${s}`,
+    actionUrl: (s) => `/admin/${s}/preview`,
     actionLabel: "Open Store Preview",
     externalAction: true,
   },

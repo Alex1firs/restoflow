@@ -376,7 +376,7 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
                     </svg>
                   </a>
                   <a
-                    href={`/r/${slug}`}
+                    href={`/admin/${slug}/preview`}
                     target="_blank"
                     className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors"
                   >
