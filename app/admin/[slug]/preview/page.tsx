@@ -7,6 +7,7 @@ import RestaurantClient from '@/app/r/[slug]/components/RestaurantClient';
 import { CartProvider } from '@/app/r/[slug]/components/CartContext';
 import Link from 'next/link';
 import { checkIsOpen, todayHours, type OpeningHours } from '@/lib/restaurant-utils';
+import { DEFAULT_HERO_SETTINGS, type HeroSettings } from '@/lib/hero-settings';
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -121,6 +122,7 @@ export default async function PreviewPage({
     rating: rData.rating ?? null,
     ordersToday: rData.ordersToday ?? null,
     deliveryTime: rData.deliveryTime ?? "",
+    heroSettings: ((restaurant as { heroSettings?: HeroSettings }).heroSettings ?? DEFAULT_HERO_SETTINGS),
   };
 
   return (

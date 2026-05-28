@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { getAdminDb } from "@/lib/firebase-admin";
+import type { HeroSettings } from "@/lib/hero-settings";
 
 export async function PUT(req: NextRequest) {
   let user: Awaited<ReturnType<typeof getAuthenticatedUser>>;
@@ -39,6 +40,7 @@ export async function PUT(req: NextRequest) {
     deliveryTime,
     hidePrices,
     dineInEnabled,
+    heroSettings,
   } = body as {
     name?: string;
     description?: string;
@@ -63,6 +65,7 @@ export async function PUT(req: NextRequest) {
     deliveryTime?: string;
     hidePrices?: boolean;
     dineInEnabled?: boolean;
+    heroSettings?: HeroSettings;
   };
 
   if (!name?.trim()) {
@@ -98,6 +101,7 @@ export async function PUT(req: NextRequest) {
       deliveryTime: (deliveryTime ?? "").trim(),
       hidePrices: hidePrices === true,
       dineInEnabled: dineInEnabled === true,
+      ...(heroSettings && typeof heroSettings === "object" ? { heroSettings } : {}),
     });
 
   return NextResponse.json({ success: true });

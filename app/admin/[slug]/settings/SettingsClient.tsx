@@ -5,6 +5,8 @@ import Link from "next/link";
 import ImageUpload from "@/app/components/ImageUpload";
 import AiTextHelper from "@/app/components/AiTextHelper";
 import { DAYS, DEFAULT_DAY_HOURS, defaultOpeningHours, type OpeningHours } from "@/lib/restaurant-utils";
+import HeroCustomizationSection from "./HeroCustomizationSection";
+import { DEFAULT_HERO_SETTINGS, type HeroSettings } from "@/lib/hero-settings";
 
 type AlertPreference = "telegram" | "sms" | "both";
 
@@ -38,6 +40,7 @@ type Props = {
     deliveryTime: string;
     hidePrices: boolean;
     dineInEnabled: boolean;
+    heroSettings: HeroSettings;
   };
 };
 
@@ -69,6 +72,10 @@ export default function SettingsClient({ restaurant, aiEnabled = false }: Props)
 
   const [openingHours, setOpeningHours] = useState<OpeningHours>(
     restaurant.openingHours ?? defaultOpeningHours()
+  );
+
+  const [heroSettings, setHeroSettings] = useState<HeroSettings>(
+    restaurant.heroSettings ?? DEFAULT_HERO_SETTINGS
   );
 
   const [saving, setSaving] = useState(false);
@@ -128,7 +135,7 @@ export default function SettingsClient({ restaurant, aiEnabled = false }: Props)
       const res = await fetch("/api/admin/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, openingHours }),
+        body: JSON.stringify({ ...form, openingHours, heroSettings }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -235,7 +242,19 @@ export default function SettingsClient({ restaurant, aiEnabled = false }: Props)
           </div>
         </Section>
 
-        {/* ── SECTION 1.5: CONVERSION FEATURES ────────────────────── */}
+        {/* ── SECTION 1.5: HERO CUSTOMIZATION ─────────────────────── */}
+        <Section title="Hero Customization" hint="Full control over your storefront's hero section">
+          <HeroCustomizationSection
+            settings={heroSettings}
+            onChange={(s) => { setHeroSettings(s); setStatus("idle"); }}
+            logoUrl={form.logo}
+            coverUrl={form.coverImage}
+            restaurantName={form.name}
+            description={form.description}
+          />
+        </Section>
+
+        {/* ── SECTION 1.6: CONVERSION FEATURES ────────────────────── */}
         <Section title="Conversion Features" hint="Engage customers and build trust">
           <Field label="Promo Banner">
             <input

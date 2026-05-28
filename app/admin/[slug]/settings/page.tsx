@@ -6,6 +6,7 @@ import AdminNav from "../components/AdminNav";
 import SubscriptionBanner from "../components/SubscriptionBanner";
 import SettingsClient from "./SettingsClient";
 import type { OpeningHours } from "@/lib/restaurant-utils";
+import { DEFAULT_HERO_SETTINGS, type HeroSettings } from "@/lib/hero-settings";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -54,6 +55,7 @@ export default async function SettingsPage({ params }: Props) {
     deliveryTime: (data.deliveryTime as string) ?? "",
     hidePrices: (data.hidePrices as boolean) ?? false,
     dineInEnabled: (data.dineInEnabled as boolean) ?? false,
+    heroSettings: ((data.heroSettings as HeroSettings) ?? DEFAULT_HERO_SETTINGS),
   };
 
   return (

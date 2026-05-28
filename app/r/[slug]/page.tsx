@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { checkIsOpen, todayHours, type OpeningHours } from '@/lib/restaurant-utils';
 import { buildPageTitle, buildPageDescription, buildJsonLd, buildCanonicalUrl, type RestaurantSEOData } from '@/lib/seo-utils';
 import { GRACE_DAYS } from '@/lib/constants';
+import { DEFAULT_HERO_SETTINGS, type HeroSettings } from '@/lib/hero-settings';
 
 function formatTodayHours(from: string, to: string): string {
   const fmt = (t: string) => {
@@ -229,6 +230,7 @@ export default async function RestaurantPage({
     ordersToday: rData.ordersToday ?? null,
     deliveryTime: rData.deliveryTime ?? "",
     hidePrices: (docSnap.data()?.hidePrices as boolean) ?? false,
+    heroSettings: ((docSnap.data()?.heroSettings as HeroSettings) ?? DEFAULT_HERO_SETTINGS),
   };
 
   return (

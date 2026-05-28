@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useCart } from "./CartContext";
 import SEOSections from "./SEOSections";
+import { DEFAULT_HERO_SETTINGS, type HeroSettings } from "@/lib/hero-settings";
 
 type DeliveryType = "delivery" | "pickup" | "dine_in";
 
@@ -40,6 +41,7 @@ interface RestaurantClientProps {
     ordersToday?: number | null;
     deliveryTime?: string;
     hidePrices?: boolean;
+    heroSettings?: HeroSettings;
   };
   menuItems: MenuItemData[];
   seo?: {
@@ -96,6 +98,8 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   const aboutSectionRef = useRef<HTMLElement>(null);
   const popularSectionRef = useRef<HTMLElement>(null);
   const faqSectionRef = useRef<HTMLElement>(null);
+
+  const hs = restaurant.heroSettings ?? DEFAULT_HERO_SETTINGS;
 
   // Dynamic Brand Theme Variables
   const primary = restaurant.primaryColor || "#F26E21"; // premium warm orange accent
@@ -457,31 +461,63 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
         </div>
       )}
 
-      {/* ── HERO REDESIGN (Phase 10A) ────────────────────────────────────────── */}
-      <section className="relative min-h-[75vh] flex flex-col justify-end bg-stone-100 dark:bg-stone-900 overflow-hidden">
+      {/* ── HERO ─────────────────────────────────────────────────────────────── */}
+      <section
+        className={`relative flex flex-col bg-stone-100 dark:bg-stone-900 overflow-hidden ${
+          hs.textVerticalPosition === "top" ? "justify-start" : hs.textVerticalPosition === "middle" ? "justify-center" : "justify-end"
+        }`}
+        style={{ minHeight: `${hs.heroHeight}vh` }}
+      >
         {restaurant.coverImage && (
-          <div 
+          <div
             className="absolute inset-0 z-0 pointer-events-none"
             style={{ transform: `translateY(${scrollY * 0.25}px)` }}
           >
-            <img 
-              src={restaurant.coverImage} 
-              alt="" 
-              className="w-full h-full object-cover opacity-90 transition-transform duration-500 scale-100"
+            <img
+              src={restaurant.coverImage}
+              alt=""
+              className="w-full h-full opacity-90 transition-transform duration-500 scale-100"
+              style={{
+                objectFit: hs.coverObjectFit,
+                objectPosition: `${hs.focalPointX}% ${hs.focalPointY}%`,
+              }}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/10" />
+            <div
+              className="absolute inset-0"
+              style={{
+                background: `linear-gradient(to top, rgba(0,0,0,${(hs.overlayOpacity / 100).toFixed(2)}) 0%, rgba(0,0,0,${(hs.overlayOpacity * 0.47 / 100).toFixed(2)}) 50%, rgba(0,0,0,${(hs.overlayOpacity * 0.12 / 100).toFixed(2)}) 100%)`,
+              }}
+            />
           </div>
         )}
 
-        {/* Top Navbar details */}
+        {/* Top Navbar */}
         <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 py-5 bg-gradient-to-b from-black/50 to-transparent">
           <div className="flex items-center gap-3">
             {restaurant.logo ? (
-              <div className="w-10 h-10 rounded-2xl overflow-hidden border border-white/20 shadow-md">
-                <img src={restaurant.logo} alt="logo" className="w-full h-full object-cover" />
+              <div
+                className="overflow-hidden border border-white/20 shadow-md flex-shrink-0"
+                style={{
+                  width: hs.logoWidth,
+                  height: hs.logoHeight,
+                  borderRadius: hs.logoBorderRadius,
+                }}
+              >
+                <img
+                  src={restaurant.logo}
+                  alt="logo"
+                  className="w-full h-full"
+                  style={{
+                    objectFit: hs.logoObjectFit,
+                    objectPosition: `${hs.logoFocalX}% ${hs.logoFocalY}%`,
+                  }}
+                />
               </div>
             ) : (
-              <div className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/25">
+              <div
+                className="bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/25 flex-shrink-0"
+                style={{ width: hs.logoWidth, height: hs.logoHeight, borderRadius: hs.logoBorderRadius }}
+              >
                 <span className="text-white font-extrabold text-sm tracking-tight">
                   {restaurant.name.slice(0, 2).toUpperCase()}
                 </span>
@@ -517,21 +553,46 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
           </div>
         </div>
 
-        {/* Hero details card */}
-        <div className="relative z-10 max-w-4xl mx-auto w-full px-6 pb-8 md:pb-12 text-white">
-          <div className="max-w-2xl space-y-4">
-            <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-none drop-shadow-md">
+        {/* Hero text */}
+        <div
+          className="relative z-10 max-w-4xl mx-auto w-full px-6 text-white"
+          style={{
+            paddingBottom: hs.textVerticalPosition === "bottom" ? "3rem" : undefined,
+            paddingTop: hs.textVerticalPosition === "top" ? "6rem" : undefined,
+            textAlign: hs.textAlign,
+          }}
+        >
+          <div
+            className={`space-y-4 ${
+              hs.textAlign === "center" ? "max-w-2xl mx-auto" : hs.textAlign === "right" ? "max-w-2xl ml-auto" : "max-w-2xl"
+            }`}
+          >
+            <h1
+              className="font-black drop-shadow-md"
+              style={{
+                fontSize: hs.headingSize,
+                lineHeight: hs.lineHeight / 100,
+                letterSpacing: `${hs.letterSpacing * 0.01}em`,
+              }}
+            >
               {restaurant.name}
             </h1>
             {restaurant.description && (
-              <p className="text-white/85 text-sm md:text-base leading-relaxed drop-shadow-sm max-w-xl font-medium">
+              <p
+                className="text-white/85 drop-shadow-sm font-medium"
+                style={{
+                  fontSize: hs.subtitleSize,
+                  lineHeight: hs.lineHeight / 100,
+                  letterSpacing: `${hs.letterSpacing * 0.01}em`,
+                }}
+              >
                 {restaurant.description}
               </p>
             )}
-            
+
             {/* Cuisine tags */}
             {keywords.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-1">
+              <div className={`flex flex-wrap gap-1.5 pt-1 ${hs.textAlign === "center" ? "justify-center" : hs.textAlign === "right" ? "justify-end" : ""}`}>
                 {keywords.slice(0, 4).map((k) => (
                   <span key={k} className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-white/15 border border-white/10 backdrop-blur-sm">
                     {k}
@@ -540,10 +601,10 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
               </div>
             )}
 
-            {/* Floating metrics grid */}
-            <div className="grid grid-cols-3 gap-3 pt-4 border-t border-white/15 max-w-md">
+            {/* Metrics */}
+            <div className={`grid grid-cols-3 gap-3 pt-4 border-t border-white/15 max-w-md ${hs.textAlign === "center" ? "mx-auto" : hs.textAlign === "right" ? "ml-auto" : ""}`}>
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center flex-shrink-0">
                   <span className="text-sm">⭐</span>
                 </div>
                 <div>
@@ -552,7 +613,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center flex-shrink-0">
                   <span className="text-sm">⏱️</span>
                 </div>
                 <div>
@@ -561,7 +622,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center flex-shrink-0">
                   <span className="text-sm">🚚</span>
                 </div>
                 <div>
