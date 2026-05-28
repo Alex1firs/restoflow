@@ -1,0 +1,911 @@
+"use client";
+
+import { useState, useRef, useCallback, useEffect } from "react";
+import type { HeroSettings } from "@/lib/hero-settings";
+
+interface Props {
+  settings: HeroSettings;
+  onChange: (s: HeroSettings) => void;
+  logoUrl: string;
+  coverUrl: string;
+  restaurantName: string;
+  description: string;
+  primaryColor: string;
+  accentColor: string;
+  onClose: () => void;
+}
+
+type TabKey = "branding" | "cover" | "typography" | "cta" | "elements";
+type ViewportMode = "desktop" | "tablet" | "mobile";
+
+export default function VisualCustomizer({
+  settings,
+  onChange,
+  logoUrl,
+  coverUrl,
+  restaurantName,
+  description,
+  primaryColor,
+  accentColor,
+  onClose,
+}: Props) {
+  const [activeTab, setActiveTab] = useState<TabKey>("branding");
+  const [viewport, setViewport] = useState<ViewportMode>("mobile");
+
+  const focalRef = useRef<HTMLDivElement>(null);
+  const logoFocalRef = useRef<HTMLDivElement>(null);
+
+  // Auto-inject Google Fonts for typography previews
+  useEffect(() => {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href =
+      "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&family=Outfit:wght@400;600;800;900&family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Inter:wght@400;500;700&display=swap";
+    document.head.appendChild(link);
+    return () => {
+      document.head.removeChild(link);
+    };
+  }, []);
+
+  const set = <K extends keyof HeroSettings>(k: K, v: HeroSettings[K]) =>
+    onChange({ ...settings, [k]: v });
+
+  const handleFocalClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const rect = focalRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+      const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+      onChange({
+        ...settings,
+        focalPointX: Math.max(0, Math.min(100, x)),
+        focalPointY: Math.max(0, Math.min(100, y)),
+      });
+    },
+    [settings, onChange]
+  );
+
+  const handleLogoFocalClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const rect = logoFocalRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+      const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+      onChange({
+        ...settings,
+        logoFocalX: Math.max(0, Math.min(100, x)),
+        logoFocalY: Math.max(0, Math.min(100, y)),
+      });
+    },
+    [settings, onChange]
+  );
+
+  const toggleTab = (tab: TabKey) => {
+    setActiveTab((prev) => (prev === tab ? tab : tab));
+  };
+
+  // Font styling resolver
+  const getTypographyStyles = () => {
+    switch (settings.fontPairing) {
+      case "modern-serif":
+        return {
+          heading: { fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 900 },
+          sub: { fontFamily: "'Inter', sans-serif", fontWeight: 400 },
+        };
+      case "sleek-sans":
+        return {
+          heading: { fontFamily: "'Outfit', sans-serif", fontWeight: 900 },
+          sub: { fontFamily: "'Outfit', sans-serif", fontWeight: 400 },
+        };
+      case "warm-display":
+        return {
+          heading: { fontFamily: "'Montserrat', sans-serif", fontWeight: 900 },
+          sub: { fontFamily: "'Outfit', sans-serif", fontWeight: 400 },
+        };
+      default:
+        return {
+          heading: { fontFamily: "system-ui, sans-serif", fontWeight: 800 },
+          sub: { fontFamily: "system-ui, sans-serif", fontWeight: 500 },
+        };
+    }
+  };
+
+  // Overlay styles resolver
+  const getOverlayStyle = () => {
+    const opacity = (settings.overlayOpacity / 100).toFixed(2);
+    switch (settings.overlayType) {
+      case "solid-brand":
+        return {
+          background: `rgba(${hexToRgb(primaryColor)}, ${opacity})`,
+        };
+      case "gradient-brand":
+        return {
+          background: `linear-gradient(to top, rgba(${hexToRgb(primaryColor)}, ${opacity}) 0%, rgba(0,0,0,${(settings.overlayOpacity * 0.5 / 100).toFixed(2)}) 80%, rgba(0,0,0,${(settings.overlayOpacity * 0.2 / 100).toFixed(2)}) 100%)`,
+        };
+      case "none":
+        return { background: "none" };
+      default:
+        return {
+          background: `linear-gradient(to top, rgba(0,0,0,${opacity}) 0%, rgba(0,0,0,${(settings.overlayOpacity * 0.47 / 100).toFixed(2)}) 50%, rgba(0,0,0,${(settings.overlayOpacity * 0.12 / 100).toFixed(2)}) 100%)`,
+        };
+    }
+  };
+
+  // Helper to convert hex to comma-separated RGB
+  function hexToRgb(hex: string) {
+    const clean = hex.replace("#", "");
+    const bigint = parseInt(clean, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `${r}, ${g}, ${b}`;
+  }
+
+  const fonts = getTypographyStyles();
+  const overlayStyle = getOverlayStyle();
+  const justifyClass =
+    settings.textVerticalPosition === "top"
+      ? "justify-start"
+      : settings.textVerticalPosition === "middle"
+      ? "justify-center"
+      : "justify-end";
+
+  // Dynamic CSS variables inside live frame
+  const brandStyle = {
+    "--brand-primary": primaryColor,
+    "--brand-accent": accentColor,
+    "--brand-primary-10": `${primaryColor}1a`,
+    "--brand-primary-20": `${primaryColor}33`,
+  } as React.CSSProperties;
+
+  return (
+    <div className="fixed inset-0 z-[9999] bg-[#FAF9F5] flex flex-col font-sans select-none overflow-hidden text-neutral-800 antialiased">
+      {/* ── HEADER ──────────────────────────────────────────────── */}
+      <header className="h-16 border-b border-[#EFECE6] bg-white px-6 flex items-center justify-between shadow-sm z-10">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20">
+            <span className="text-lg">🎨</span>
+          </div>
+          <div>
+            <h1 className="text-sm font-black tracking-tight text-neutral-900">RestoFlow Live Customizer</h1>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Real-time design engine</p>
+          </div>
+        </div>
+
+        {/* Viewport switch controls */}
+        <div className="flex items-center gap-1 bg-[#FAF9F5] border border-[#EFECE6] rounded-xl p-1 shadow-inner">
+          <button
+            onClick={() => setViewport("desktop")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+              viewport === "desktop" ? "bg-white text-gray-900 shadow" : "text-gray-400 hover:text-gray-600"
+            }`}
+          >
+            <span>🖥️</span> Desktop
+          </button>
+          <button
+            onClick={() => setViewport("tablet")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+              viewport === "tablet" ? "bg-white text-gray-900 shadow" : "text-gray-400 hover:text-gray-600"
+            }`}
+          >
+            <span>📟</span> Tablet
+          </button>
+          <button
+            onClick={() => setViewport("mobile")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+              viewport === "mobile" ? "bg-white text-gray-900 shadow" : "text-gray-400 hover:text-gray-600"
+            }`}
+          >
+            <span>📱</span> Mobile
+          </button>
+        </div>
+
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider text-gray-700 bg-white border border-[#EFECE6] hover:bg-stone-50 active:scale-95 transition shadow-sm"
+        >
+          Finish Customization
+        </button>
+      </header>
+
+      {/* ── WORKSPACE CORE ──────────────────────────────────────── */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left side editor panel */}
+        <aside className="w-[390px] border-r border-[#EFECE6] bg-white flex flex-col h-full z-10 shadow-[2px_0_15px_rgba(0,0,0,0.01)]">
+          <div className="flex-1 overflow-y-auto scrollbar-thin p-5 space-y-4">
+            
+            {/* 1. Branding & Logo */}
+            <AccordionItem
+              title="Branding & Logo"
+              icon="🏢"
+              active={activeTab === "branding"}
+              onClick={() => toggleTab("branding")}
+            >
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 bg-stone-50 p-3 rounded-2xl border border-gray-100">
+                  {logoUrl ? (
+                    <img
+                      src={logoUrl}
+                      alt="logo"
+                      className="w-12 h-12 rounded-xl border object-cover shadow-sm bg-white"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-gray-200 border-2 border-dashed flex items-center justify-center text-[10px] font-bold text-gray-400">
+                      No Logo
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="text-xs font-black text-gray-700 uppercase tracking-wider">Logo Dimensions</h3>
+                    <p className="text-[10px] text-gray-400 mt-0.5">Scale and fit inside the header strip</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Slider label="Width" min={24} max={120} value={settings.logoWidth} onChange={(v) => set("logoWidth", v)} suffix="px" />
+                  <Slider label="Height" min={24} max={120} value={settings.logoHeight} onChange={(v) => set("logoHeight", v)} suffix="px" />
+                </div>
+                <Slider label="Corner Radius" min={0} max={60} value={settings.logoBorderRadius} onChange={(v) => set("logoBorderRadius", v)} suffix="px" />
+                
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Image Alignment Fit</label>
+                  <ToggleGroup
+                    options={[
+                      { value: "cover", label: "Fill & Crop" },
+                      { value: "contain", label: "Show Full Logo" },
+                    ]}
+                    value={settings.logoObjectFit}
+                    onChange={(v) => set("logoObjectFit", v as "cover" | "contain")}
+                  />
+                </div>
+
+                {logoUrl && settings.logoObjectFit === "cover" && (
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
+                      Logo Crop Focus <span className="text-orange-500 font-bold lowercase">(click to lock)</span>
+                    </label>
+                    <div
+                      ref={logoFocalRef}
+                      onClick={handleLogoFocalClick}
+                      className="relative rounded-2xl overflow-hidden cursor-crosshair border border-gray-150 select-none shadow-sm"
+                      style={{ height: 80 }}
+                    >
+                      <img src={logoUrl} alt="" className="w-full h-full object-cover" />
+                      <div
+                        className="absolute w-5 h-5 rounded-full border-2 border-white shadow bg-orange-500 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                        style={{ left: `${settings.logoFocalX}%`, top: `${settings.logoFocalY}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </AccordionItem>
+
+            {/* 2. Cover & Layout */}
+            <AccordionItem
+              title="Cover & Layout"
+              icon="🖼️"
+              active={activeTab === "cover"}
+              onClick={() => toggleTab("cover")}
+            >
+              <div className="space-y-4">
+                <Slider label="Hero Height" min={30} max={100} value={settings.heroHeight} onChange={(v) => set("heroHeight", v)} suffix="vh" />
+                
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Image Fit Mode</label>
+                  <ToggleGroup
+                    options={[
+                      { value: "cover", label: "Fill & Zoom" },
+                      { value: "contain", label: "Show Whole Banner" },
+                    ]}
+                    value={settings.coverObjectFit}
+                    onChange={(v) => set("coverObjectFit", v as "cover" | "contain")}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Overlay Type</label>
+                  <ToggleGroup
+                    options={[
+                      { value: "dark", label: "Classic Dark" },
+                      { value: "solid-brand", label: "Solid Brand" },
+                      { value: "gradient-brand", label: "Brand Gradient" },
+                      { value: "none", label: "None" },
+                    ]}
+                    value={settings.overlayType}
+                    onChange={(v) => set("overlayType", v as any)}
+                  />
+                </div>
+
+                <Slider label="Overlay Opacity" min={0} max={100} value={settings.overlayOpacity} onChange={(v) => set("overlayOpacity", v)} suffix="%" />
+
+                {coverUrl && (
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
+                      Cover Banner Focus <span className="text-orange-500 font-bold lowercase">(click to lock)</span>
+                    </label>
+                    <div
+                      ref={focalRef}
+                      onClick={handleFocalClick}
+                      className="relative rounded-2xl overflow-hidden cursor-crosshair border border-gray-150 select-none shadow-sm"
+                      style={{ height: 120 }}
+                    >
+                      <img src={coverUrl} alt="" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/15 pointer-events-none" />
+                      <div
+                        className="absolute w-6 h-6 rounded-full border-2 border-white shadow-lg bg-orange-500 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                        style={{ left: `${settings.focalPointX}%`, top: `${settings.focalPointY}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </AccordionItem>
+
+            {/* 3. Typography */}
+            <AccordionItem
+              title="Typography"
+              icon="🔤"
+              active={activeTab === "typography"}
+              onClick={() => toggleTab("typography")}
+            >
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Typography Font Pairing</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { key: "default", name: "System Serif", desc: "Default clean style" },
+                      { key: "modern-serif", name: "Playfair Display", desc: "Elegant high-end foodie" },
+                      { key: "sleek-sans", name: "Outfit Sans", desc: "Minimal premium brand" },
+                      { key: "warm-display", name: "Montserrat Display", desc: "Bold friendly vibe" },
+                    ].map((f) => (
+                      <button
+                        key={f.key}
+                        type="button"
+                        onClick={() => set("fontPairing", f.key as any)}
+                        className={`p-2.5 rounded-xl border text-left transition ${
+                          settings.fontPairing === f.key
+                            ? "border-orange-500 bg-orange-50/50"
+                            : "border-gray-200 bg-white hover:border-gray-300"
+                        }`}
+                      >
+                        <h4 className="text-xs font-bold text-gray-900 leading-tight">{f.name}</h4>
+                        <p className="text-[9px] text-gray-400 mt-0.5 leading-tight">{f.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Alignment & Grid Layout</label>
+                    <div className="grid grid-cols-3 gap-1.5 w-fit">
+                      {(["top", "middle", "bottom"] as const).map((v) =>
+                        (["left", "center", "right"] as const).map((a) => {
+                          const active = settings.textVerticalPosition === v && settings.textAlign === a;
+                          return (
+                            <button
+                              key={`${v}-${a}`}
+                              type="button"
+                              onClick={() => onChange({ ...settings, textVerticalPosition: v, textAlign: a })}
+                              className={`w-10 h-10 rounded-xl border transition flex items-center justify-center ${
+                                active ? "border-orange-500 bg-orange-50" : "border-gray-200 bg-white hover:border-gray-350"
+                              }`}
+                            >
+                              <PosDot active={active} v={v} a={a} />
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  <Slider label="Heading Font Size" min={20} max={80} value={settings.headingSize} onChange={(v) => set("headingSize", v)} suffix="px" />
+                  <Slider label="Subtitle Font Size" min={10} max={32} value={settings.subtitleSize} onChange={(v) => set("subtitleSize", v)} suffix="px" />
+                  <Slider label="Line Height" min={80} max={250} value={settings.lineHeight} onChange={(v) => set("lineHeight", v)} div={100} suffix="" />
+                  <Slider label="Letter Spacing" min={-8} max={25} value={settings.letterSpacing} onChange={(v) => set("letterSpacing", v)} div={100} suffix="em" />
+                </div>
+              </div>
+            </AccordionItem>
+
+            {/* 4. Buttons & CTA */}
+            <AccordionItem
+              title="CTA Buttons"
+              icon="🔘"
+              active={activeTab === "cta"}
+              onClick={() => toggleTab("cta")}
+            >
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Button Edge Style</label>
+                  <ToggleGroup
+                    options={[
+                      { value: "pill", label: "Pill Shape" },
+                      { value: "rounded", label: "Rounded" },
+                      { value: "sharp", label: "Sharp Box" },
+                    ]}
+                    value={settings.buttonStyle}
+                    onChange={(v) => set("buttonStyle", v as any)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Primary CTA Button Label</label>
+                  <input
+                    type="text"
+                    value={settings.primaryCtaText}
+                    onChange={(e) => set("primaryCtaText", e.target.value)}
+                    placeholder="e.g. Order Online"
+                    className="w-full border border-gray-250 rounded-xl px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-orange-500 transition bg-white font-medium"
+                  />
+                </div>
+
+                <div className="border-t border-gray-100 pt-3">
+                  <label className="flex items-center gap-3 cursor-pointer w-fit">
+                    <div
+                      onClick={() => set("showSecondaryCta", !settings.showSecondaryCta)}
+                      className={`relative w-8 h-4 rounded-full transition-colors cursor-pointer ${settings.showSecondaryCta ? "bg-orange-500" : "bg-gray-200"}`}
+                    >
+                      <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${settings.showSecondaryCta ? "translate-x-4" : "translate-x-0.5"}`} />
+                    </div>
+                    <span className="text-xs font-bold text-gray-700">Display Secondary CTA Button</span>
+                  </label>
+                </div>
+
+                {settings.showSecondaryCta && (
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Secondary CTA Button Label</label>
+                    <input
+                      type="text"
+                      value={settings.secondaryCtaText}
+                      onChange={(e) => set("secondaryCtaText", e.target.value)}
+                      placeholder="e.g. Book a Table"
+                      className="w-full border border-gray-255 rounded-xl px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-orange-500 transition bg-white font-medium"
+                    />
+                  </div>
+                )}
+              </div>
+            </AccordionItem>
+
+            {/* 5. Elements Toggle */}
+            <AccordionItem
+              title="Visibility Toggles"
+              icon="👁️"
+              active={activeTab === "elements"}
+              onClick={() => toggleTab("elements")}
+            >
+              <div className="space-y-3 pt-1">
+                <ToggleRow label="Show Brand Logo" enabled={settings.showLogo} onToggle={() => set("showLogo", !settings.showLogo)} />
+                <ToggleRow label="Show Subtitle / Description" enabled={settings.showSubtitle} onToggle={() => set("showSubtitle", !settings.showSubtitle)} />
+                <ToggleRow label="Show Cuisine & Metric Tags" enabled={settings.showTags} onToggle={() => set("showTags", !settings.showTags)} />
+                <ToggleRow label="Show Open Status Badge" enabled={settings.showOpenBadge} onToggle={() => set("showOpenBadge", !settings.showOpenBadge)} />
+              </div>
+            </AccordionItem>
+
+          </div>
+        </aside>
+
+        {/* Right side live interactive mockup pane */}
+        <main className="flex-1 bg-[#FAF9F5] p-8 flex items-center justify-center overflow-y-auto z-0 relative select-text">
+          {/* Parallax background canvas helper */}
+          <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] opacity-40 pointer-events-none" />
+
+          {/* VIEWPORT CONTROLLER CONTAINER */}
+          <div
+            className={`transition-all duration-300 ease-out flex flex-col ${
+              viewport === "desktop"
+                ? "w-full max-w-4xl"
+                : viewport === "tablet"
+                ? "w-[768px]"
+                : "w-[390px] border-[10px] border-neutral-900 rounded-[50px] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] bg-[#0d0c0b] overflow-hidden relative"
+            }`}
+            style={{
+              height: viewport === "mobile" ? "680px" : undefined,
+            }}
+          >
+            {/* Viewport Dynamic Island notch mockup */}
+            {viewport === "mobile" && (
+              <div className="h-6 w-full bg-neutral-900 flex items-center justify-center flex-shrink-0 z-50">
+                <div className="w-24 h-4 bg-black rounded-full shadow-inner mt-1" />
+              </div>
+            )}
+
+            {/* PREVIEW CONTAINER */}
+            <div
+              style={brandStyle}
+              className={`w-full overflow-hidden select-none bg-stone-100 flex flex-col relative transition-colors ${
+                viewport === "mobile" ? "flex-1 overflow-y-auto scrollbar-hide" : "rounded-3xl border border-[#EFECE6] shadow-md h-[400px]"
+              }`}
+            >
+              {/* Storefront Hero section inside mockup */}
+              <section
+                onClick={() => toggleTab("cover")}
+                className={`relative flex flex-col bg-stone-100 overflow-hidden cursor-pointer hover:ring-2 hover:ring-orange-500/50 transition-all ${justifyClass}`}
+                style={{
+                  height: viewport === "mobile" ? "100%" : "400px",
+                  minHeight: viewport === "mobile" ? undefined : `${settings.heroHeight}vh`,
+                }}
+              >
+                {coverUrl && (
+                  <div className="absolute inset-0 z-0 pointer-events-none">
+                    <img
+                      src={coverUrl}
+                      alt=""
+                      className="w-full h-full opacity-90 transition-transform duration-500 scale-100"
+                      style={{
+                        objectFit: settings.coverObjectFit,
+                        objectPosition: `${settings.focalPointX}% ${settings.focalPointY}%`,
+                      }}
+                    />
+                    <div className="absolute inset-0" style={overlayStyle} />
+                  </div>
+                )}
+
+                {/* Navbar strip inside mockup */}
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleTab("branding");
+                  }}
+                  className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-5 py-4 bg-gradient-to-b from-black/45 to-transparent cursor-pointer hover:bg-white/10 rounded-lg transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    {settings.showLogo && logoUrl ? (
+                      <div
+                        className="overflow-hidden border border-white/20 shadow flex-shrink-0"
+                        style={{
+                          width: Math.round(settings.logoWidth * 0.7),
+                          height: Math.round(settings.logoHeight * 0.7),
+                          borderRadius: Math.round(settings.logoBorderRadius * 0.7),
+                        }}
+                      >
+                        <img
+                          src={logoUrl}
+                          alt="logo"
+                          className="w-full h-full"
+                          style={{
+                            objectFit: settings.logoObjectFit,
+                            objectPosition: `${settings.logoFocalX}% ${settings.logoFocalY}%`,
+                          }}
+                        />
+                      </div>
+                    ) : settings.showLogo ? (
+                      <div
+                        className="bg-white/15 backdrop-blur flex items-center justify-center border border-white/20 flex-shrink-0"
+                        style={{
+                          width: Math.round(settings.logoWidth * 0.7),
+                          height: Math.round(settings.logoHeight * 0.7),
+                          borderRadius: Math.round(settings.logoBorderRadius * 0.7),
+                        }}
+                      >
+                        <span className="text-white font-extrabold text-[9px]">
+                          {restaurantName.slice(0, 2).toUpperCase()}
+                        </span>
+                      </div>
+                    ) : null}
+                    <span className="text-white font-black text-xs tracking-tight drop-shadow-sm select-none">
+                      {restaurantName}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {settings.showOpenBadge && (
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-400/30 text-emerald-400 text-[8px] font-bold uppercase tracking-wider">
+                        <span className="w-1 h-1 bg-emerald-400 rounded-full" />
+                        Open
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Hero text overlay mockup */}
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleTab("typography");
+                  }}
+                  className="relative z-10 max-w-4xl mx-auto w-full px-5 text-white py-6"
+                  style={{
+                    textAlign: settings.textAlign,
+                  }}
+                >
+                  <div
+                    className={`space-y-2.5 ${
+                      settings.textAlign === "center"
+                        ? "max-w-2xl mx-auto"
+                        : settings.textAlign === "right"
+                        ? "max-w-2xl ml-auto"
+                        : "max-w-2xl"
+                    }`}
+                  >
+                    <h1
+                      className="font-black drop-shadow"
+                      style={{
+                        ...fonts.heading,
+                        fontSize: Math.round(settings.headingSize * 0.7),
+                        lineHeight: settings.lineHeight / 100,
+                        letterSpacing: `${settings.letterSpacing * 0.01}em`,
+                      }}
+                    >
+                      {restaurantName}
+                    </h1>
+
+                    {settings.showSubtitle && description && (
+                      <p
+                        className="text-white/85 font-medium leading-relaxed"
+                        style={{
+                          ...fonts.sub,
+                          fontSize: Math.round(settings.subtitleSize * 0.75),
+                          lineHeight: settings.lineHeight / 100,
+                          letterSpacing: `${settings.letterSpacing * 0.01}em`,
+                        }}
+                      >
+                        {description}
+                      </p>
+                    )}
+
+                    {/* Tags metrics preview inside frame */}
+                    {settings.showTags && (
+                      <div
+                        className={`flex flex-wrap gap-1.5 pt-1.5 border-t border-white/10 ${
+                          settings.textAlign === "center"
+                            ? "justify-center"
+                            : settings.textAlign === "right"
+                            ? "justify-end"
+                            : ""
+                        }`}
+                      >
+                        <div className="flex items-center gap-1 text-[8px] text-white/80 font-bold bg-white/10 px-2 py-0.5 rounded-md border border-white/10">
+                          <span>⭐</span> 4.8
+                        </div>
+                        <div className="flex items-center gap-1 text-[8px] text-white/80 font-bold bg-white/10 px-2 py-0.5 rounded-md border border-white/10">
+                          <span>⏱️</span> 20–35 min
+                        </div>
+                        <div className="flex items-center gap-1 text-[8px] text-white/80 font-bold bg-white/10 px-2 py-0.5 rounded-md border border-white/10">
+                          <span>🚚</span> Free
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Interactive button CTA shapes mockup */}
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleTab("cta");
+                      }}
+                      className={`flex gap-2 pt-2 ${
+                        settings.textAlign === "center"
+                          ? "justify-center"
+                          : settings.textAlign === "right"
+                          ? "justify-end"
+                          : ""
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        style={{ backgroundColor: primaryColor }}
+                        className={`text-white text-[9px] font-black uppercase tracking-wider py-2.5 px-4 shadow ${
+                          settings.buttonStyle === "pill"
+                            ? "rounded-full"
+                            : settings.buttonStyle === "sharp"
+                            ? "rounded-none"
+                            : "rounded-xl"
+                        }`}
+                      >
+                        {settings.primaryCtaText || "Order Online"}
+                      </button>
+
+                      {settings.showSecondaryCta && (
+                        <button
+                          type="button"
+                          className={`text-white text-[9px] font-black uppercase tracking-wider py-2.5 px-4 bg-white/15 border border-white/15 backdrop-blur ${
+                            settings.buttonStyle === "pill"
+                              ? "rounded-full"
+                              : settings.buttonStyle === "sharp"
+                              ? "rounded-none"
+                              : "rounded-xl"
+                          }`}
+                        >
+                          {settings.secondaryCtaText || "Book a Table"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Simulated storefront info section */}
+              {viewport === "mobile" && (
+                <div className="bg-white border-t border-gray-100 p-5 space-y-4">
+                  <div className="flex gap-2 items-center">
+                    <span className="w-1 h-4 bg-orange-500 rounded-full" />
+                    <span className="text-xs font-black uppercase tracking-wide text-neutral-800">Operational Hours</span>
+                  </div>
+                  <div className="bg-stone-50 border border-gray-100 rounded-2xl p-3 flex justify-between items-center">
+                    <span className="text-[10px] font-bold text-gray-500">Every day 09:00 AM - 10:00 PM</span>
+                    <span className="text-[9px] font-bold bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full">WAT Time</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Bottom device bezel mockup */}
+            {viewport === "mobile" && (
+              <div className="h-6 w-full bg-neutral-900 flex items-center justify-center flex-shrink-0 z-50">
+                <div className="w-32 h-1 bg-white/30 rounded-full mb-1" />
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+/* ── COMPONENT UTILITIES ─────────────────────────────────── */
+
+function AccordionItem({
+  title,
+  icon,
+  active,
+  onClick,
+  children,
+}: {
+  title: string;
+  icon: string;
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border border-[#EFECE6] bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.015)] overflow-hidden transition-all duration-300">
+      <button
+        type="button"
+        onClick={onClick}
+        className="w-full flex items-center justify-between px-4 py-3.5 bg-stone-50 hover:bg-stone-100/50 transition text-left"
+      >
+        <div className="flex items-center gap-2.5">
+          <span className="text-sm">{icon}</span>
+          <span className="text-xs font-black text-gray-800 uppercase tracking-tight">{title}</span>
+        </div>
+        <svg
+          className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${active ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      <div
+        className={`transition-all duration-300 ease-in-out ${
+          active ? "max-h-[800px] border-t border-[#EFECE6] p-4 opacity-100" : "max-h-0 opacity-0 pointer-events-none"
+        } overflow-hidden`}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function Slider({
+  label,
+  min,
+  max,
+  value,
+  onChange,
+  div = 1,
+  suffix = "",
+}: {
+  label: string;
+  min: number;
+  max: number;
+  value: number;
+  onChange: (v: number) => void;
+  div?: number;
+  suffix?: string;
+}) {
+  const displayVal = (value / div).toFixed(div > 1 ? 2 : 0);
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-1">
+        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{label}</p>
+        <span className="text-[10px] font-bold text-gray-400 bg-stone-100 px-1.5 py-0.5 rounded">
+          {displayVal}
+          {suffix}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full accent-orange-500 cursor-pointer h-1 bg-gray-200 rounded-lg appearance-none"
+      />
+    </div>
+  );
+}
+
+function ToggleGroup({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex gap-1.5 flex-wrap">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onChange(o.value)}
+          className={`flex-1 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl border transition ${
+            value === o.value
+              ? "bg-gray-900 text-white border-gray-900 shadow-sm"
+              : "bg-white text-gray-500 border-gray-200 hover:border-gray-350"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ToggleRow({
+  label,
+  enabled,
+  onToggle,
+}: {
+  label: string;
+  enabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-b-0">
+      <span className="text-xs font-bold text-gray-700">{label}</span>
+      <div
+        onClick={onToggle}
+        className={`relative w-8 h-4 rounded-full transition-colors cursor-pointer ${enabled ? "bg-orange-500" : "bg-gray-200"}`}
+      >
+        <div
+          className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${
+            enabled ? "translate-x-4" : "translate-x-0.5"
+          }`}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PosDot({
+  active,
+  v,
+  a,
+}: {
+  active: boolean;
+  v: "top" | "middle" | "bottom";
+  a: "left" | "center" | "right";
+}) {
+  const cx = a === "left" ? 6 : a === "center" ? 12 : 18;
+  const cy = v === "top" ? 6 : v === "middle" ? 12 : 18;
+  return (
+    <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden>
+      <rect
+        x="2"
+        y="2"
+        width="20"
+        height="20"
+        rx="3"
+        fill={active ? "#fff7ed" : "#f9fafb"}
+        stroke={active ? "#f97316" : "#e5e7eb"}
+        strokeWidth="1.5"
+      />
+      <circle cx={cx} cy={cy} r="2.5" fill={active ? "#f97316" : "#9ca3af"} />
+    </svg>
+  );
+}

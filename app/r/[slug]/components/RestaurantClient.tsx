@@ -66,6 +66,15 @@ function parseList(s?: string): string[] {
   return s.split(",").map((x) => x.trim()).filter(Boolean);
 }
 
+function hexToRgb(hex: string) {
+  const clean = hex.replace("#", "");
+  const bigint = parseInt(clean, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `${r}, ${g}, ${b}`;
+}
+
 export default function RestaurantClient({ restaurant, menuItems, seo, isPreview, initialTable }: RestaurantClientProps) {
   const { items, addToCart, updateQuantity, clearCart, totalPrice, totalItems } = useCart();
 
@@ -172,6 +181,20 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Google Font preloader for custom visual storefront font pairings
+  useEffect(() => {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href =
+      "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&family=Outfit:wght@400;600;800;900&family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Inter:wght@400;500;700&display=swap";
+    document.head.appendChild(link);
+    return () => {
+      try {
+        document.head.removeChild(link);
+      } catch {}
+    };
   }, []);
 
   // Parallax scroll listener
@@ -462,186 +485,272 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
       )}
 
       {/* ── HERO ─────────────────────────────────────────────────────────────── */}
-      <section
-        className={`relative flex flex-col bg-stone-100 dark:bg-stone-900 overflow-hidden ${
-          hs.textVerticalPosition === "top" ? "justify-start" : hs.textVerticalPosition === "middle" ? "justify-center" : "justify-end"
-        }`}
-        style={{ minHeight: `${hs.heroHeight}vh` }}
-      >
-        {restaurant.coverImage && (
-          <div
-            className="absolute inset-0 z-0 pointer-events-none"
-            style={{ transform: `translateY(${scrollY * 0.25}px)` }}
-          >
-            <img
-              src={restaurant.coverImage}
-              alt=""
-              className="w-full h-full opacity-90 transition-transform duration-500 scale-100"
-              style={{
-                objectFit: hs.coverObjectFit,
-                objectPosition: `${hs.focalPointX}% ${hs.focalPointY}%`,
-              }}
-            />
-            <div
-              className="absolute inset-0"
-              style={{
-                background: `linear-gradient(to top, rgba(0,0,0,${(hs.overlayOpacity / 100).toFixed(2)}) 0%, rgba(0,0,0,${(hs.overlayOpacity * 0.47 / 100).toFixed(2)}) 50%, rgba(0,0,0,${(hs.overlayOpacity * 0.12 / 100).toFixed(2)}) 100%)`,
-              }}
-            />
-          </div>
-        )}
+      {(() => {
+        const getTypographyStyles = () => {
+          switch (hs.fontPairing) {
+            case "modern-serif":
+              return {
+                heading: { fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 900 },
+                sub: { fontFamily: "'Inter', sans-serif", fontWeight: 400 },
+              };
+            case "sleek-sans":
+              return {
+                heading: { fontFamily: "'Outfit', sans-serif", fontWeight: 900 },
+                sub: { fontFamily: "'Outfit', sans-serif", fontWeight: 400 },
+              };
+            case "warm-display":
+              return {
+                heading: { fontFamily: "'Montserrat', sans-serif", fontWeight: 900 },
+                sub: { fontFamily: "'Outfit', sans-serif", fontWeight: 400 },
+              };
+            default:
+              return {
+                heading: { fontFamily: "system-ui, sans-serif", fontWeight: 800 },
+                sub: { fontFamily: "system-ui, sans-serif", fontWeight: 500 },
+              };
+          }
+        };
 
-        {/* Top Navbar */}
-        <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 py-5 bg-gradient-to-b from-black/50 to-transparent">
-          <div className="flex items-center gap-3">
-            {restaurant.logo ? (
+        const getOverlayStyle = () => {
+          const opacity = (hs.overlayOpacity / 100).toFixed(2);
+          switch (hs.overlayType) {
+            case "solid-brand":
+              return {
+                background: `rgba(${hexToRgb(primary)}, ${opacity})`,
+              };
+            case "gradient-brand":
+              return {
+                background: `linear-gradient(to top, rgba(${hexToRgb(primary)}, ${opacity}) 0%, rgba(0,0,0,${(hs.overlayOpacity * 0.5 / 100).toFixed(2)}) 80%, rgba(0,0,0,${(hs.overlayOpacity * 0.2 / 100).toFixed(2)}) 100%)`,
+              };
+            case "none":
+              return { background: "none" };
+            default:
+              return {
+                background: `linear-gradient(to top, rgba(0,0,0,${opacity}) 0%, rgba(0,0,0,${(hs.overlayOpacity * 0.47 / 100).toFixed(2)}) 50%, rgba(0,0,0,${(hs.overlayOpacity * 0.12 / 100).toFixed(2)}) 100%)`,
+              };
+          }
+        };
+
+        const fonts = getTypographyStyles();
+        const oStyle = getOverlayStyle();
+        const btnStyleCls = hs.buttonStyle === "pill"
+          ? "rounded-full"
+          : hs.buttonStyle === "sharp"
+          ? "rounded-none"
+          : "rounded-xl";
+
+        return (
+          <section
+            className={`relative flex flex-col bg-stone-100 dark:bg-stone-900 overflow-hidden ${
+              hs.textVerticalPosition === "top" ? "justify-start" : hs.textVerticalPosition === "middle" ? "justify-center" : "justify-end"
+            }`}
+            style={{ minHeight: `${hs.heroHeight}vh` }}
+          >
+            {restaurant.coverImage && (
               <div
-                className="overflow-hidden border border-white/20 shadow-md flex-shrink-0"
-                style={{
-                  width: hs.logoWidth,
-                  height: hs.logoHeight,
-                  borderRadius: hs.logoBorderRadius,
-                }}
+                className="absolute inset-0 z-0 pointer-events-none"
+                style={{ transform: `translateY(${scrollY * 0.25}px)` }}
               >
                 <img
-                  src={restaurant.logo}
-                  alt="logo"
-                  className="w-full h-full"
+                  src={restaurant.coverImage}
+                  alt=""
+                  className="w-full h-full opacity-90 transition-transform duration-500 scale-100"
                   style={{
-                    objectFit: hs.logoObjectFit,
-                    objectPosition: `${hs.logoFocalX}% ${hs.logoFocalY}%`,
+                    objectFit: hs.coverObjectFit,
+                    objectPosition: `${hs.focalPointX}% ${hs.focalPointY}%`,
                   }}
                 />
-              </div>
-            ) : (
-              <div
-                className="bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/25 flex-shrink-0"
-                style={{ width: hs.logoWidth, height: hs.logoHeight, borderRadius: hs.logoBorderRadius }}
-              >
-                <span className="text-white font-extrabold text-sm tracking-tight">
-                  {restaurant.name.slice(0, 2).toUpperCase()}
-                </span>
+                <div
+                  className="absolute inset-0"
+                  style={oStyle}
+                />
               </div>
             )}
-            <span className="text-white font-black text-lg tracking-tight drop-shadow-sm select-none">{restaurant.name}</span>
-          </div>
 
-          <div className="hidden md:flex items-center gap-8">
-            {navSections.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => scrollTo(s.id)}
-                className="text-white/80 hover:text-white text-[11px] font-bold uppercase tracking-widest transition-all hover:scale-105 active:scale-95"
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
+            {/* Top Navbar */}
+            <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 py-5 bg-gradient-to-b from-black/50 to-transparent">
+              <div className="flex items-center gap-3">
+                {hs.showLogo !== false && restaurant.logo ? (
+                  <div
+                    className="overflow-hidden border border-white/20 shadow-md flex-shrink-0"
+                    style={{
+                      width: hs.logoWidth,
+                      height: hs.logoHeight,
+                      borderRadius: hs.logoBorderRadius,
+                    }}
+                  >
+                    <img
+                      src={restaurant.logo}
+                      alt="logo"
+                      className="w-full h-full"
+                      style={{
+                        objectFit: hs.logoObjectFit,
+                        objectPosition: `${hs.logoFocalX}% ${hs.logoFocalY}%`,
+                      }}
+                    />
+                  </div>
+                ) : hs.showLogo !== false ? (
+                  <div
+                    className="bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/25 flex-shrink-0"
+                    style={{ width: hs.logoWidth, height: hs.logoHeight, borderRadius: hs.logoBorderRadius }}
+                  >
+                    <span className="text-white font-extrabold text-sm tracking-tight">
+                      {restaurant.name.slice(0, 2).toUpperCase()}
+                    </span>
+                  </div>
+                ) : null}
+                <span className="text-white font-black text-lg tracking-tight drop-shadow-sm select-none">{restaurant.name}</span>
+              </div>
 
-          <div className="flex items-center gap-3">
-            {restaurant.isOpen ? (
-              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-400/30 text-emerald-400 text-[10px] font-bold uppercase tracking-wider shadow-sm">
-                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-                Open Now
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500/20 backdrop-blur-md border border-rose-400/30 text-rose-400 text-[10px] font-bold uppercase tracking-wider shadow-sm">
-                <span className="w-1.5 h-1.5 bg-rose-400/60 rounded-full" />
-                Closed
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Hero text */}
-        <div
-          className="relative z-10 max-w-4xl mx-auto w-full px-6 text-white"
-          style={{
-            paddingBottom: hs.textVerticalPosition === "bottom" ? "3rem" : undefined,
-            paddingTop: hs.textVerticalPosition === "top" ? "6rem" : undefined,
-            textAlign: hs.textAlign,
-          }}
-        >
-          <div
-            className={`space-y-4 ${
-              hs.textAlign === "center" ? "max-w-2xl mx-auto" : hs.textAlign === "right" ? "max-w-2xl ml-auto" : "max-w-2xl"
-            }`}
-          >
-            <h1
-              className="font-black drop-shadow-md"
-              style={{
-                fontSize: hs.headingSize,
-                lineHeight: hs.lineHeight / 100,
-                letterSpacing: `${hs.letterSpacing * 0.01}em`,
-              }}
-            >
-              {restaurant.name}
-            </h1>
-            {restaurant.description && (
-              <p
-                className="text-white/85 drop-shadow-sm font-medium"
-                style={{
-                  fontSize: hs.subtitleSize,
-                  lineHeight: hs.lineHeight / 100,
-                  letterSpacing: `${hs.letterSpacing * 0.01}em`,
-                }}
-              >
-                {restaurant.description}
-              </p>
-            )}
-
-            {/* Cuisine tags */}
-            {keywords.length > 0 && (
-              <div className={`flex flex-wrap gap-1.5 pt-1 ${hs.textAlign === "center" ? "justify-center" : hs.textAlign === "right" ? "justify-end" : ""}`}>
-                {keywords.slice(0, 4).map((k) => (
-                  <span key={k} className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-white/15 border border-white/10 backdrop-blur-sm">
-                    {k}
-                  </span>
+              <div className="hidden md:flex items-center gap-8">
+                {navSections.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => scrollTo(s.id)}
+                    className="text-white/80 hover:text-white text-[11px] font-bold uppercase tracking-widest transition-all hover:scale-105 active:scale-95"
+                  >
+                    {s.label}
+                  </button>
                 ))}
               </div>
-            )}
 
-            {/* Metrics */}
-            <div className={`grid grid-cols-3 gap-3 pt-4 border-t border-white/15 max-w-md ${hs.textAlign === "center" ? "mx-auto" : hs.textAlign === "right" ? "ml-auto" : ""}`}>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-sm">⭐</span>
-                </div>
-                <div>
-                  <p className="text-[10px] text-white/50 uppercase font-black tracking-wider">Rating</p>
-                  <p className="text-xs font-bold text-white">{rating ? rating.toFixed(1) : "4.8"}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-sm">⏱️</span>
-                </div>
-                <div>
-                  <p className="text-[10px] text-white/50 uppercase font-black tracking-wider">Speed</p>
-                  <p className="text-xs font-bold text-white">{deliveryTime}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-sm">🚚</span>
-                </div>
-                <div>
-                  <p className="text-[10px] text-white/50 uppercase font-black tracking-wider">Delivery</p>
-                  <p className="text-xs font-bold text-white">
-                    {restaurant.deliveryEnabled
-                      ? restaurant.hidePrices
-                        ? "Available"
-                        : restaurant.deliveryFee > 0
-                        ? fmt(restaurant.deliveryFee)
-                        : "Free"
-                      : "N/A"}
-                  </p>
-                </div>
+              <div className="flex items-center gap-3">
+                {hs.showOpenBadge !== false && (
+                  restaurant.isOpen ? (
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/20 backdrop-blur-md border border-emerald-400/30 text-emerald-400 text-[10px] font-bold uppercase tracking-wider shadow-sm">
+                      <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                      Open Now
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500/20 backdrop-blur-md border border-rose-400/30 text-rose-400 text-[10px] font-bold uppercase tracking-wider shadow-sm">
+                      <span className="w-1.5 h-1.5 bg-rose-400/60 rounded-full" />
+                      Closed
+                    </span>
+                  )
+                )}
               </div>
             </div>
-          </div>
-        </div>
-      </section>
+
+            {/* Hero text */}
+            <div
+              className="relative z-10 max-w-4xl mx-auto w-full px-6 text-white"
+              style={{
+                paddingBottom: hs.textVerticalPosition === "bottom" ? "3rem" : undefined,
+                paddingTop: hs.textVerticalPosition === "top" ? "6rem" : undefined,
+                textAlign: hs.textAlign,
+              }}
+            >
+              <div
+                className={`space-y-4 ${
+                  hs.textAlign === "center" ? "max-w-2xl mx-auto" : hs.textAlign === "right" ? "max-w-2xl ml-auto" : "max-w-2xl"
+                }`}
+              >
+                <h1
+                  className="font-black drop-shadow-md animate-fadeIn"
+                  style={{
+                    ...fonts.heading,
+                    fontSize: hs.headingSize,
+                    lineHeight: hs.lineHeight / 100,
+                    letterSpacing: `${hs.letterSpacing * 0.01}em`,
+                  }}
+                >
+                  {restaurant.name}
+                </h1>
+                {hs.showSubtitle !== false && restaurant.description && (
+                  <p
+                    className="text-white/85 drop-shadow-sm font-medium leading-relaxed"
+                    style={{
+                      ...fonts.sub,
+                      fontSize: hs.subtitleSize,
+                      lineHeight: hs.lineHeight / 100,
+                      letterSpacing: `${hs.letterSpacing * 0.01}em`,
+                    }}
+                  >
+                    {restaurant.description}
+                  </p>
+                )}
+
+                {/* Cuisine tags */}
+                {hs.showTags !== false && keywords.length > 0 && (
+                  <div className={`flex flex-wrap gap-1.5 pt-1 ${hs.textAlign === "center" ? "justify-center" : hs.textAlign === "right" ? "justify-end" : ""}`}>
+                    {keywords.slice(0, 4).map((k) => (
+                      <span key={k} className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-white/15 border border-white/10 backdrop-blur-sm">
+                        {k}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Metrics */}
+                {hs.showTags !== false && (
+                  <div className={`grid grid-cols-3 gap-3 pt-4 border-t border-white/15 max-w-md ${hs.textAlign === "center" ? "mx-auto" : hs.textAlign === "right" ? "ml-auto" : ""}`}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm">⭐</span>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-white/50 uppercase font-black tracking-wider">Rating</p>
+                        <p className="text-xs font-bold text-white">{rating ? rating.toFixed(1) : "4.8"}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm">⏱️</span>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-white/50 uppercase font-black tracking-wider">Speed</p>
+                        <p className="text-xs font-bold text-white">{deliveryTime}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm">🚚</span>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-white/50 uppercase font-black tracking-wider">Delivery</p>
+                        <p className="text-xs font-bold text-white">
+                          {restaurant.deliveryEnabled
+                            ? restaurant.hidePrices
+                              ? "Available"
+                              : restaurant.deliveryFee > 0
+                              ? fmt(restaurant.deliveryFee)
+                              : "Free"
+                            : "N/A"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Hero Button CTAs */}
+                <div
+                  className={`flex gap-3 pt-2.5 ${
+                    hs.textAlign === "center" ? "justify-center" : hs.textAlign === "right" ? "justify-end" : ""
+                  }`}
+                >
+                  <button
+                    onClick={() => scrollTo("menu")}
+                    style={{ backgroundColor: primary }}
+                    className={`text-white text-xs font-black uppercase tracking-wider py-3.5 px-6 shadow-md shadow-[var(--brand-primary-10)] active:scale-95 transition-all hover:opacity-95 ${btnStyleCls}`}
+                  >
+                    {hs.primaryCtaText || "Order Online"}
+                  </button>
+
+                  {hs.showSecondaryCta && (
+                    <button
+                      onClick={() => setScheduleOpen(true)}
+                      className={`text-white text-xs font-black uppercase tracking-wider py-3.5 px-6 bg-white/15 border border-white/15 backdrop-blur-md active:scale-[0.97] transition-all hover:bg-white/20 ${btnStyleCls}`}
+                    >
+                      {hs.secondaryCtaText || "Schedule Preorder"}
+                    </button>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          </section>
+        );
+      })()}
 
       {/* ── Operational Info Bar ─────────────────────────────────────────────── */}
       <div className="bg-white dark:bg-[#141412] border-b border-[#EFECE6] dark:border-[#1F1F1C] px-6 py-6 shadow-[0_2px_15px_rgba(0,0,0,0.015)] transition-colors duration-300">

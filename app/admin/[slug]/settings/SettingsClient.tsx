@@ -251,6 +251,8 @@ export default function SettingsClient({ restaurant, aiEnabled = false }: Props)
             coverUrl={form.coverImage}
             restaurantName={form.name}
             description={form.description}
+            primaryColor={form.primaryColor}
+            accentColor={form.accentColor}
           />
         </Section>
 

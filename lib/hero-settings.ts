@@ -16,6 +16,18 @@ export interface HeroSettings {
   focalPointX: number;     // 0–100
   focalPointY: number;     // 0–100
   overlayOpacity: number;  // 0–100
+
+  // Premium visual control variables
+  fontPairing: "default" | "modern-serif" | "sleek-sans" | "warm-display";
+  overlayType: "dark" | "solid-brand" | "gradient-brand" | "none";
+  buttonStyle: "pill" | "rounded" | "sharp";
+  primaryCtaText: string;
+  secondaryCtaText: string;
+  showSecondaryCta: boolean;
+  showLogo: boolean;
+  showSubtitle: boolean;
+  showTags: boolean;
+  showOpenBadge: boolean;
 }
 
 export const DEFAULT_HERO_SETTINGS: HeroSettings = {
@@ -36,4 +48,16 @@ export const DEFAULT_HERO_SETTINGS: HeroSettings = {
   focalPointX: 50,
   focalPointY: 50,
   overlayOpacity: 85,
+
+  // Default values for new premium properties
+  fontPairing: "default",
+  overlayType: "dark",
+  buttonStyle: "rounded",
+  primaryCtaText: "Order Online",
+  secondaryCtaText: "Book a Table",
+  showSecondaryCta: false,
+  showLogo: true,
+  showSubtitle: true,
+  showTags: true,
+  showOpenBadge: true,
 };
