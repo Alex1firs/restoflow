@@ -15,7 +15,7 @@ interface Props {
   onClose: () => void;
 }
 
-type TabKey = "branding" | "cover" | "typography" | "cta" | "elements" | "navbar" | "partners";
+type TabKey = "branding" | "cover" | "typography" | "cta" | "elements" | "navbar" | "partners" | "menu";
 type ViewportMode = "desktop" | "tablet" | "mobile";
 
 export default function VisualCustomizer({
@@ -621,6 +621,285 @@ export default function VisualCustomizer({
               </div>
             </AccordionItem>
 
+            {/* 8. Culinary Menu Customizer */}
+            <AccordionItem
+              title="Storefront Menu"
+              icon="🍽️"
+              active={activeTab === "menu"}
+              onClick={() => toggleTab("menu")}
+            >
+              <div className="space-y-4 pt-1">
+                {/* 1. Header label visibility & text */}
+                <div className="space-y-2">
+                  <ToggleRow
+                    label="Show Subheader Label"
+                    enabled={settings.menuShowHeaderLabel !== false}
+                    onToggle={() => set("menuShowHeaderLabel", settings.menuShowHeaderLabel === false ? true : false)}
+                  />
+                  {(settings.menuShowHeaderLabel !== false) && (
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Subheader text</label>
+                      <input
+                        type="text"
+                        value={settings.menuHeaderLabelText || ""}
+                        onChange={(e) => set("menuHeaderLabelText", e.target.value)}
+                        placeholder="e.g. Elite Gastronomy"
+                        className="w-full border border-gray-250 rounded-xl px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-orange-500 transition bg-white font-medium"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Main Title Text */}
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Menu Title</label>
+                  <input
+                    type="text"
+                    value={settings.menuTitleText || ""}
+                    onChange={(e) => set("menuTitleText", e.target.value)}
+                    placeholder="Explore Culinary Menu"
+                    className="w-full border border-gray-250 rounded-xl px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-orange-500 transition bg-white font-medium"
+                  />
+                </div>
+
+                {/* 3. Description visibility & text */}
+                <div className="space-y-2">
+                  <ToggleRow
+                    label="Show Menu Description"
+                    enabled={settings.menuShowDescription !== false}
+                    onToggle={() => set("menuShowDescription", settings.menuShowDescription === false ? true : false)}
+                  />
+                  {(settings.menuShowDescription !== false) && (
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Description Paragraph</label>
+                      <textarea
+                        value={settings.menuDescriptionText || ""}
+                        onChange={(e) => set("menuDescriptionText", e.target.value)}
+                        placeholder="Freshly made dishes, sides, desserts..."
+                        rows={3}
+                        className="w-full border border-gray-250 rounded-xl px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-orange-500 transition bg-white font-medium resize-none"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <hr className="border-gray-100" />
+
+                {/* 4. Typography Sizing Sliders */}
+                <div className="space-y-3">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Typography Sizing</label>
+                  
+                  {settings.menuShowHeaderLabel !== false && (
+                    <div>
+                      <div className="flex justify-between text-[10px] text-gray-500 font-bold mb-1">
+                        <span>Subheader Label size</span>
+                        <span>{settings.menuLabelSize || 10}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="8"
+                        max="16"
+                        value={settings.menuLabelSize || 10}
+                        onChange={(e) => set("menuLabelSize", parseInt(e.target.value))}
+                        className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="flex justify-between text-[10px] text-gray-500 font-bold mb-1">
+                      <span>Menu Title size</span>
+                      <span>{settings.menuTitleSize || 30}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="20"
+                      max="60"
+                      value={settings.menuTitleSize || 30}
+                      onChange={(e) => set("menuTitleSize", parseInt(e.target.value))}
+                      className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                    />
+                  </div>
+
+                  {settings.menuShowDescription !== false && (
+                    <div>
+                      <div className="flex justify-between text-[10px] text-gray-500 font-bold mb-1">
+                        <span>Description size</span>
+                        <span>{settings.menuDescriptionSize || 14}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="11"
+                        max="18"
+                        value={settings.menuDescriptionSize || 14}
+                        onChange={(e) => set("menuDescriptionSize", parseInt(e.target.value))}
+                        className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <hr className="border-gray-100" />
+
+                {/* 5. Section Background styling */}
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Section Background</label>
+                    <ToggleGroup
+                      options={[
+                        { value: "default", label: "Default" },
+                        { value: "solid", label: "Solid Color" },
+                        { value: "gradient", label: "Gradient" },
+                      ]}
+                      value={settings.menuBgColorType || "default"}
+                      onChange={(v) => set("menuBgColorType", v as any)}
+                    />
+                  </div>
+
+                  {settings.menuBgColorType === "solid" && (
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Custom Background Color</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="color"
+                          value={settings.menuCustomBgColor || "#ffffff"}
+                          onChange={(e) => set("menuCustomBgColor", e.target.value)}
+                          className="w-8 h-8 rounded-lg border border-gray-200 cursor-pointer p-0 overflow-hidden"
+                        />
+                        <input
+                          type="text"
+                          value={settings.menuCustomBgColor || ""}
+                          onChange={(e) => set("menuCustomBgColor", e.target.value)}
+                          placeholder="#ffffff"
+                          className="flex-1 border border-gray-250 rounded-xl px-3 py-1.5 text-xs text-gray-900 focus:outline-none focus:border-orange-500 bg-white"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {settings.menuBgColorType === "gradient" && (
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Linear Gradient Rule</label>
+                      <input
+                        type="text"
+                        value={settings.menuCustomGradient || ""}
+                        onChange={(e) => set("menuCustomGradient", e.target.value)}
+                        placeholder="e.g. linear-gradient(135deg, #fdfbf7 0%, #ffffff 100%)"
+                        className="w-full border border-gray-250 rounded-xl px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-orange-500 bg-white font-mono"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <hr className="border-gray-100" />
+
+                {/* 6. Card Columns & Layout sizing */}
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Card Grid Columns</label>
+                    <ToggleGroup
+                      options={[
+                        { value: "1", label: "1 Col" },
+                        { value: "2", label: "2 Cols" },
+                        { value: "3", label: "3 Cols" },
+                      ]}
+                      value={String(settings.menuColumns || 3)}
+                      onChange={(v) => set("menuColumns", parseInt(v) as any)}
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-[10px] text-gray-500 font-bold mb-1">
+                      <span>Card Rounding (Border Radius)</span>
+                      <span>{settings.menuCardBorderRadius ?? 16}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="32"
+                      value={settings.menuCardBorderRadius ?? 16}
+                      onChange={(e) => set("menuCardBorderRadius", parseInt(e.target.value))}
+                      className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-[10px] text-gray-500 font-bold mb-1">
+                      <span>Card Image Height</span>
+                      <span>{settings.menuCardImageHeight || 180}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="120"
+                      max="300"
+                      value={settings.menuCardImageHeight || 180}
+                      onChange={(e) => set("menuCardImageHeight", parseInt(e.target.value))}
+                      className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Image Fit / Scale (Crop)</label>
+                    <ToggleGroup
+                      options={[
+                        { value: "cover", label: "Crop Fill (Cover)" },
+                        { value: "contain", label: "Fit Screen (Contain)" },
+                      ]}
+                      value={settings.menuCardImageFit || "cover"}
+                      onChange={(v) => set("menuCardImageFit", v as any)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Card Text Alignment</label>
+                    <ToggleGroup
+                      options={[
+                        { value: "left", label: "Left" },
+                        { value: "center", label: "Center" },
+                        { value: "right", label: "Right" },
+                      ]}
+                      value={settings.menuCardTextAlign || "left"}
+                      onChange={(v) => set("menuCardTextAlign", v as any)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Card Background Styling</label>
+                    <ToggleGroup
+                      options={[
+                        { value: "default", label: "Card Default" },
+                        { value: "transparent", label: "Transparent" },
+                        { value: "custom", label: "Custom Solid" },
+                      ]}
+                      value={settings.menuCardBgStyle || "default"}
+                      onChange={(v) => set("menuCardBgStyle", v as any)}
+                    />
+                  </div>
+
+                  {settings.menuCardBgStyle === "custom" && (
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Custom Card Bg Color</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="color"
+                          value={settings.menuCardCustomBgColor || "#ffffff"}
+                          onChange={(e) => set("menuCardCustomBgColor", e.target.value)}
+                          className="w-8 h-8 rounded-lg border border-gray-200 cursor-pointer p-0 overflow-hidden"
+                        />
+                        <input
+                          type="text"
+                          value={settings.menuCardCustomBgColor || ""}
+                          onChange={(e) => set("menuCardCustomBgColor", e.target.value)}
+                          placeholder="#ffffff"
+                          className="flex-1 border border-gray-250 rounded-xl px-3 py-1.5 text-xs text-gray-900 focus:outline-none focus:border-orange-500 bg-white"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </AccordionItem>
+
           </div>
         </aside>
 
@@ -962,6 +1241,176 @@ export default function VisualCustomizer({
                   </div>
                 </div>
               )}
+
+              {/* Mockup Storefront Menu Section */}
+              <div
+                id="mockup-menu-section"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleTab("menu");
+                }}
+                style={{
+                  background:
+                    settings.menuBgColorType === "solid"
+                      ? settings.menuCustomBgColor || "#ffffff"
+                      : settings.menuBgColorType === "gradient"
+                      ? settings.menuCustomGradient || "linear-gradient(135deg, #fdfbf7 0%, #ffffff 100%)"
+                      : "#ffffff",
+                }}
+                className={`py-6 border-b border-stone-100 transition-all cursor-pointer hover:bg-stone-50/50 ${
+                  activeTab === "menu" ? "ring-2 ring-orange-500/50" : ""
+                }`}
+              >
+                <div className="max-w-4xl mx-auto px-4">
+                  {/* Category Pills Navigation Mockup */}
+                  <div className="flex gap-1.5 justify-center mb-6 overflow-x-auto pb-1 scrollbar-hide">
+                    <span className="text-[9px] font-black uppercase bg-orange-500 text-white px-3 py-1.5 rounded-full shadow-sm">
+                      All Specialties
+                    </span>
+                    <span className="text-[9px] font-black uppercase bg-stone-100 text-stone-600 px-3 py-1.5 rounded-full border border-stone-200">
+                      Main Dishes
+                    </span>
+                    <span className="text-[9px] font-black uppercase bg-stone-100 text-stone-600 px-3 py-1.5 rounded-full border border-stone-200">
+                      Desserts & Sides
+                    </span>
+                  </div>
+
+                  {/* Header Sublabel */}
+                  {settings.menuShowHeaderLabel !== false && (
+                    <div
+                      className={`mb-1 ${
+                        settings.menuCardTextAlign === "center"
+                          ? "text-center"
+                          : settings.menuCardTextAlign === "right"
+                          ? "text-end"
+                          : ""
+                      }`}
+                    >
+                      <span
+                        style={{ fontSize: `${settings.menuLabelSize || 10}px` }}
+                        className="font-black uppercase tracking-wider text-orange-500"
+                      >
+                        {settings.menuHeaderLabelText || "Elite Gastronomy"}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Main Title Heading */}
+                  <div
+                    className={`${
+                      settings.menuCardTextAlign === "center"
+                        ? "text-center"
+                        : settings.menuCardTextAlign === "right"
+                        ? "text-end"
+                        : ""
+                    }`}
+                  >
+                    <h3
+                      style={{ fontSize: `${settings.menuTitleSize || 30}px` }}
+                      className="font-black text-neutral-900 tracking-tight leading-none"
+                    >
+                      {settings.menuTitleText || "Explore Culinary Menu"}
+                    </h3>
+                  </div>
+
+                  {/* Description Paragraph */}
+                  {settings.menuShowDescription !== false && (
+                    <p
+                      style={{ fontSize: `${settings.menuDescriptionSize || 14}px` }}
+                      className={`text-[#7A7368] mt-1.5 leading-relaxed max-w-xl ${
+                        settings.menuCardTextAlign === "center"
+                          ? "mx-auto text-center"
+                          : settings.menuCardTextAlign === "right"
+                          ? "ml-auto text-end"
+                          : ""
+                      }`}
+                    >
+                      {settings.menuDescriptionText ||
+                        "Explore freshly made signature dishes, snacks, side selections, beverages, and desserts."}
+                    </p>
+                  )}
+
+                  {/* Custom columns card grid */}
+                  <div
+                    className={`grid gap-3.5 mt-6 ${
+                      settings.menuColumns === 1
+                        ? "grid-cols-1"
+                        : settings.menuColumns === 2
+                        ? "grid-cols-2"
+                        : "grid-cols-3"
+                    }`}
+                  >
+                    {[
+                      {
+                        name: "Party Jollof Rice and Moi-moi",
+                        price: "₦8,000",
+                        desc: "Smoky, spiced Jollof rice paired with a rich, steamed Moi-moi.",
+                        badge: "Popular",
+                        icon: "🍛",
+                      },
+                      {
+                        name: "Flame Grilled Quarter Chicken",
+                        price: "₦12,500",
+                        desc: "Succulent chicken marinated in heritage spices, flame kissed and tender.",
+                        badge: "Elite",
+                        icon: "🍗",
+                      },
+                    ].map((item, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          borderRadius: `${settings.menuCardBorderRadius ?? 16}px`,
+                          backgroundColor:
+                            settings.menuCardBgStyle === "custom"
+                              ? settings.menuCardCustomBgColor || "#ffffff"
+                              : settings.menuCardBgStyle === "transparent"
+                              ? "transparent"
+                              : "#ffffff",
+                        }}
+                        className={`overflow-hidden border border-stone-150 transition shadow-sm ${
+                          settings.menuCardBgStyle === "transparent" ? "border-transparent shadow-none" : ""
+                        }`}
+                      >
+                        {/* Mock Image container */}
+                        <div
+                          style={{
+                            height: `${settings.menuCardImageHeight || 180}px`,
+                          }}
+                          className="relative w-full bg-stone-100 flex items-center justify-center overflow-hidden"
+                        >
+                          <span className="text-3xl select-none">{item.icon}</span>
+                          <span className="absolute top-2 left-2 bg-orange-500 text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full">
+                            {item.badge}
+                          </span>
+                        </div>
+
+                        {/* Card details */}
+                        <div
+                          className={`p-3.5 ${
+                            settings.menuCardTextAlign === "center"
+                              ? "text-center"
+                              : settings.menuCardTextAlign === "right"
+                              ? "text-end"
+                              : ""
+                          }`}
+                        >
+                          <div className="flex flex-col sm:flex-row justify-between items-start gap-1">
+                            <h4 className="font-extrabold text-[11px] text-neutral-900 leading-tight">
+                              {item.name}
+                            </h4>
+                            <span className="text-[10px] font-black text-orange-600 leading-none">
+                              {item.price}
+                            </span>
+                          </div>
+                          <p className="text-[9px] text-neutral-500 mt-1 leading-normal font-medium">
+                            {item.desc}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
 
             </div>
 

@@ -37,6 +37,24 @@ export interface HeroSettings {
   showPartnersSection: boolean;
   partnersStyle: "floating" | "stagnant";
   partnersSectionTitle: string;
+  menuShowHeaderLabel: boolean;
+  menuHeaderLabelText: string;
+  menuTitleText: string;
+  menuShowDescription: boolean;
+  menuDescriptionText: string;
+  menuBgColorType: "default" | "solid" | "gradient";
+  menuCustomBgColor: string;
+  menuCustomGradient: string;
+  menuTitleSize: number;
+  menuLabelSize: number;
+  menuDescriptionSize: number;
+  menuColumns: 1 | 2 | 3;
+  menuCardBgStyle: "default" | "transparent" | "custom";
+  menuCardCustomBgColor: string;
+  menuCardBorderRadius: number;
+  menuCardImageHeight: number;
+  menuCardImageFit: "cover" | "contain";
+  menuCardTextAlign: "left" | "center" | "right";
 }
 
 export const DEFAULT_HERO_SETTINGS: HeroSettings = {
@@ -78,4 +96,22 @@ export const DEFAULT_HERO_SETTINGS: HeroSettings = {
   showPartnersSection: true,
   partnersStyle: "floating",
   partnersSectionTitle: "Trusted Partners on RestoFlow",
+  menuShowHeaderLabel: true,
+  menuHeaderLabelText: "Elite Gastronomy",
+  menuTitleText: "Explore Culinary Menu",
+  menuShowDescription: true,
+  menuDescriptionText: "Explore freshly made signature dishes, snacks, side selections, beverages, and desserts.",
+  menuBgColorType: "default",
+  menuCustomBgColor: "",
+  menuCustomGradient: "",
+  menuTitleSize: 30,
+  menuLabelSize: 10,
+  menuDescriptionSize: 14,
+  menuColumns: 3,
+  menuCardBgStyle: "default",
+  menuCardCustomBgColor: "",
+  menuCardBorderRadius: 16,
+  menuCardImageHeight: 180,
+  menuCardImageFit: "cover",
+  menuCardTextAlign: "left",
 };

@@ -970,103 +970,217 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
       </nav>
 
       {/* ── MENU EXPERIENCE REDESIGN (Phase 10B) ──────────────────────────────── */}
-      <section id="menu" ref={menuSectionRef} className="scroll-mt-24 max-w-4xl mx-auto px-6 pt-12 pb-6">
-        <div className="mb-8">
-          <span className="text-[10px] font-black uppercase tracking-wider text-[var(--brand-primary)]">Elite Gastronomy</span>
-          <h2 className="text-3xl font-extrabold text-neutral-900 dark:text-neutral-50 tracking-tight mt-0.5">Explore Culinary Menu</h2>
-          {restaurant.description && (
-            <p className="text-[#7A7368] dark:text-[#A19B91] text-sm mt-2 max-w-xl leading-relaxed">
-              Explore freshly made signature dishes, snacks, side selections, beverages, and desserts.
-            </p>
-          )}
-        </div>
-
-        {/* Scrollable menu category pills */}
-        <div className="sticky top-[58px] z-20 bg-[#FAF9F5]/95 dark:bg-[#0D0C0B]/95 backdrop-blur-md py-3.5 border-b border-[#EFECE6] dark:border-[#1F1F1C] -mx-6 px-6 overflow-x-auto scrollbar-hide">
-          <div ref={categoryTabsRef} className="flex gap-2">
-            <button
-              onClick={() => { setActiveCategory(null); scrollTo("menu"); }}
-              style={activeCategory === null ? { backgroundColor: primary } : {}}
-              className={`flex-shrink-0 px-4.5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all duration-200 ${
-                activeCategory === null
-                  ? "text-white shadow-md shadow-[var(--brand-primary-20)] scale-105"
-                  : "text-[#7A7368] hover:text-neutral-900 dark:text-[#A19B91] dark:hover:text-white bg-white dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] hover:border-[var(--brand-primary)]"
+      <div
+        style={{
+          background:
+            hs.menuBgColorType === "solid"
+              ? hs.menuCustomBgColor || undefined
+              : hs.menuBgColorType === "gradient"
+              ? hs.menuCustomGradient || undefined
+              : undefined,
+        }}
+        className="w-full transition-all duration-300"
+      >
+        <section id="menu" ref={menuSectionRef} className="scroll-mt-24 max-w-4xl mx-auto px-6 pt-12 pb-12">
+          <div className="mb-8">
+            {hs.menuShowHeaderLabel !== false && (
+              <div
+                className={`mb-1 ${
+                  hs.menuCardTextAlign === "center"
+                    ? "text-center"
+                    : hs.menuCardTextAlign === "right"
+                    ? "text-end"
+                    : ""
+                }`}
+              >
+                <span
+                  style={{
+                    fontSize: `${hs.menuLabelSize || 10}px`,
+                    color: primary,
+                  }}
+                  className="font-black uppercase tracking-wider"
+                >
+                  {hs.menuHeaderLabelText || "Elite Gastronomy"}
+                </span>
+              </div>
+            )}
+            
+            <div
+              className={`${
+                hs.menuCardTextAlign === "center"
+                  ? "text-center"
+                  : hs.menuCardTextAlign === "right"
+                  ? "text-end"
+                  : ""
               }`}
             >
-              All Specialties
-            </button>
-            {categories.map((cat) => (
+              <h2
+                style={{
+                  fontSize: `${hs.menuTitleSize || 30}px`,
+                }}
+                className="font-extrabold text-neutral-900 dark:text-neutral-50 tracking-tight mt-0.5"
+              >
+                {hs.menuTitleText || "Explore Culinary Menu"}
+              </h2>
+            </div>
+
+            {hs.menuShowDescription !== false && (
+              <p
+                style={{
+                  fontSize: `${hs.menuDescriptionSize || 14}px`,
+                }}
+                className={`text-[#7A7368] dark:text-[#A19B91] mt-2 max-w-xl leading-relaxed ${
+                  hs.menuCardTextAlign === "center"
+                    ? "mx-auto text-center"
+                    : hs.menuCardTextAlign === "right"
+                    ? "ml-auto text-end"
+                    : ""
+                }`}
+              >
+                {hs.menuDescriptionText || "Explore freshly made signature dishes, snacks, side selections, beverages, and desserts."}
+              </p>
+            )}
+          </div>
+
+          {/* Scrollable menu category pills */}
+          <div
+            style={{
+              backgroundColor:
+                hs.menuBgColorType === "solid"
+                  ? hs.menuCustomBgColor
+                    ? `${hs.menuCustomBgColor}f2`
+                    : undefined
+                  : undefined,
+            }}
+            className="sticky top-[58px] z-20 bg-[#FAF9F5]/95 dark:bg-[#0D0C0B]/95 backdrop-blur-md py-3.5 border-b border-[#EFECE6] dark:border-[#1F1F1C] -mx-6 px-6 overflow-x-auto scrollbar-hide transition-all duration-300"
+          >
+            <div ref={categoryTabsRef} className="flex gap-2">
               <button
-                key={cat}
-                onClick={() => { setActiveCategory(cat); scrollTo("menu"); }}
-                style={activeCategory === cat ? { backgroundColor: primary } : {}}
+                onClick={() => { setActiveCategory(null); scrollTo("menu"); }}
+                style={activeCategory === null ? { backgroundColor: primary } : {}}
                 className={`flex-shrink-0 px-4.5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all duration-200 ${
-                  activeCategory === cat
+                  activeCategory === null
                     ? "text-white shadow-md shadow-[var(--brand-primary-20)] scale-105"
                     : "text-[#7A7368] hover:text-neutral-900 dark:text-[#A19B91] dark:hover:text-white bg-white dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] hover:border-[var(--brand-primary)]"
                 }`}
               >
-                {cat}
+                All Specialties
               </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Menu grid */}
-        <div className="py-8">
-          {filteredItems.length === 0 ? (
-            <div className="text-center py-20 bg-white dark:bg-[#141412] rounded-3xl border border-[#EFECE6] dark:border-[#1F1F1C] p-8 shadow-sm">
-              <span className="text-4xl">🍽️</span>
-              <p className="text-neutral-900 dark:text-neutral-50 text-base font-extrabold mt-3 tracking-tight">Menu is currently empty</p>
-              <p className="text-[#7A7368] dark:text-[#A19B91] text-xs mt-1">Our kitchen is preparing fresh lists. Check back shortly!</p>
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => { setActiveCategory(cat); scrollTo("menu"); }}
+                  style={activeCategory === cat ? { backgroundColor: primary } : {}}
+                  className={`flex-shrink-0 px-4.5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all duration-200 ${
+                    activeCategory === cat
+                      ? "text-white shadow-md shadow-[var(--brand-primary-20)] scale-105"
+                      : "text-[#7A7368] hover:text-neutral-900 dark:text-[#A19B91] dark:hover:text-white bg-white dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] hover:border-[var(--brand-primary)]"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
             </div>
-          ) : (
-            <div
-              data-fade="menu-grid"
-              className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 ${fade("menu-grid")}`}
-            >
-              {filteredItems.map((item, idx) => {
-                const cartItem = items.find((i) => i.id === item.id);
-                const qty = cartItem?.quantity ?? 0;
-                return (
-                  <div
-                    key={item.id}
-                    className={`group bg-white dark:bg-[#141412] rounded-3xl border flex flex-col transition-all duration-300 shadow-[0_4px_25px_rgba(0,0,0,0.01)] ${
-                      item.available
-                        ? "border-[#EFECE6] dark:border-[#1F1F1C] hover:border-[var(--brand-primary)] dark:hover:border-[var(--brand-primary)] hover:shadow-xl hover:-translate-y-1.5"
-                        : "border-[#EFECE6] dark:border-[#1F1F1C] opacity-65"
-                    }`}
-                  >
-                    <div className="relative h-48 overflow-hidden bg-stone-50 dark:bg-stone-900/60 rounded-t-3xl flex-shrink-0">
-                      {idx < 3 && item.available && (
-                        <div
-                          style={{ backgroundColor: primary }}
-                          className="absolute top-3 left-3 z-10 text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg shadow-sm"
-                        >
-                          🔥 Popular
-                        </div>
-                      )}
-                      <img
-                        src={getItemImage(item)}
-                        alt={item.name}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        loading="lazy"
-                      />
-                      {!item.available && (
-                        <div className="absolute inset-0 bg-[#0D0C0B]/75 backdrop-blur-xs flex items-center justify-center">
-                          <span className="bg-[#141412] text-rose-500 text-xs font-black uppercase tracking-wider px-3.5 py-2 rounded-xl border border-rose-950/20 shadow-lg">
-                            Sold Out
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-5 flex flex-col flex-1">
-                      <div className="flex justify-between items-start gap-2 mb-1.5">
-                        <h3 className="font-extrabold text-[15px] text-neutral-900 dark:text-neutral-50 leading-snug group-hover:text-[var(--brand-primary)] transition-colors">{item.name}</h3>
-                        {!restaurant.hidePrices && (
-                          <span className="font-black text-sm text-[var(--brand-primary)] flex-shrink-0 tracking-tight">{fmt(item.price)}</span>
+          </div>
+
+          {/* Menu grid */}
+          <div className="py-8">
+            {filteredItems.length === 0 ? (
+              <div className="text-center py-20 bg-white dark:bg-[#141412] rounded-3xl border border-[#EFECE6] dark:border-[#1F1F1C] p-8 shadow-sm">
+                <span className="text-4xl">🍽️</span>
+                <p className="text-neutral-900 dark:text-neutral-50 text-base font-extrabold mt-3 tracking-tight">Menu is currently empty</p>
+                <p className="text-[#7A7368] dark:text-[#A19B91] text-xs mt-1">Our kitchen is preparing fresh lists. Check back shortly!</p>
+              </div>
+            ) : (
+              <div
+                data-fade="menu-grid"
+                className={`grid gap-6 ${
+                  hs.menuColumns === 1
+                    ? "grid-cols-1"
+                    : hs.menuColumns === 2
+                    ? "grid-cols-1 sm:grid-cols-2"
+                    : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                } ${fade("menu-grid")}`}
+              >
+                {filteredItems.map((item, idx) => {
+                  const cartItem = items.find((i) => i.id === item.id);
+                  const qty = cartItem?.quantity ?? 0;
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        borderRadius: `${hs.menuCardBorderRadius ?? 16}px`,
+                        backgroundColor:
+                          hs.menuCardBgStyle === "custom"
+                            ? hs.menuCardCustomBgColor || undefined
+                            : hs.menuCardBgStyle === "transparent"
+                            ? "transparent"
+                            : undefined,
+                      }}
+                      className={`group flex flex-col transition-all duration-300 shadow-[0_4px_25px_rgba(0,0,0,0.01)] border ${
+                        hs.menuCardBgStyle === "transparent" ? "bg-transparent border-transparent shadow-none" : "bg-white dark:bg-[#141412] border-[#EFECE6] dark:border-[#1F1F1C]"
+                      } ${
+                        item.available
+                          ? "hover:border-[var(--brand-primary)] dark:hover:border-[var(--brand-primary)] hover:shadow-xl hover:-translate-y-1.5"
+                          : "opacity-65"
+                      }`}
+                    >
+                      <div
+                        style={{
+                          height: `${hs.menuCardImageHeight || 180}px`,
+                          borderTopLeftRadius: `${hs.menuCardBorderRadius ?? 16}px`,
+                          borderTopRightRadius: `${hs.menuCardBorderRadius ?? 16}px`,
+                        }}
+                        className="relative overflow-hidden bg-stone-50 dark:bg-stone-900/60 flex-shrink-0"
+                      >
+                        {idx < 3 && item.available && (
+                          <div
+                            style={{ backgroundColor: primary }}
+                            className="absolute top-3 left-3 z-10 text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg shadow-sm"
+                          >
+                            🔥 Popular
+                          </div>
+                        )}
+                        <img
+                          src={getItemImage(item)}
+                          alt={item.name}
+                          style={{
+                            objectFit: hs.menuCardImageFit || "cover",
+                          }}
+                          className="w-full h-full transition-transform duration-500 group-hover:scale-105"
+                          loading="lazy"
+                        />
+                        {!item.available && (
+                          <div className="absolute inset-0 bg-[#0D0C0B]/75 backdrop-blur-xs flex items-center justify-center">
+                            <span className="bg-[#141412] text-rose-500 text-xs font-black uppercase tracking-wider px-3.5 py-2 rounded-xl border border-rose-950/20 shadow-lg">
+                              Sold Out
+                            </span>
+                          </div>
                         )}
                       </div>
+                      <div
+                        className={`p-5 flex flex-col flex-1 ${
+                          hs.menuCardTextAlign === "center"
+                            ? "text-center"
+                            : hs.menuCardTextAlign === "right"
+                            ? "text-end"
+                            : "text-start"
+                        }`}
+                      >
+                        <div
+                          className={`flex justify-between items-start gap-2 mb-1.5 ${
+                            hs.menuCardTextAlign === "center"
+                              ? "flex-col items-center"
+                              : hs.menuCardTextAlign === "right"
+                              ? "flex-row-reverse"
+                              : "flex-row"
+                          }`}
+                        >
+                          <h3 className="font-extrabold text-[15px] text-neutral-900 dark:text-neutral-50 leading-snug group-hover:text-[var(--brand-primary)] transition-colors">{item.name}</h3>
+                          {!restaurant.hidePrices && (
+                            <span className="font-black text-sm text-[var(--brand-primary)] flex-shrink-0 tracking-tight">{fmt(item.price)}</span>
+                          )}
+                        </div>
                       {item.description && (
                         <p className="text-xs text-[#7A7368] dark:text-[#A19B91] mb-4 leading-relaxed line-clamp-2 font-medium">{item.description}</p>
                       )}
@@ -1110,6 +1224,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
           )}
         </div>
       </section>
+    </div>
 
       {/* ── Chef Specialties Showcase (Phase 10G) ───────────────────────────── */}
       {popularItems.length > 0 && (
