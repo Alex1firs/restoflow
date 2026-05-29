@@ -15,7 +15,7 @@ interface Props {
   onClose: () => void;
 }
 
-type TabKey = "branding" | "cover" | "typography" | "cta" | "elements" | "navbar";
+type TabKey = "branding" | "cover" | "typography" | "cta" | "elements" | "navbar" | "partners";
 type ViewportMode = "desktop" | "tablet" | "mobile";
 
 export default function VisualCustomizer({
@@ -578,6 +578,49 @@ export default function VisualCustomizer({
               </div>
             </AccordionItem>
 
+            {/* 7. Partner Showcase */}
+            <AccordionItem
+              title="Partner Showcase"
+              icon="🏢"
+              active={activeTab === "partners"}
+              onClick={() => toggleTab("partners")}
+            >
+              <div className="space-y-4 pt-1">
+                <ToggleRow
+                  label="Display Partner Showcase"
+                  enabled={settings.showPartnersSection}
+                  onToggle={() => set("showPartnersSection", !settings.showPartnersSection)}
+                />
+                
+                {settings.showPartnersSection && (
+                  <>
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Showcase Style</label>
+                      <ToggleGroup
+                        options={[
+                          { value: "floating", label: "Floating Marquee" },
+                          { value: "stagnant", label: "Stagnant Grid" },
+                        ]}
+                        value={settings.partnersStyle}
+                        onChange={(v) => set("partnersStyle", v as any)}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Showcase Section Title</label>
+                      <input
+                        type="text"
+                        value={settings.partnersSectionTitle}
+                        onChange={(e) => set("partnersSectionTitle", e.target.value)}
+                        placeholder="e.g. Trusted Partners"
+                        className="w-full border border-gray-250 rounded-xl px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-orange-500 transition bg-white font-medium"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            </AccordionItem>
+
           </div>
         </aside>
 
@@ -836,6 +879,89 @@ export default function VisualCustomizer({
                   </div>
                 </div>
               </section>
+
+              {/* Dynamic CSS styles for marquee animation inside mockup */}
+              <style>{`
+                @keyframes marqueeCustomizer {
+                  0% { transform: translateX(0%); }
+                  100% { transform: translateX(-50%); }
+                }
+                .animate-marquee-preview {
+                  display: flex;
+                  width: max-content;
+                  animation: marqueeCustomizer 25s linear infinite;
+                }
+              `}</style>
+
+              {/* Mockup Partner Brands Showcase Section */}
+              {settings.showPartnersSection && (
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleTab("partners");
+                  }}
+                  className={`bg-white border-b border-stone-100 py-3 overflow-hidden cursor-pointer hover:bg-stone-50 transition-all ${
+                    activeTab === "partners" ? "ring-2 ring-orange-500/50" : ""
+                  }`}
+                >
+                  <div className="max-w-4xl mx-auto px-4">
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest text-center mb-1.5">
+                      {settings.partnersSectionTitle || "Our Partners"}
+                    </p>
+                    
+                    {settings.partnersStyle === "floating" ? (
+                      <div className="relative overflow-hidden w-full h-8 flex items-center">
+                        <div className="flex gap-8 whitespace-nowrap animate-marquee-preview py-1">
+                          {[
+                            { name: "Grills Capitol", icon: "🔥" },
+                            { name: "Sweet Treats", icon: "🍰" },
+                            { name: "The Noodle Box", icon: "🍜" },
+                            { name: "Burger Craft", icon: "🍔" },
+                            { name: "Pasta & Co", icon: "🍝" },
+                          ].map((partner, idx) => (
+                            <span key={idx} className="inline-flex items-center gap-1.5 text-[9px] font-extrabold text-[#7A7368]">
+                              <span className="w-5 h-5 rounded bg-stone-100 flex items-center justify-center text-xs shadow-inner">
+                                {partner.icon}
+                              </span>
+                              {partner.name}
+                            </span>
+                          ))}
+                          {/* Duplicate for infinite effect */}
+                          {[
+                            { name: "Grills Capitol", icon: "🔥" },
+                            { name: "Sweet Treats", icon: "🍰" },
+                            { name: "The Noodle Box", icon: "🍜" },
+                            { name: "Burger Craft", icon: "🍔" },
+                            { name: "Pasta & Co", icon: "🍝" },
+                          ].map((partner, idx) => (
+                            <span key={`dup-${idx}`} className="inline-flex items-center gap-1.5 text-[9px] font-extrabold text-[#7A7368]">
+                              <span className="w-5 h-5 rounded bg-stone-100 flex items-center justify-center text-xs shadow-inner">
+                                {partner.icon}
+                              </span>
+                              {partner.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap justify-center gap-3 py-1">
+                        {[
+                          { name: "Grills Capitol", icon: "🔥" },
+                          { name: "Sweet Treats", icon: "🍰" },
+                          { name: "The Noodle Box", icon: "🍜" },
+                          { name: "Burger Craft", icon: "🍔" },
+                          { name: "Pasta & Co", icon: "🍝" },
+                        ].map((partner, idx) => (
+                          <span key={idx} className="inline-flex items-center gap-1.5 text-[9px] font-extrabold text-[#7A7368] bg-stone-50 border border-stone-100 px-2 py-0.5 rounded-lg shadow-sm">
+                            <span>{partner.icon}</span>
+                            {partner.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Simulated storefront info section */}
               {viewport === "mobile" && (

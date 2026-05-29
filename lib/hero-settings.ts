@@ -34,6 +34,9 @@ export interface HeroSettings {
   navbarMenuTextMenu: string;
   navbarMenuTextReviews: string;
   navbarMenuTextInfo: string;
+  showPartnersSection: boolean;
+  partnersStyle: "floating" | "stagnant";
+  partnersSectionTitle: string;
 }
 
 export const DEFAULT_HERO_SETTINGS: HeroSettings = {
@@ -72,4 +75,7 @@ export const DEFAULT_HERO_SETTINGS: HeroSettings = {
   navbarMenuTextMenu: "Menu",
   navbarMenuTextReviews: "Reviews",
   navbarMenuTextInfo: "Info",
+  showPartnersSection: true,
+  partnersStyle: "floating",
+  partnersSectionTitle: "Trusted Partners on RestoFlow",
 };

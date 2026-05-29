@@ -867,22 +867,98 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
         </div>
       </div>
 
-      {/* ── Trending Strip / Social Proof (Phase 10G) ────────────────────────── */}
-      <div className="bg-[#FAF9F5] dark:bg-[#0D0C0B] py-3.5 border-b border-[#EFECE6] dark:border-[#1F1F1C] overflow-x-auto scrollbar-hide">
-        <div className="max-w-4xl mx-auto px-6">
-          <div className="flex items-center gap-6 text-xs font-bold text-[#7A7368] dark:text-[#A19B91] min-w-max justify-center">
-            {ordersToday ? (
-              <span className="flex items-center gap-1.5"><span className="text-rose-500 animate-pulse">🔥</span> {ordersToday}+ placed today</span>
+      {/* Dynamic CSS styles for B2B partners marquee scroll animation */}
+      <style>{`
+        @keyframes marqueeStorefront {
+          0% { transform: translateX(0%); }
+          100% { transform: translateX(-50%); }
+        }
+        .animate-marquee-storefront {
+          display: flex;
+          width: max-content;
+          animation: marqueeStorefront 30s linear infinite;
+        }
+        .animate-marquee-storefront:hover {
+          animation-play-state: paused;
+        }
+      `}</style>
+
+      {/* ── B2B Partners Showcase Section (Phase 10H) ────────────────────────── */}
+      {hs.showPartnersSection !== false && (
+        <div className="bg-white dark:bg-[#0D0C0B] py-4 border-b border-[#EFECE6] dark:border-[#1F1F1C] overflow-hidden">
+          <div className="max-w-4xl mx-auto px-6">
+            <p className="text-[10px] font-black text-[#A19B91] dark:text-neutral-500 uppercase tracking-widest text-center mb-2.5">
+              {hs.partnersSectionTitle || "Our Partners"}
+            </p>
+
+            {hs.partnersStyle === "stagnant" ? (
+              <div className="flex flex-wrap justify-center items-center gap-3.5 py-1">
+                {[
+                  { name: "Grills Capitol", icon: "🔥" },
+                  { name: "Sweet Treats", icon: "🍰" },
+                  { name: "The Noodle Box", icon: "🍜" },
+                  { name: "Burger Craft", icon: "🍔" },
+                  { name: "Pasta & Co", icon: "🍝" },
+                ].map((partner, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-2 text-xs font-extrabold text-[#7A7368] dark:text-[#A19B91] bg-stone-50 dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] px-3.5 py-1.5 rounded-2xl shadow-sm hover:scale-105 active:scale-95 transition-all"
+                  >
+                    <span className="w-5 h-5 rounded-lg bg-stone-100 dark:bg-stone-900 flex items-center justify-center text-xs shadow-inner">
+                      {partner.icon}
+                    </span>
+                    {partner.name}
+                  </span>
+                ))}
+              </div>
             ) : (
-              <span className="flex items-center gap-1.5"><span className="text-[var(--brand-primary)]">⚡</span> Trending restaurant hub</span>
+              <div className="relative overflow-hidden w-full h-9 flex items-center">
+                {/* Fade overlays for left & right marquee edges */}
+                <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-white dark:from-[#0D0C0B] to-transparent z-10 pointer-events-none" />
+                <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-white dark:from-[#0D0C0B] to-transparent z-10 pointer-events-none" />
+
+                <div className="flex gap-10 whitespace-nowrap animate-marquee-storefront py-1">
+                  {[
+                    { name: "Grills Capitol", icon: "🔥" },
+                    { name: "Sweet Treats", icon: "🍰" },
+                    { name: "The Noodle Box", icon: "🍜" },
+                    { name: "Burger Craft", icon: "🍔" },
+                    { name: "Pasta & Co", icon: "🍝" },
+                  ].map((partner, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center gap-2 text-xs font-extrabold text-[#7A7368] dark:text-[#A19B91] bg-stone-50 dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] px-3.5 py-1.5 rounded-2xl shadow-sm cursor-pointer hover:border-[var(--brand-primary)] transition-all"
+                    >
+                      <span className="w-5 h-5 rounded-lg bg-stone-100 dark:bg-stone-900 flex items-center justify-center text-xs shadow-inner">
+                        {partner.icon}
+                      </span>
+                      {partner.name}
+                    </span>
+                  ))}
+                  {/* Duplicate set for infinite loop scrolling */}
+                  {[
+                    { name: "Grills Capitol", icon: "🔥" },
+                    { name: "Sweet Treats", icon: "🍰" },
+                    { name: "The Noodle Box", icon: "🍜" },
+                    { name: "Burger Craft", icon: "🍔" },
+                    { name: "Pasta & Co", icon: "🍝" },
+                  ].map((partner, idx) => (
+                    <span
+                      key={`dup-${idx}`}
+                      className="inline-flex items-center gap-2 text-xs font-extrabold text-[#7A7368] dark:text-[#A19B91] bg-stone-50 dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] px-3.5 py-1.5 rounded-2xl shadow-sm cursor-pointer hover:border-[var(--brand-primary)] transition-all"
+                    >
+                      <span className="w-5 h-5 rounded-lg bg-stone-100 dark:bg-stone-900 flex items-center justify-center text-xs shadow-inner">
+                        {partner.icon}
+                      </span>
+                      {partner.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
             )}
-            <span className="text-stone-300 dark:text-stone-800">|</span>
-            <span className="flex items-center gap-1.5"><span className="text-emerald-500">✨</span> Hygiene Standard Certified</span>
-            <span className="text-stone-300 dark:text-stone-800">|</span>
-            <span className="flex items-center gap-1.5"><span className="text-yellow-400">⭐</span> 99% Satisfaction Rate</span>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ── Promo Banner ─────────────────────────────────────────────────────── */}
       {restaurant.promoBanner && !promoDismissed && (
