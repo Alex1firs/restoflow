@@ -1,7 +1,7 @@
 import "server-only";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export const AI_MODEL = "gemini-flash-latest";
+export const AI_MODEL = "gemini-2.5-flash";
 
 let _genai: GoogleGenerativeAI | null = null;
 
