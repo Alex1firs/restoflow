@@ -851,73 +851,77 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
   // ── Tactical Plate Builder Cart Operations ──────────────────────────────────
 
   const addToCart = useCallback((item: MenuItem) => {
-    // 1. Check if MenuCombo shortcut. If so, auto-expand into its constituent FoodItems
+    // 1. Combo shortcut: expand into constituent FoodItems instantly
     if (item.itemType === "combo" && item.comboItems && item.comboItems.length > 0) {
       const addedLogs: string[] = [];
       setCart((prev) => {
-        let newPrev = [...prev];
+        const newPrev = [...prev];
         item.comboItems!.forEach((combo) => {
           const matchedItem = enrichedMenuItems.find((x) => x.id === combo.foodItemId);
           if (matchedItem) {
             addedLogs.push(matchedItem.name);
-            const subCartItem: CartItem = {
-              cartItemId: `cart-${Math.random().toString(36).substring(2, 9)}-${Date.now()}`,
-              id: matchedItem.id,
-              name: `${matchedItem.name} (Combo A)`,
-              category: matchedItem.category,
-              image: matchedItem.image || "",
-              kitchenStation: matchedItem.kitchenStation || "kitchen",
-              allowCustomPrice: matchedItem.allowCustomPrice || false,
-              basePrice: matchedItem.basePrice ?? matchedItem.price ?? 0,
-              selectedSize: null,
-              selectedModifiers: [],
-              customPrice: null,
-              quantity: combo.quantity,
-              itemNote: `Combo shortcut component`,
-            };
-            newPrev.push(subCartItem);
+            // Smart merge: increment plain version if it already exists in tray
+            const existingIdx = newPrev.findIndex(
+              (c) => c.id === matchedItem.id && c.selectedModifiers.length === 0 && !c.selectedSize && !c.customPrice
+            );
+            if (existingIdx !== -1) {
+              newPrev[existingIdx] = { ...newPrev[existingIdx], quantity: newPrev[existingIdx].quantity + combo.quantity };
+            } else {
+              newPrev.push({
+                cartItemId: `cart-${Math.random().toString(36).substring(2, 9)}-${Date.now()}`,
+                id: matchedItem.id,
+                name: matchedItem.name,
+                category: matchedItem.category,
+                image: matchedItem.image || "",
+                kitchenStation: matchedItem.kitchenStation || "kitchen",
+                allowCustomPrice: matchedItem.allowCustomPrice || false,
+                basePrice: matchedItem.basePrice ?? matchedItem.price ?? 0,
+                selectedSize: null,
+                selectedModifiers: [],
+                customPrice: null,
+                quantity: combo.quantity,
+                itemNote: "",
+              });
+            }
           }
         });
         return newPrev;
       });
-      showSystemToast(`Expanded combo into ${addedLogs.join(", ")}!`);
+      showSystemToast(`Added ${addedLogs.join(", ")} to tray`);
       return;
     }
 
-    // 2. For FoodItem: If it has custom portions, modifiers selection or custom price, open plate builder modal!
-    const hasCustomizations =
-      (item.sizes && item.sizes.length > 0) ||
-      (item.modifierGroups && item.modifierGroups.length > 0) ||
-      item.allowCustomPrice;
-
-    if (hasCustomizations) {
-      setCustomizingItem(item);
-      setCustomizingCartItemId(null);
-      setActiveSize(item.sizes && item.sizes.length > 0 ? item.sizes[0] : null);
-      setActiveModifiers([]);
-      setActiveCustomPrice("");
-      setActiveItemNote("");
-      return;
-    }
-
-    // 3. Simple item quick-add (under 80ms interaction speed)
+    // 2. ALL food items: one-tap instant add — no modal, no configuration gate.
+    //    Modifiers and sizes are optional secondary actions available from the cart.
     setCart((prev) => {
-      const newCartItem: CartItem = {
-        cartItemId: `cart-${Math.random().toString(36).substring(2, 9)}-${Date.now()}`,
-        id: item.id,
-        name: item.name,
-        category: item.category,
-        image: item.image || "",
-        kitchenStation: item.kitchenStation || "kitchen",
-        allowCustomPrice: item.allowCustomPrice || false,
-        basePrice: item.basePrice ?? item.price ?? 0,
-        selectedSize: null,
-        selectedModifiers: [],
-        customPrice: null,
-        quantity: 1,
-        itemNote: "",
-      };
-      return [...prev, newCartItem];
+      // Smart merge: if a plain version (no size, no modifiers, no custom price) already
+      // exists in the tray, just increment its quantity instead of creating a duplicate line.
+      const existingIdx = prev.findIndex(
+        (c) => c.id === item.id && c.selectedModifiers.length === 0 && !c.selectedSize && !c.customPrice
+      );
+      if (existingIdx !== -1) {
+        return prev.map((c, i) =>
+          i === existingIdx ? { ...c, quantity: c.quantity + 1 } : c
+        );
+      }
+      return [
+        ...prev,
+        {
+          cartItemId: `cart-${Math.random().toString(36).substring(2, 9)}-${Date.now()}`,
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          image: item.image || "",
+          kitchenStation: item.kitchenStation || "kitchen",
+          allowCustomPrice: item.allowCustomPrice || false,
+          basePrice: item.basePrice ?? item.price ?? 0,
+          selectedSize: null,
+          selectedModifiers: [],
+          customPrice: null,
+          quantity: 1,
+          itemNote: "",
+        },
+      ];
     });
   }, [enrichedMenuItems]);
 
@@ -1731,18 +1735,36 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
                   : "Tap items from the menu to add them here."}
               </div>
             ) : (
-              cart.map((item) => (
+              cart.map((item) => {
+                const rawMenuItem = enrichedMenuItems.find((x) => x.id === item.id);
+                const isCustomizable = !!(
+                  rawMenuItem &&
+                  ((rawMenuItem.sizes && rawMenuItem.sizes.length > 0) ||
+                    (rawMenuItem.modifierGroups && rawMenuItem.modifierGroups.length > 0) ||
+                    rawMenuItem.allowCustomPrice)
+                );
+                return (
                 <div key={item.cartItemId} className="flex flex-col gap-1 px-4 py-3 border-b border-gray-50 bg-white hover:bg-gray-50/50 transition-colors">
                   <div className="flex items-center gap-2">
-                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => triggerCustomize(item)}>
-                      <p className="font-bold text-gray-900 text-sm truncate flex items-center gap-1.5">
-                        {item.name}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="font-bold text-gray-900 text-sm truncate">
+                          {item.name}
+                        </p>
                         {item.selectedSize && (
                           <span className="text-[9px] font-black bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full shrink-0">
                             {item.selectedSize.name}
                           </span>
                         )}
-                      </p>
+                        {isCustomizable && (
+                          <button
+                            onClick={() => triggerCustomize(item)}
+                            className="text-[9px] font-black px-2 py-0.5 rounded-full shrink-0 border transition-colors bg-gray-50 text-gray-400 border-gray-200 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200"
+                          >
+                            ✏ Edit
+                          </button>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-500 font-medium">
                         {fmt(itemUnitPrice(item))} each
                       </p>
@@ -1792,7 +1814,8 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
                     </p>
                   )}
                 </div>
-              ))
+                );
+              })
             )}
           </div>
 
@@ -1942,10 +1965,10 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
             <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between flex-shrink-0 bg-gray-50">
               <div>
                 <span className="text-[10px] font-black uppercase text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full shrink-0">
-                  {customizingItem.category} Plate Builder
+                  Customize · {customizingItem.category}
                 </span>
                 <h3 className="text-lg font-black text-gray-900 mt-1.5 leading-tight">
-                  Customize {customizingItem.name}
+                  {customizingItem.name}
                 </h3>
               </div>
               <button
@@ -2110,15 +2133,9 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
               </div>
               <button
                 onClick={saveCustomization}
-                disabled={
-                  !!(customizingItem.modifierGroups?.some(
-                    (g) => g.required && !activeModifiers.some((m) => m.groupName === g.groupName)
-                  ) ||
-                  (customizingItem.sizes && customizingItem.sizes.length > 0 && !activeSize))
-                }
-                className="bg-orange-600 hover:bg-orange-500 active:bg-orange-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black px-8 py-3 rounded-2xl transition-all shadow-md shadow-orange-600/10 text-sm shrink-0"
+                className="bg-orange-600 hover:bg-orange-500 active:bg-orange-700 text-white font-black px-8 py-3 rounded-2xl transition-all shadow-md shadow-orange-600/10 text-sm shrink-0"
               >
-                {customizingCartItemId ? "Update Cart Tray" : "Add to Tray Plate"}
+                Update Tray
               </button>
             </div>
           </div>
