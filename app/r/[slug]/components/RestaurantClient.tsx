@@ -969,38 +969,6 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
         </div>
       </nav>
 
-      {/* ── Closed Banner ────────────────────────────────────────────────────── */}
-      {!restaurant.isOpen && (
-        <div className="bg-stone-50 dark:bg-[#141412] border-b border-[#EFECE6] dark:border-[#1F1F1C] px-6 py-4.5">
-          <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3.5">
-              <span className="text-2xl flex-shrink-0 animate-pulse">🌙</span>
-              <div>
-                <p className="text-neutral-900 dark:text-neutral-100 font-extrabold text-sm tracking-tight">Currently Resting</p>
-                <p className="text-[#7A7368] dark:text-[#A19B91] text-xs mt-0.5 font-medium leading-relaxed max-w-lg">
-                  We are closed for preparation right now. Browse our full online selection and schedule a preorder delivery for when we reopen!
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2 w-full sm:w-auto">
-              <button
-                onClick={() => scrollTo("menu")}
-                className="flex-1 sm:flex-initial bg-white dark:bg-[#1E1E1C] hover:bg-stone-50 dark:hover:bg-stone-900 text-neutral-800 dark:text-neutral-200 text-xs font-bold px-4 py-3 rounded-xl border border-[#EFECE6] dark:border-[#1F1F1C] transition-all shadow-sm active:scale-95"
-              >
-                Browse Menu
-              </button>
-              <button
-                onClick={() => setScheduleOpen(true)}
-                style={{ backgroundColor: primary }}
-                className="flex-1 sm:flex-initial text-white text-xs font-bold px-5 py-3 rounded-xl shadow-md transition-opacity hover:opacity-95 active:scale-95"
-              >
-                Schedule Delivery
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ── MENU EXPERIENCE REDESIGN (Phase 10B) ──────────────────────────────── */}
       <section id="menu" ref={menuSectionRef} className="scroll-mt-24 max-w-4xl mx-auto px-6 pt-12 pb-6">
         <div className="mb-8">
