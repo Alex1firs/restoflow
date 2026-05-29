@@ -26,6 +26,7 @@ import {
   X,
   LogOut,
   ExternalLink,
+  Sliders,
 } from "lucide-react";
 
 type Role = "owner" | "manager" | "staff";
@@ -116,6 +117,12 @@ function buildGroups(slug: string): NavGroup[] {
           name: "Menu",
           href: `/admin/${slug}/menu`,
           Icon: ChefHat,
+          roles: ["owner", "manager"],
+        },
+        {
+          name: "POS Items",
+          href: `/admin/${slug}/prepared-items`,
+          Icon: Sliders,
           roles: ["owner", "manager"],
         },
         {

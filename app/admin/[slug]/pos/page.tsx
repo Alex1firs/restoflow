@@ -28,7 +28,7 @@ export default async function POSPage({ params }: Props) {
   const data = restaurantSnap.data()!;
 
   const menuSnap = await db
-    .collection("menu_items")
+    .collection("prepared_items")
     .where("restaurantId", "==", slug)
     .get();
 

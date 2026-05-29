@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     const restaurantSlug = user.restaurantSlug;
 
     const menuSnap = await db
-      .collection("menu_items")
+      .collection("prepared_items")
       .where("restaurantId", "==", restaurantSlug)
       .get();
 

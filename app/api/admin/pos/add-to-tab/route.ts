@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     // Validate items against trusted server-side menu pricing
     const menuSnap = await db
-      .collection("menu_items")
+      .collection("prepared_items")
       .where("restaurantId", "==", user.restaurantSlug)
       .get();
 
