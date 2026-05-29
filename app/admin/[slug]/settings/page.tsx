@@ -58,12 +58,27 @@ export default async function SettingsPage({ params }: Props) {
     heroSettings: ((data.heroSettings as HeroSettings) ?? DEFAULT_HERO_SETTINGS),
   };
 
+  const menuSnap = await getAdminDb().collection("menu_items").where("restaurantId", "==", slug).get();
+  const menuItems = menuSnap.docs.map((d) => ({
+    id: d.id,
+    name: (d.data().name as string) ?? "",
+    price: (d.data().price as number) ?? 0,
+    available: (d.data().available as boolean) ?? true,
+    image: (d.data().image as string) ?? "",
+    description: (d.data().description as string) ?? "",
+    category: (d.data().category as string) ?? "",
+  }));
+
   return (
     <div className="flex min-h-screen bg-gray-100">
       <AdminNav slug={slug} role="owner" />
       <div className="flex-1 min-w-0 pt-14 pb-16 lg:pt-0 lg:pb-0">
         <SubscriptionBanner subscription={subscription} />
-        <SettingsClient restaurant={restaurant} aiEnabled={!!process.env.GEMINI_API_KEY} />
+        <SettingsClient
+          restaurant={restaurant}
+          menuItems={menuItems}
+          aiEnabled={!!process.env.GEMINI_API_KEY}
+        />
       </div>
     </div>
   );

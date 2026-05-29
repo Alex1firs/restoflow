@@ -42,9 +42,10 @@ type Props = {
     dineInEnabled: boolean;
     heroSettings: HeroSettings;
   };
+  menuItems?: any[];
 };
 
-export default function SettingsClient({ restaurant, aiEnabled = false }: Props) {
+export default function SettingsClient({ restaurant, aiEnabled = false, menuItems = [] }: Props) {
   const [form, setForm] = useState({
     name: restaurant.name,
     description: restaurant.description,
@@ -255,6 +256,7 @@ export default function SettingsClient({ restaurant, aiEnabled = false }: Props)
             accentColor={form.accentColor}
             slug={restaurant.slug}
             saving={saving}
+            menuItems={menuItems}
             onSave={async () => {
               setSaving(true);
               setStatus("idle");

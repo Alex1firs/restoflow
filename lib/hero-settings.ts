@@ -55,6 +55,8 @@ export interface HeroSettings {
   menuCardImageHeight: number;
   menuCardImageFit: "cover" | "contain";
   menuCardTextAlign: "left" | "center" | "right";
+  menuShowBadge: boolean;
+  menuBadgeText: string;
 }
 
 export const DEFAULT_HERO_SETTINGS: HeroSettings = {
@@ -114,4 +116,6 @@ export const DEFAULT_HERO_SETTINGS: HeroSettings = {
   menuCardImageHeight: 180,
   menuCardImageFit: "cover",
   menuCardTextAlign: "left",
+  menuShowBadge: true,
+  menuBadgeText: "Popular",
 };

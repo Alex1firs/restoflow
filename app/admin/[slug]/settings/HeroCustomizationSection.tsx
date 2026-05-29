@@ -16,6 +16,7 @@ interface Props {
   onSave?: () => Promise<void>;
   saving?: boolean;
   slug?: string;
+  menuItems?: any[];
 }
 
 export default function HeroCustomizationSection({
@@ -30,6 +31,7 @@ export default function HeroCustomizationSection({
   onSave,
   saving = false,
   slug,
+  menuItems = [],
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -127,6 +129,7 @@ export default function HeroCustomizationSection({
           onSave={onSave}
           saving={saving}
           slug={slug}
+          menuItems={menuItems}
         />
       )}
     </div>

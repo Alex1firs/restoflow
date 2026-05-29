@@ -16,6 +16,7 @@ interface Props {
   onSave?: () => Promise<void>;
   saving?: boolean;
   slug?: string;
+  menuItems?: any[];
 }
 
 type TabKey = "branding" | "cover" | "typography" | "cta" | "elements" | "navbar" | "partners" | "menu";
@@ -34,6 +35,7 @@ export default function VisualCustomizer({
   onSave,
   saving = false,
   slug,
+  menuItems = [],
 }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>("branding");
   const [viewport, setViewport] = useState<ViewportMode>("mobile");
@@ -984,6 +986,34 @@ export default function VisualCustomizer({
                       </div>
                     </div>
                   )}
+
+                  {/* Card Highlight Badge Visibility & Custom Text */}
+                  <div className="pt-1.5 border-t border-dashed border-gray-150 space-y-3">
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Show Highlight Badge</label>
+                      <ToggleGroup
+                        options={[
+                          { value: "true", label: "Visible" },
+                          { value: "false", label: "Hidden" },
+                        ]}
+                        value={String(settings.menuShowBadge !== false)}
+                        onChange={(v) => set("menuShowBadge", v === "true")}
+                      />
+                    </div>
+
+                    {settings.menuShowBadge !== false && (
+                      <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Badge Text</label>
+                        <input
+                          type="text"
+                          value={settings.menuBadgeText || "Popular"}
+                          onChange={(e) => set("menuBadgeText", e.target.value)}
+                          placeholder="e.g. Popular, Chef's Special, Elite"
+                          className="w-full border border-gray-250 rounded-xl px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-orange-500 bg-white font-medium"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </AccordionItem>
@@ -1437,24 +1467,31 @@ export default function VisualCustomizer({
                         : "grid-cols-5"
                     }`}
                   >
-                    {[
-                      {
-                        name: "Party Jollof Rice and Moi-moi",
-                        price: "₦8,000",
-                        desc: "Smoky, spiced Jollof rice paired with a rich, steamed Moi-moi.",
-                        badge: "Popular",
-                        icon: "🍛",
-                        image: "https://images.unsplash.com/photo-1534483509719-3feaee7c30da?w=600&auto=format",
-                      },
-                      {
-                        name: "Flame Grilled Quarter Chicken",
-                        price: "₦12,500",
-                        desc: "Succulent chicken marinated in heritage spices, flame kissed and tender.",
-                        badge: "Elite",
-                        icon: "🍗",
-                        image: "https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=600&auto=format",
-                      },
-                    ].map((item, idx) => (
+                    {(menuItems && menuItems.length > 0
+                      ? menuItems.slice(0, 2).map((item, idx) => ({
+                          name: item.name,
+                          price: `₦${Number(item.price).toLocaleString()}`,
+                          desc: item.description || "Freshly made standard selection.",
+                          icon: "🍛",
+                          image: item.image || "https://images.unsplash.com/photo-1534483509719-3feaee7c30da?w=600&auto=format",
+                        }))
+                      : [
+                          {
+                            name: "Party Jollof Rice and Moi-moi",
+                            price: "₦8,000",
+                            desc: "Smoky, spiced Jollof rice paired with a rich, steamed Moi-moi.",
+                            icon: "🍛",
+                            image: "https://images.unsplash.com/photo-1534483509719-3feaee7c30da?w=600&auto=format",
+                          },
+                          {
+                            name: "Flame Grilled Quarter Chicken",
+                            price: "₦12,500",
+                            desc: "Succulent chicken marinated in heritage spices, flame kissed and tender.",
+                            icon: "🍗",
+                            image: "https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=600&auto=format",
+                          },
+                        ]
+                    ).map((item, idx) => (
                       <div
                         key={idx}
                         style={{
@@ -1491,9 +1528,11 @@ export default function VisualCustomizer({
                             }}
                             className="w-full h-full transition-transform duration-500 hover:scale-105"
                           />
-                          <span className="absolute top-2 left-2 bg-orange-500 text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-sm">
-                            {item.badge}
-                          </span>
+                          {settings.menuShowBadge !== false && (
+                            <span className="absolute top-2 left-2 bg-orange-500 text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-sm">
+                              {settings.menuBadgeText || "Popular"}
+                            </span>
+                          )}
                         </div>
 
                         {/* Card details */}

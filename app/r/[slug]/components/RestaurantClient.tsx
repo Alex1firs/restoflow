@@ -1143,12 +1143,12 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                         }}
                         className="relative overflow-hidden bg-stone-50 dark:bg-stone-900/60 flex-shrink-0 transition-all duration-300"
                       >
-                        {idx < 3 && item.available && (
+                        {hs.menuShowBadge !== false && idx < 3 && item.available && (
                           <div
                             style={{ backgroundColor: primary }}
                             className="absolute top-3 left-3 z-10 text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg shadow-sm"
                           >
-                            🔥 Popular
+                            {hs.menuBadgeText || "Popular"}
                           </div>
                         )}
                         <img
