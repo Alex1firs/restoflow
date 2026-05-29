@@ -78,20 +78,15 @@ export async function POST(request: NextRequest) {
       .where("restaurantId", "==", restaurantSlug)
       .get();
 
-    const menuMap = new Map<string, { name: string; price: number; available: boolean }>();
+    const menuMap = new Map<string, any>();
     for (const doc of menuSnap.docs) {
-      const d = doc.data();
-      menuMap.set(doc.id, {
-        name: d.name as string,
-        price: d.price as number,
-        available: (d.available as boolean) ?? true,
-      });
+      menuMap.set(doc.id, { id: doc.id, ...doc.data() });
     }
 
-    const validatedItems: { id: string; name: string; price: number; quantity: number }[] = [];
+    const validatedItems: any[] = [];
     let itemsTotal = 0;
 
-    for (const item of items as { id: string; quantity: number }[]) {
+    for (const item of items as any[]) {
       if (
         typeof item.id !== "string" ||
         !item.id ||
@@ -101,30 +96,64 @@ export async function POST(request: NextRequest) {
       ) {
         return NextResponse.json({ error: "Invalid item in order" }, { status: 400 });
       }
-      const menuItem = menuMap.get(item.id);
-      if (!menuItem) {
+      const dbItem = menuMap.get(item.id);
+      if (!dbItem) {
         return NextResponse.json(
           { error: "Item not found or does not belong to this restaurant" },
           { status: 400 }
         );
       }
-      if (!menuItem.available) {
+      if (dbItem.available === false) {
         return NextResponse.json(
-          { error: `"${menuItem.name}" is currently unavailable` },
+          { error: `"${dbItem.name}" is currently unavailable` },
           { status: 400 }
         );
       }
+
+      // Calculate unit price: size base price or base price + sum(modifiers)
+      let unitPrice = 0;
+      if (item.customPrice !== undefined && item.customPrice !== null) {
+        if (!dbItem.allowCustomPrice) {
+          return NextResponse.json(
+            { error: `Custom pricing is not enabled for "${dbItem.name}"` },
+            { status: 400 }
+          );
+        }
+        unitPrice = Number(item.customPrice);
+      } else {
+        const base = item.selectedSize ? Number(item.selectedSize.price) : Number(dbItem.basePrice ?? dbItem.price ?? 0);
+        const mods = Array.isArray(item.selectedModifiers)
+          ? item.selectedModifiers.reduce((sum: number, m: any) => sum + Number(m.price || 0), 0)
+          : 0;
+        unitPrice = base + mods;
+      }
+
       validatedItems.push({
         id: item.id,
-        name: menuItem.name,
-        price: menuItem.price,
+        name: dbItem.name,
+        price: unitPrice,
+        basePrice: dbItem.basePrice ?? dbItem.price ?? 0,
         quantity: item.quantity,
+        selectedSize: item.selectedSize || null,
+        selectedModifiers: item.selectedModifiers || [],
+        customPrice: item.customPrice || null,
+        itemNote: item.itemNote || "",
+        kitchenStation: item.kitchenStation || dbItem.kitchenStation || "kitchen",
       });
-      itemsTotal += menuItem.price * item.quantity;
+      itemsTotal += unitPrice * item.quantity;
     }
 
     const total = itemsTotal;
     const isDineIn = resolvedServiceMode === "dine_in";
+
+    const auditLog = (body as any).auditLog || [];
+    auditLog.push({
+      action: "order_created",
+      staffId: user.uid,
+      staffName: typeof staffName === "string" ? staffName.trim() : "Staff",
+      timestamp: new Date().toISOString(),
+      details: `Created counter POS order with ${validatedItems.length} items. Total: ₦${itemsTotal.toLocaleString("en-NG")}`,
+    });
 
     const orderRef = await db.collection("orders").add({
       restaurantId: restaurantSlug,
@@ -152,6 +181,7 @@ export async function POST(request: NextRequest) {
       staffId: user.uid,
       staffName: typeof staffName === "string" ? staffName.trim() : "",
       createdAt: FieldValue.serverTimestamp(),
+      auditLog,
     });
 
     return NextResponse.json(

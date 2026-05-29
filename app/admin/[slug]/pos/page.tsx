@@ -42,6 +42,13 @@ export default async function POSPage({ params }: Props) {
       category: (d.category as string) ?? "Other",
       available: (d.available as boolean) ?? true,
       image: (d.image as string) ?? "",
+      itemType: (d.itemType as "item" | "combo") ?? "item",
+      basePrice: (d.basePrice as number) ?? (d.price as number) ?? 0,
+      sizes: (d.sizes as any[] | undefined) ?? null,
+      modifierGroups: (d.modifierGroups as any[] | undefined) ?? null,
+      kitchenStation: (d.kitchenStation as string) ?? "kitchen",
+      allowCustomPrice: (d.allowCustomPrice as boolean) ?? false,
+      comboItems: (d.comboItems as any[] | undefined) ?? null,
     };
   });
 
@@ -71,6 +78,7 @@ export default async function POSPage({ params }: Props) {
             menuItems={menuItems}
             staffName={staffName}
             staffId={user.uid}
+            role={user.role as "owner" | "manager" | "staff"}
           />
         </div>
       </div>

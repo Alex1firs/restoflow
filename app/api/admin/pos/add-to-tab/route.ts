@@ -61,48 +61,94 @@ export async function POST(request: NextRequest) {
       .where("restaurantId", "==", user.restaurantSlug)
       .get();
 
-    const menuMap = new Map<string, { name: string; price: number; available: boolean }>();
+    const menuMap = new Map<string, any>();
     for (const doc of menuSnap.docs) {
-      const d = doc.data();
-      menuMap.set(doc.id, {
-        name: d.name as string,
-        price: d.price as number,
-        available: (d.available as boolean) ?? true,
-      });
+      menuMap.set(doc.id, { id: doc.id, ...doc.data() });
     }
 
-    const validatedItems: { id: string; name: string; price: number; quantity: number }[] = [];
+    const validatedItems: any[] = [];
     let addOnTotal = 0;
 
-    for (const item of items as { id: string; quantity: number }[]) {
+    for (const item of items as any[]) {
       if (
         typeof item.id !== "string" || !item.id ||
         typeof item.quantity !== "number" || !Number.isInteger(item.quantity) || item.quantity < 1
       ) {
         return NextResponse.json({ error: "Invalid item in order" }, { status: 400 });
       }
-      const menuItem = menuMap.get(item.id);
-      if (!menuItem) {
+      const dbItem = menuMap.get(item.id);
+      if (!dbItem) {
         return NextResponse.json(
           { error: "Item not found or does not belong to this restaurant" },
           { status: 400 }
         );
       }
-      if (!menuItem.available) {
+      if (dbItem.available === false) {
         return NextResponse.json(
-          { error: `"${menuItem.name}" is currently unavailable` },
+          { error: `"${dbItem.name}" is currently unavailable` },
           { status: 400 }
         );
       }
-      validatedItems.push({ id: item.id, name: menuItem.name, price: menuItem.price, quantity: item.quantity });
-      addOnTotal += menuItem.price * item.quantity;
+
+      // Calculate unit price
+      let unitPrice = 0;
+      if (item.customPrice !== undefined && item.customPrice !== null) {
+        if (!dbItem.allowCustomPrice) {
+          return NextResponse.json(
+            { error: `Custom pricing is not enabled for "${dbItem.name}"` },
+            { status: 400 }
+          );
+        }
+        unitPrice = Number(item.customPrice);
+      } else {
+        const base = item.selectedSize ? Number(item.selectedSize.price) : Number(dbItem.basePrice ?? dbItem.price ?? 0);
+        const mods = Array.isArray(item.selectedModifiers)
+          ? item.selectedModifiers.reduce((sum: number, m: any) => sum + Number(m.price || 0), 0)
+          : 0;
+        unitPrice = base + mods;
+      }
+
+      validatedItems.push({
+        id: item.id,
+        name: dbItem.name,
+        price: unitPrice,
+        basePrice: dbItem.basePrice ?? dbItem.price ?? 0,
+        quantity: item.quantity,
+        selectedSize: item.selectedSize || null,
+        selectedModifiers: item.selectedModifiers || [],
+        customPrice: item.customPrice || null,
+        itemNote: item.itemNote || "",
+        kitchenStation: item.kitchenStation || dbItem.kitchenStation || "kitchen",
+      });
+      addOnTotal += unitPrice * item.quantity;
     }
 
     // Merge items into the tab's accumulating item list
-    const existingItems = (tab.items as { id: string; name: string; price: number; quantity: number }[]) ?? [];
+    const existingItems = (tab.items as any[]) ?? [];
     const mergedItems = [...existingItems];
     for (const newItem of validatedItems) {
-      const idx = mergedItems.findIndex((i) => i.id === newItem.id);
+      const idx = mergedItems.findIndex((i) => {
+        if (i.id !== newItem.id) return false;
+        
+        // Match size name
+        const sizeA = i.selectedSize?.name || null;
+        const sizeB = newItem.selectedSize?.name || null;
+        if (sizeA !== sizeB) return false;
+
+        // Match custom price
+        if (i.customPrice !== newItem.customPrice) return false;
+
+        // Match note
+        if ((i.itemNote || "") !== (newItem.itemNote || "")) return false;
+
+        // Match modifiers list
+        const modsA = Array.isArray(i.selectedModifiers) ? i.selectedModifiers.map((m: any) => `${m.groupName}:${m.name}`).sort().join(",") : "";
+        const modsB = Array.isArray(newItem.selectedModifiers) ? newItem.selectedModifiers.map((m: any) => `${m.groupName}:${m.name}`).sort().join(",") : "";
+        if (modsA !== modsB) return false;
+
+        return true;
+      });
+
       if (idx >= 0) {
         mergedItems[idx] = { ...mergedItems[idx], quantity: mergedItems[idx].quantity + newItem.quantity };
       } else {

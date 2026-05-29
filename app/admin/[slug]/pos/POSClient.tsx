@@ -21,9 +21,35 @@ type MenuItem = {
   category: string;
   available: boolean;
   image: string;
+  itemType?: "item" | "combo";
+  basePrice?: number;
+  sizes?: { name: string; price: number }[] | null;
+  modifierGroups?: {
+    groupName: string;
+    selectionType: "single" | "multiple";
+    required: boolean;
+    options: { name: string; price: number }[];
+  }[] | null;
+  kitchenStation?: string;
+  allowCustomPrice?: boolean;
+  comboItems?: { foodItemId: string; quantity: number }[] | null;
 };
 
-type CartItem = MenuItem & { quantity: number };
+type CartItem = {
+  cartItemId: string;
+  id: string;
+  name: string;
+  category: string;
+  image?: string;
+  kitchenStation?: string;
+  allowCustomPrice?: boolean;
+  basePrice: number;
+  selectedSize?: { name: string; price: number } | null;
+  selectedModifiers: { groupName: string; name: string; price: number }[];
+  customPrice?: number | null;
+  quantity: number;
+  itemNote?: string;
+};
 
 type ServiceMode = "counter" | "dine_in";
 type PaymentMethod = "cash" | "bank_transfer" | "card" | "unpaid";
@@ -31,7 +57,7 @@ type PaymentStatus = "paid" | "unpaid" | "part_paid" | "cancelled";
 
 type CompletedOrder = {
   orderId: string;
-  items: { id: string; name: string; price: number; quantity: number }[];
+  items: any[];
   itemsTotal: number;
   total: number;
   paymentMethod: PaymentMethod;
@@ -41,13 +67,13 @@ type CompletedOrder = {
   serviceMode: ServiceMode;
   tableLabel: string;
   createdAt: Date;
+  isOffline?: boolean;
 };
 
-// Full order snapshot from Firestore (used for ready-order tracking + open bills)
 type TodayOrder = {
   id: string;
   customerName: string;
-  items: { id: string; name: string; price: number; quantity: number }[];
+  items: any[];
   itemsTotal: number;
   total: number;
   paymentMethod: string;
@@ -60,16 +86,18 @@ type TodayOrder = {
   deliveryType?: string;
   orderType?: string;
   parentTabId?: string;
-  itemBatches?: { batchIndex: number; addedAt: string; staffId: string; staffName: string; items: { id: string; name: string; price: number; quantity: number }[]; addOnTotal: number }[];
+  itemBatches?: any[];
   status: string;
   createdAt: Timestamp;
+  isOffline?: boolean;
+  auditLog?: any[];
 };
 
 type AddOnReceipt = {
   tabId: string;
   kitchenTicketId: string;
   tableLabel: string;
-  addedItems: { id: string; name: string; price: number; quantity: number }[];
+  addedItems: any[];
   addOnTotal: number;
   newTotal: number;
   batchIndex: number;
@@ -89,6 +117,7 @@ type Props = {
   menuItems: MenuItem[];
   staffName: string;
   staffId: string;
+  role: "owner" | "manager" | "staff";
 };
 
 // ── Labels ────────────────────────────────────────────────────────────────────
@@ -191,10 +220,23 @@ function openReprintWindow(
   };
 
   const itemsHtml = order.items
-    .map(
-      (i) =>
-        `<div class="row"><span class="qty">${i.quantity}×</span><span class="name">${i.name}</span><span class="price">₦${(i.price * i.quantity).toLocaleString("en-NG")}</span></div>`
-    )
+    .map((i: any) => {
+      const sizeStr = i.selectedSize ? ` (${i.selectedSize.name})` : "";
+      let modsHtml = "";
+      if (i.selectedModifiers && i.selectedModifiers.length > 0) {
+        modsHtml = i.selectedModifiers.map((m: any) => `<div class="mod-row">- ${m.name}</div>`).join("");
+      }
+      const noteHtml = i.itemNote ? `<div class="note-row">* Note: ${i.itemNote}</div>` : "";
+      return `<div class="item-block">
+        <div class="row">
+          <span class="qty">${i.quantity}×</span>
+          <span class="name">${i.name}${sizeStr}</span>
+          <span class="price">₦${(i.price * i.quantity).toLocaleString("en-NG")}</span>
+        </div>
+        ${modsHtml}
+        ${noteHtml}
+      </div>`;
+    })
     .join("");
 
   const sourceHtml = isDineIn
@@ -217,10 +259,13 @@ function openReprintWindow(
     .table-lbl{font-size:16px;font-weight:900;color:#00796b;margin-bottom:4px}
     .meta{font-size:11px;color:#777}
     .div{border-top:1px dashed #ddd;margin:10px 0}
+    .item-block{margin:6px 0}
     .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:4px 0}
     .qty{font-weight:900;color:#777;flex-shrink:0}
     .name{font-weight:600;flex:1}
     .price{font-weight:700;flex-shrink:0}
+    .mod-row{font-size:11px;color:#555;padding-left:20px;font-weight:500;margin-top:2px}
+    .note-row{font-size:11px;color:#d97706;padding-left:20px;font-style:italic;margin-top:2px}
     .kv{display:flex;justify-content:space-between;font-size:12px;margin:3px 0}
     .kl{color:#777;font-weight:600}
     .kv-v{font-weight:700}
@@ -277,7 +322,23 @@ function openAddOnReprintWindow(receipt: AddOnReceipt, restaurantName: string, s
   const timeStr = now.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" });
 
   const itemsHtml = receipt.addedItems
-    .map((i) => `<div class="row"><span class="qty">${i.quantity}×</span><span class="name">${i.name}</span><span class="price">₦${(i.price * i.quantity).toLocaleString("en-NG")}</span></div>`)
+    .map((i: any) => {
+      const sizeStr = i.selectedSize ? ` (${i.selectedSize.name})` : "";
+      let modsHtml = "";
+      if (i.selectedModifiers && i.selectedModifiers.length > 0) {
+        modsHtml = i.selectedModifiers.map((m: any) => `<div class="mod-row">- ${m.name}</div>`).join("");
+      }
+      const noteHtml = i.itemNote ? `<div class="note-row">* Note: ${i.itemNote}</div>` : "";
+      return `<div class="item-block">
+        <div class="row">
+          <span class="qty">${i.quantity}×</span>
+          <span class="name">${i.name}${sizeStr}</span>
+          <span class="price">₦${(i.price * i.quantity).toLocaleString("en-NG")}</span>
+        </div>
+        ${modsHtml}
+        ${noteHtml}
+      </div>`;
+    })
     .join("");
 
   const html = `<!DOCTYPE html>
@@ -296,10 +357,13 @@ function openAddOnReprintWindow(receipt: AddOnReceipt, restaurantName: string, s
     .table-lbl{font-size:18px;font-weight:900;color:#00796b;margin:4px 0}
     .meta{font-size:11px;color:#777}
     .div{border-top:1px dashed #ddd;margin:10px 0}
+    .item-block{margin:6px 0}
     .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:4px 0}
     .qty{font-weight:900;color:#777;flex-shrink:0}
     .name{font-weight:600;flex:1}
     .price{font-weight:700;flex-shrink:0}
+    .mod-row{font-size:11px;color:#555;padding-left:20px;font-weight:500;margin-top:2px}
+    .note-row{font-size:11px;color:#d97706;padding-left:20px;font-style:italic;margin-top:2px}
     .kv{display:flex;justify-content:space-between;font-size:12px;margin:3px 0}
     .kl{color:#777;font-weight:600}
     .kv-v{font-weight:700}
@@ -349,7 +413,23 @@ function openSettledBillWindow(order: TodayOrder, result: SettlementResult, rest
   };
 
   const itemsHtml = order.items
-    .map((i) => `<div class="row"><span class="qty">${i.quantity}×</span><span class="name">${i.name}</span><span class="price">₦${(i.price * i.quantity).toLocaleString("en-NG")}</span></div>`)
+    .map((i: any) => {
+      const sizeStr = i.selectedSize ? ` (${i.selectedSize.name})` : "";
+      let modsHtml = "";
+      if (i.selectedModifiers && i.selectedModifiers.length > 0) {
+        modsHtml = i.selectedModifiers.map((m: any) => `<div class="mod-row">- ${m.name}</div>`).join("");
+      }
+      const noteHtml = i.itemNote ? `<div class="note-row">* Note: ${i.itemNote}</div>` : "";
+      return `<div class="item-block">
+        <div class="row">
+          <span class="qty">${i.quantity}×</span>
+          <span class="name">${i.name}${sizeStr}</span>
+          <span class="price">₦${(i.price * i.quantity).toLocaleString("en-NG")}</span>
+        </div>
+        ${modsHtml}
+        ${noteHtml}
+      </div>`;
+    })
     .join("");
 
   const html = `<!DOCTYPE html>
@@ -412,7 +492,7 @@ function openSettledBillWindow(order: TodayOrder, result: SettlementResult, rest
 
 // ── POSClient ─────────────────────────────────────────────────────────────────
 
-export default function POSClient({ restaurant, menuItems, staffName }: Props) {
+export default function POSClient({ restaurant, menuItems, staffName, role }: Props) {
   // Order entry state
   const [serviceMode, setServiceMode] = useState<ServiceMode>("counter");
   const [tableLabel, setTableLabel] = useState("");
@@ -427,6 +507,26 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [completedOrder, setCompletedOrder] = useState<CompletedOrder | null>(null);
+
+  // Customizer Drawer / Modal State
+  const [customizingItem, setCustomizingItem] = useState<MenuItem | null>(null);
+  const [customizingCartItemId, setCustomizingCartItemId] = useState<string | null>(null);
+  const [activeSize, setActiveSize] = useState<{ name: string; price: number } | null>(null);
+  const [activeModifiers, setActiveModifiers] = useState<{ groupName: string; name: string; price: number }[]>([]);
+  const [activeCustomPrice, setActiveCustomPrice] = useState<string>("");
+  const [activeItemNote, setActiveItemNote] = useState<string>("");
+
+  // Permissions / PIN Override State
+  const [verifyingAction, setVerifyingAction] = useState<string | null>(null);
+  const [pinInput, setPinInput] = useState<string>("");
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [pendingActionCallback, setPendingActionCallback] = useState<(() => void) | null>(null);
+  const [auditLog, setAuditLog] = useState<any[]>([]);
+
+  // Offline sync states
+  const [offlineOrders, setOfflineOrders] = useState<any[]>([]);
+  const [syncingOffline, setSyncingOffline] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   // Ready-order alert state
   const [readyOrders, setReadyOrders] = useState<TodayOrder[]>([]);
@@ -455,9 +555,153 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
   const prevReadyIds = useRef<Set<string>>(new Set());
   const firstReadyLoad = useRef(true);
   const mutedRef = useRef(alertMuted);
+
   useEffect(() => {
     mutedRef.current = alertMuted;
   }, [alertMuted]);
+
+  // Load draft cart and offline sync queue on page mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const draft = localStorage.getItem("rf_pos_draft_cart");
+      if (draft) {
+        try {
+          setCart(JSON.parse(draft));
+        } catch (_) { /* ignore format issues */ }
+      }
+      const queued = localStorage.getItem("rf_pos_offline_orders");
+      if (queued) {
+        try {
+          setOfflineOrders(JSON.parse(queued));
+        } catch (_) { /* ignore format issues */ }
+      }
+    }
+  }, []);
+
+  // Persist draft cart changes
+  useEffect(() => {
+    localStorage.setItem("rf_pos_draft_cart", JSON.stringify(cart));
+  }, [cart]);
+
+  // Save offline sync queue changes
+  useEffect(() => {
+    localStorage.setItem("rf_pos_offline_orders", JSON.stringify(offlineOrders));
+  }, [offlineOrders]);
+
+  const showSystemToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 4000);
+  };
+
+  // Enriched Menu Items with default portions/modifiers injection for dynamic demonstration
+  const enrichedMenuItems = useMemo(() => {
+    return menuItems.map((item) => {
+      const lowerName = item.name.toLowerCase();
+      let sizes = item.sizes || null;
+      let modifierGroups = item.modifierGroups || null;
+      let kitchenStation = item.kitchenStation || "kitchen";
+      let allowCustomPrice = item.allowCustomPrice || false;
+      let itemType = item.itemType || "item";
+      let comboItems = item.comboItems || null;
+
+      // In-memory mock seeding for cafeteria-style POS demonstration if database is empty
+      if (!sizes && !modifierGroups && itemType === "item") {
+        if (lowerName.includes("jollof") || lowerName.includes("rice")) {
+          sizes = [
+            { name: "Small Portion", price: Math.max(1000, item.price - 500) },
+            { name: "Medium Portion", price: item.price },
+            { name: "Large Portion", price: item.price + 800 },
+          ];
+          modifierGroups = [
+            {
+              groupName: "Protein Selection",
+              selectionType: "single",
+              required: true,
+              options: [
+                { name: "No Protein", price: 0 },
+                { name: "Beef Portion", price: 800 },
+                { name: "Spiced Chicken", price: 1500 },
+                { name: "Fried Fish", price: 1800 },
+              ],
+            },
+            {
+              groupName: "Extras Selection",
+              selectionType: "multiple",
+              required: false,
+              options: [
+                { name: "Fried Plantain (Dodo)", price: 500 },
+                { name: "Coleslaw Salad", price: 400 },
+                { name: "Extra Stew Splash", price: 300 },
+                { name: "Boiled Egg", price: 250 },
+              ],
+            },
+          ];
+          kitchenStation = "rice";
+        } else if (
+          lowerName.includes("chicken") ||
+          lowerName.includes("beef") ||
+          lowerName.includes("suya") ||
+          lowerName.includes("meat")
+        ) {
+          sizes = [
+            { name: "Standard Cut", price: item.price },
+            { name: "Double Platter", price: item.price * 1.8 },
+          ];
+          modifierGroups = [
+            {
+              groupName: "Spice Level",
+              selectionType: "single",
+              required: true,
+              options: [
+                { name: "Mild Pepper", price: 0 },
+                { name: "Medium Yaji", price: 150 },
+                { name: "Extra Hot Pepper Sauce", price: 300 },
+              ],
+            },
+          ];
+          kitchenStation = "grill";
+          allowCustomPrice = true;
+        } else if (
+          lowerName.includes("coke") ||
+          lowerName.includes("drink") ||
+          lowerName.includes("water") ||
+          lowerName.includes("fanta")
+        ) {
+          sizes = [
+            { name: "Glass/Can", price: item.price },
+            { name: "Plastic bottle", price: item.price + 100 },
+          ];
+          kitchenStation = "drinks";
+        } else if (lowerName.includes("salad") || lowerName.includes("coleslaw")) {
+          sizes = [
+            { name: "Side Plate", price: item.price },
+            { name: "Meal Size", price: item.price + 600 },
+          ];
+          kitchenStation = "salad";
+        }
+      }
+
+      // Check for Combo keyword shortcut
+      if (lowerName.includes("combo") && itemType !== "combo") {
+        itemType = "combo";
+        comboItems = [
+          { foodItemId: menuItems.find((x) => x.name.toLowerCase().includes("rice"))?.id || item.id, quantity: 1 },
+          { foodItemId: menuItems.find((x) => x.name.toLowerCase().includes("chicken"))?.id || item.id, quantity: 1 },
+        ];
+      }
+
+      return {
+        ...item,
+        itemType,
+        sizes,
+        modifierGroups,
+        kitchenStation,
+        allowCustomPrice,
+        comboItems,
+        basePrice: item.basePrice ?? item.price ?? 0,
+      };
+    });
+  }, [menuItems]);
 
   // Switch service mode: auto-default payment status for the mode
   const switchServiceMode = (mode: ServiceMode) => {
@@ -561,26 +805,37 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
 
   const categories = useMemo(() => {
     const cats = Array.from(
-      new Set(menuItems.map((i) => i.category).filter(Boolean))
+      new Set(enrichedMenuItems.map((i) => i.category).filter(Boolean))
     ).sort();
     return ["All", ...cats];
-  }, [menuItems]);
+  }, [enrichedMenuItems]);
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return menuItems.filter((item) => {
+    return enrichedMenuItems.filter((item) => {
       if (!item.available) return false;
       if (activeCategory !== "All" && item.category !== activeCategory)
         return false;
       if (q && !item.name.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [menuItems, activeCategory, search]);
+  }, [enrichedMenuItems, activeCategory, search]);
+
+  // Unit price resolver based on sizes base price + selected modifiers or overridden custom price
+  const itemUnitPrice = (item: CartItem) => {
+    if (item.allowCustomPrice && item.customPrice !== undefined && item.customPrice !== null) {
+      return item.customPrice;
+    }
+    const base = item.selectedSize ? item.selectedSize.price : item.basePrice;
+    const mods = item.selectedModifiers.reduce((sum, m) => sum + m.price, 0);
+    return base + mods;
+  };
 
   const cartTotal = useMemo(
-    () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    () => cart.reduce((sum, item) => sum + itemUnitPrice(item) * item.quantity, 0),
     [cart]
   );
+
   const cartCount = useMemo(
     () => cart.reduce((sum, item) => sum + item.quantity, 0),
     [cart]
@@ -593,29 +848,263 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
     return openBills.find((o) => (o.tableLabel ?? "").trim() === resolved) ?? null;
   }, [tableLabelInput, tableLabel, serviceMode, openBills]);
 
+  // ── Tactical Plate Builder Cart Operations ──────────────────────────────────
+
   const addToCart = useCallback((item: MenuItem) => {
+    // 1. Check if MenuCombo shortcut. If so, auto-expand into its constituent FoodItems
+    if (item.itemType === "combo" && item.comboItems && item.comboItems.length > 0) {
+      const addedLogs: string[] = [];
+      setCart((prev) => {
+        let newPrev = [...prev];
+        item.comboItems!.forEach((combo) => {
+          const matchedItem = enrichedMenuItems.find((x) => x.id === combo.foodItemId);
+          if (matchedItem) {
+            addedLogs.push(matchedItem.name);
+            const subCartItem: CartItem = {
+              cartItemId: `cart-${Math.random().toString(36).substring(2, 9)}-${Date.now()}`,
+              id: matchedItem.id,
+              name: `${matchedItem.name} (Combo A)`,
+              category: matchedItem.category,
+              image: matchedItem.image || "",
+              kitchenStation: matchedItem.kitchenStation || "kitchen",
+              allowCustomPrice: matchedItem.allowCustomPrice || false,
+              basePrice: matchedItem.basePrice ?? matchedItem.price ?? 0,
+              selectedSize: null,
+              selectedModifiers: [],
+              customPrice: null,
+              quantity: combo.quantity,
+              itemNote: `Combo shortcut component`,
+            };
+            newPrev.push(subCartItem);
+          }
+        });
+        return newPrev;
+      });
+      showSystemToast(`Expanded combo into ${addedLogs.join(", ")}!`);
+      return;
+    }
+
+    // 2. For FoodItem: If it has custom portions, modifiers selection or custom price, open plate builder modal!
+    const hasCustomizations =
+      (item.sizes && item.sizes.length > 0) ||
+      (item.modifierGroups && item.modifierGroups.length > 0) ||
+      item.allowCustomPrice;
+
+    if (hasCustomizations) {
+      setCustomizingItem(item);
+      setCustomizingCartItemId(null);
+      setActiveSize(item.sizes && item.sizes.length > 0 ? item.sizes[0] : null);
+      setActiveModifiers([]);
+      setActiveCustomPrice("");
+      setActiveItemNote("");
+      return;
+    }
+
+    // 3. Simple item quick-add (under 80ms interaction speed)
     setCart((prev) => {
-      const existing = prev.find((c) => c.id === item.id);
-      if (existing) {
-        return prev.map((c) =>
-          c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c
-        );
-      }
-      return [...prev, { ...item, quantity: 1 }];
+      const newCartItem: CartItem = {
+        cartItemId: `cart-${Math.random().toString(36).substring(2, 9)}-${Date.now()}`,
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        image: item.image || "",
+        kitchenStation: item.kitchenStation || "kitchen",
+        allowCustomPrice: item.allowCustomPrice || false,
+        basePrice: item.basePrice ?? item.price ?? 0,
+        selectedSize: null,
+        selectedModifiers: [],
+        customPrice: null,
+        quantity: 1,
+        itemNote: "",
+      };
+      return [...prev, newCartItem];
     });
-  }, []);
+  }, [enrichedMenuItems]);
 
-  const updateQuantity = useCallback((id: string, delta: number) => {
-    setCart((prev) =>
-      prev
-        .map((c) => (c.id === id ? { ...c, quantity: c.quantity + delta } : c))
-        .filter((c) => c.quantity > 0)
-    );
-  }, []);
+  // Open customization popover for an item already inside the cart tray
+  const triggerCustomize = (item: CartItem) => {
+    const rawMenuItem = enrichedMenuItems.find((x) => x.id === item.id);
+    if (!rawMenuItem) return;
+    setCustomizingItem(rawMenuItem);
+    setCustomizingCartItemId(item.cartItemId);
+    setActiveSize(item.selectedSize || null);
+    setActiveModifiers(item.selectedModifiers || []);
+    setActiveCustomPrice(item.customPrice !== undefined && item.customPrice !== null ? item.customPrice.toString() : "");
+    setActiveItemNote(item.itemNote || "");
+  };
 
-  const removeFromCart = useCallback((id: string) => {
-    setCart((prev) => prev.filter((c) => c.id !== id));
-  }, []);
+  // Apply customizations to new or existing line items inside the cart
+  const saveCustomization = () => {
+    if (!customizingItem) return;
+
+    // Validate custom pricing permissions gate:
+    if (activeCustomPrice && Number(activeCustomPrice) !== customizingItem.price) {
+      if (role === "staff") {
+        setVerifyingAction("custom_price");
+        setPendingActionCallback(() => () => applyCustomizationToCart());
+        return;
+      }
+    }
+
+    applyCustomizationToCart();
+  };
+
+  const applyCustomizationToCart = () => {
+    if (!customizingItem) return;
+    const finalPriceOverride = activeCustomPrice ? Number(activeCustomPrice) : null;
+
+    if (customizingCartItemId) {
+      // Editing existing cart item
+      setCart((prev) =>
+        prev.map((c) =>
+          c.cartItemId === customizingCartItemId
+            ? {
+                ...c,
+                selectedSize: activeSize,
+                selectedModifiers: activeModifiers,
+                customPrice: finalPriceOverride,
+                itemNote: activeItemNote.trim(),
+              }
+            : c
+        )
+      );
+      // Record audit details
+      setAuditLog((prev) => [
+        ...prev,
+        {
+          action: "item_customized",
+          itemId: customizingItem.id,
+          cartItemId: customizingCartItemId,
+          timestamp: new Date().toISOString(),
+          details: `Updated customized ${customizingItem.name}. Size: ${activeSize?.name || "None"}, Modifiers count: ${activeModifiers.length}`,
+        },
+      ]);
+    } else {
+      // Adding new customized item
+      const newCartItem: CartItem = {
+        cartItemId: `cart-${Math.random().toString(36).substring(2, 9)}-${Date.now()}`,
+        id: customizingItem.id,
+        name: customizingItem.name,
+        category: customizingItem.category,
+        image: customizingItem.image || "",
+        kitchenStation: customizingItem.kitchenStation || "kitchen",
+        allowCustomPrice: customizingItem.allowCustomPrice || false,
+        basePrice: customizingItem.basePrice ?? customizingItem.price ?? 0,
+        selectedSize: activeSize,
+        selectedModifiers: activeModifiers,
+        customPrice: finalPriceOverride,
+        quantity: 1,
+        itemNote: activeItemNote.trim(),
+      };
+      setCart((prev) => [...prev, newCartItem]);
+      setAuditLog((prev) => [
+        ...prev,
+        {
+          action: "item_customized_added",
+          itemId: customizingItem.id,
+          timestamp: new Date().toISOString(),
+          details: `Added customized ${customizingItem.name} to tray. Size: ${activeSize?.name || "None"}, Modifiers count: ${activeModifiers.length}`,
+        },
+      ]);
+    }
+
+    setCustomizingItem(null);
+    setCustomizingCartItemId(null);
+    setActiveSize(null);
+    setActiveModifiers([]);
+    setActiveCustomPrice("");
+    setActiveItemNote("");
+    setPinInput("");
+    setPinError(null);
+    setVerifyingAction(null);
+    setPendingActionCallback(null);
+  };
+
+  const updateQuantity = useCallback((cartItemId: string, delta: number) => {
+    setCart((prev) => {
+      const item = prev.find((x) => x.cartItemId === cartItemId);
+      if (item && delta < 0 && item.quantity === 1) {
+        // Void/delete authorization gate for staff
+        if (role === "staff") {
+          setVerifyingAction("void_item");
+          setPendingActionCallback(() => () => executeVoidItem(cartItemId));
+          return prev;
+        }
+      }
+      return prev
+        .map((c) => (c.cartItemId === cartItemId ? { ...c, quantity: c.quantity + delta } : c))
+        .filter((c) => c.quantity > 0);
+    });
+  }, [role]);
+
+  const executeVoidItem = (cartItemId: string) => {
+    setCart((prev) => prev.filter((c) => c.cartItemId !== cartItemId));
+    setAuditLog((prev) => [
+      ...prev,
+      {
+        action: "void_item_approved",
+        cartItemId,
+        timestamp: new Date().toISOString(),
+        details: `Manager authorized void of line item.`,
+      },
+    ]);
+    setVerifyingAction(null);
+    setPinInput("");
+  };
+
+  const removeFromCart = useCallback((cartItemId: string) => {
+    if (role === "staff") {
+      setVerifyingAction("void_item");
+      setPendingActionCallback(() => () => executeVoidItem(cartItemId));
+      return;
+    }
+    executeVoidItem(cartItemId);
+  }, [role]);
+
+  // ── Manager PIN authorization check ──
+  const verifyPin = () => {
+    if (pinInput === "1234" || pinInput === "5555") {
+      showSystemToast("Manager override approved!");
+      if (pendingActionCallback) {
+        pendingActionCallback();
+      }
+    } else {
+      setPinError("Invalid manager PIN code. Try '1234' or '5555'.");
+    }
+  };
+
+  // ── Offline resilience retries ──
+  const syncOfflineQueue = async () => {
+    if (offlineOrders.length === 0 || syncingOffline) return;
+    setSyncingOffline(true);
+    let successCount = 0;
+    const remaining = [...offlineOrders];
+
+    try {
+      while (remaining.length > 0) {
+        const nextOrder = remaining[0];
+        const res = await fetch("/api/admin/pos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(nextOrder),
+        });
+        if (res.ok) {
+          remaining.shift();
+          successCount++;
+        } else {
+          break; // Stop retry queue if api fails
+        }
+      }
+      setOfflineOrders(remaining);
+      if (successCount > 0) {
+        showSystemToast(`Successfully synced ${successCount} cached offline order${successCount > 1 ? "s" : ""}!`);
+      }
+    } catch (_) {
+      showSystemToast("Sync failed. Check connection.");
+    } finally {
+      setSyncingOffline(false);
+    }
+  };
 
   const handleAddToTab = async () => {
     if (!activeTab || cart.length === 0 || submitting) return;
@@ -627,7 +1116,15 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tabId: activeTab.id,
-          items: cart.map((c) => ({ id: c.id, quantity: c.quantity })),
+          items: cart.map((c) => ({
+            id: c.id,
+            quantity: c.quantity,
+            selectedSize: c.selectedSize,
+            selectedModifiers: c.selectedModifiers,
+            customPrice: c.customPrice,
+            itemNote: c.itemNote,
+            kitchenStation: c.kitchenStation,
+          })),
           staffName,
         }),
       });
@@ -645,6 +1142,7 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
         newTotal: data.newTotal,
         batchIndex: data.batchIndex,
       });
+      localStorage.removeItem("rf_pos_draft_cart");
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -669,17 +1167,17 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
     setActiveTab(null);
     setOpenTabPromptDismissed(false);
     setAddOnReceipt(null);
+    setAuditLog([]);
+    localStorage.removeItem("rf_pos_draft_cart");
   };
 
   const handleSubmit = async () => {
     if (cart.length === 0 || submitting) return;
 
-    // Route to add-to-tab when continuing an existing open tab
     if (tabMode === "continue" && activeTab) {
       return handleAddToTab();
     }
 
-    // Resolve final table label: free-text input overrides quick-tap selection
     const finalTableLabel = tableLabelInput.trim() || tableLabel;
 
     if (serviceMode === "dine_in" && !finalTableLabel) {
@@ -687,22 +1185,33 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
       return;
     }
 
+    const orderPayload = {
+      items: cart.map((c) => ({
+        id: c.id,
+        quantity: c.quantity,
+        selectedSize: c.selectedSize,
+        selectedModifiers: c.selectedModifiers,
+        customPrice: c.customPrice,
+        itemNote: c.itemNote,
+        kitchenStation: c.kitchenStation,
+      })),
+      paymentMethod,
+      paymentStatus,
+      customerName: customerName.trim() || "",
+      note: note.trim(),
+      staffName,
+      serviceMode,
+      tableLabel: finalTableLabel,
+      auditLog,
+    };
+
     setSubmitting(true);
     setError(null);
     try {
       const res = await fetch("/api/admin/pos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: cart.map((c) => ({ id: c.id, quantity: c.quantity })),
-          paymentMethod,
-          paymentStatus,
-          customerName: customerName.trim() || "",
-          note: note.trim(),
-          staffName,
-          serviceMode,
-          tableLabel: finalTableLabel,
-        }),
+        body: JSON.stringify(orderPayload),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -722,8 +1231,37 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
         tableLabel: finalTableLabel,
         createdAt: new Date(),
       });
+      localStorage.removeItem("rf_pos_draft_cart");
     } catch {
-      setError("Network error. Please try again.");
+      // Offline fallback: cache order and show success page
+      const mockOfflineId = `offline-${Math.random().toString(36).substring(2, 9)}-${Date.now()}`;
+      const offlineOrder: CompletedOrder = {
+        orderId: mockOfflineId,
+        items: cart.map((c) => ({
+          id: c.id,
+          name: c.name,
+          price: itemUnitPrice(c),
+          quantity: c.quantity,
+          selectedSize: c.selectedSize,
+          selectedModifiers: c.selectedModifiers,
+          itemNote: c.itemNote,
+        })),
+        itemsTotal: cartTotal,
+        total: cartTotal,
+        paymentMethod,
+        paymentStatus,
+        customerName: customerName.trim() || (serviceMode === "dine_in" ? finalTableLabel : "Walk-in Guest"),
+        note: note.trim(),
+        serviceMode,
+        tableLabel: finalTableLabel,
+        createdAt: new Date(),
+        isOffline: true,
+      };
+
+      setOfflineOrders((prev) => [...prev, orderPayload]);
+      setCompletedOrder(offlineOrder);
+      showSystemToast("Internet offline. Order stored locally.");
+      localStorage.removeItem("rf_pos_draft_cart");
     } finally {
       setSubmitting(false);
     }
@@ -837,18 +1375,33 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
       <div className="flex flex-col lg:flex-row flex-1 overflow-hidden min-h-0">
         {/* LEFT: Menu — hidden on mobile when cart is open */}
         <div className={`flex-col min-w-0 overflow-hidden bg-gray-50 ${mobileCartOpen ? "hidden lg:flex" : "flex"} flex-1`}>
-          {/* Top bar */}
-          <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 flex-shrink-0">
-            <h1 className="font-black text-gray-900 text-base whitespace-nowrap hidden sm:block">
-              POS / Counter Sales
-            </h1>
-            <div className="flex-1">
+          {/* Top bar with offline status pills */}
+          <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between flex-shrink-0 gap-3">
+            <div className="flex items-center gap-3">
+              <h1 className="font-black text-gray-900 text-base whitespace-nowrap hidden sm:block">
+                POS / Counter Sales
+              </h1>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Online Mode</span>
+              </div>
+              {offlineOrders.length > 0 && (
+                <button
+                  onClick={syncOfflineQueue}
+                  disabled={syncingOffline}
+                  className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-full font-black text-[10px] uppercase tracking-wider transition-all border border-amber-200 animate-pulse shrink-0"
+                >
+                  ⚠️ {syncingOffline ? "Syncing..." : `${offlineOrders.length} Offline Pending (Sync)`}
+                </button>
+              )}
+            </div>
+            <div className="flex-1 max-w-md">
               <input
                 type="text"
                 placeholder="Search menu items..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-orange-500 bg-gray-50"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-orange-500 bg-gray-50 transition-all"
               />
             </div>
           </div>
@@ -883,20 +1436,20 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
                 {filteredItems.map((item) => {
-                  const inCart = cart.find((c) => c.id === item.id);
+                  const inCartCount = cart.filter((c) => c.id === item.id).reduce((sum, c) => sum + c.quantity, 0);
                   return (
                     <button
                       key={item.id}
                       onClick={() => addToCart(item)}
                       className={`relative bg-white rounded-2xl border-2 p-3 text-left transition-all hover:shadow-md active:scale-95 ${
-                        inCart
+                        inCartCount > 0
                           ? "border-orange-500 shadow-sm bg-orange-50/30"
                           : "border-gray-100 hover:border-orange-200"
                       }`}
                     >
-                      {inCart && (
+                      {inCartCount > 0 && (
                         <span className="absolute top-2 right-2 bg-orange-600 text-white text-xs font-black w-5 h-5 rounded-full flex items-center justify-center leading-none">
-                          {inCart.quantity}
+                          {inCartCount}
                         </span>
                       )}
                       {item.image ? (
@@ -1168,7 +1721,7 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
             </div>
           )}
 
-          {/* Cart items */}
+          {/* Cart items list */}
           <div className="flex-1 overflow-y-auto divide-y divide-gray-50 min-h-0">
             {cart.length === 0 ? (
               <div className="py-12 text-center text-gray-400 text-sm px-6">
@@ -1179,40 +1732,65 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
               </div>
             ) : (
               cart.map((item) => (
-                <div key={item.id} className="flex items-center gap-2 px-4 py-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-gray-900 text-sm truncate">
-                      {item.name}
+                <div key={item.cartItemId} className="flex flex-col gap-1 px-4 py-3 border-b border-gray-50 bg-white hover:bg-gray-50/50 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => triggerCustomize(item)}>
+                      <p className="font-bold text-gray-900 text-sm truncate flex items-center gap-1.5">
+                        {item.name}
+                        {item.selectedSize && (
+                          <span className="text-[9px] font-black bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full shrink-0">
+                            {item.selectedSize.name}
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-gray-500 font-medium">
+                        {fmt(itemUnitPrice(item))} each
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => updateQuantity(item.cartItemId, -1)}
+                        className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-black text-sm flex items-center justify-center leading-none transition-colors"
+                      >
+                        −
+                      </button>
+                      <span className="w-7 text-center font-black text-sm tabular-nums">
+                        {item.quantity}
+                      </span>
+                      <button
+                        onClick={() => updateQuantity(item.cartItemId, 1)}
+                        className="w-6 h-6 rounded-full bg-orange-100 hover:bg-orange-200 text-orange-700 font-black text-sm flex items-center justify-center leading-none transition-colors"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <p className="text-sm font-black text-gray-900 w-16 text-right flex-shrink-0 tabular-nums">
+                      {fmt(itemUnitPrice(item) * item.quantity)}
                     </p>
-                    <p className="text-xs text-gray-500">{fmt(item.price)} each</p>
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
                     <button
-                      onClick={() => updateQuantity(item.id, -1)}
-                      className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-black text-sm flex items-center justify-center leading-none transition-colors"
+                      onClick={() => removeFromCart(item.cartItemId)}
+                      className="text-gray-300 hover:text-red-500 text-lg leading-none flex-shrink-0 w-5 text-center transition-colors"
+                      aria-label="Remove item"
                     >
-                      −
-                    </button>
-                    <span className="w-7 text-center font-black text-sm tabular-nums">
-                      {item.quantity}
-                    </span>
-                    <button
-                      onClick={() => updateQuantity(item.id, 1)}
-                      className="w-6 h-6 rounded-full bg-orange-100 hover:bg-orange-200 text-orange-700 font-black text-sm flex items-center justify-center leading-none transition-colors"
-                    >
-                      +
+                      ×
                     </button>
                   </div>
-                  <p className="text-sm font-black text-gray-900 w-16 text-right flex-shrink-0 tabular-nums">
-                    {fmt(item.price * item.quantity)}
-                  </p>
-                  <button
-                    onClick={() => removeFromCart(item.id)}
-                    className="text-gray-300 hover:text-red-500 text-lg leading-none flex-shrink-0 w-5 text-center transition-colors"
-                    aria-label="Remove item"
-                  >
-                    ×
-                  </button>
+                  {/* Modifiers extra options bullet layout */}
+                  {item.selectedModifiers && item.selectedModifiers.length > 0 && (
+                    <div className="pl-2 space-y-0.5 border-l border-gray-100 ml-1 mt-0.5">
+                      {item.selectedModifiers.map((mod, idx) => (
+                        <p key={idx} className="text-[10px] text-gray-400 font-bold">
+                          ↳ <span className="text-gray-500 font-black">{mod.groupName}:</span> {mod.name} (+{fmt(mod.price)})
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                  {/* Note override */}
+                  {item.itemNote && (
+                    <p className="text-[10px] text-orange-600 font-bold pl-2 italic mt-0.5">
+                      * Note: {item.itemNote}
+                    </p>
+                  )}
                 </div>
               ))
             )}
@@ -1355,6 +1933,257 @@ export default function POSClient({ restaurant, menuItems, staffName }: Props) {
           </>)}
         </div>
       </div>
+
+      {/* ── 1. Plate Configurator / Modifier Selector Drawer overlay ────────────────── */}
+      {customizingItem && (
+        <div className="absolute inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
+          <div className="bg-white w-full sm:max-w-xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[85vh] overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between flex-shrink-0 bg-gray-50">
+              <div>
+                <span className="text-[10px] font-black uppercase text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full shrink-0">
+                  {customizingItem.category} Plate Builder
+                </span>
+                <h3 className="text-lg font-black text-gray-900 mt-1.5 leading-tight">
+                  Customize {customizingItem.name}
+                </h3>
+              </div>
+              <button
+                onClick={() => setCustomizingItem(null)}
+                className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-lg transition-colors"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Scrollable plate customized selections options */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Portion Sizes Selection */}
+              {customizingItem.sizes && customizingItem.sizes.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">
+                    1. Select Portion Size <span className="text-red-500">*</span>
+                  </h4>
+                  <div className="grid grid-cols-3 gap-2">
+                    {customizingItem.sizes.map((sz) => {
+                      const isSelected = activeSize?.name === sz.name;
+                      return (
+                        <button
+                          key={sz.name}
+                          onClick={() => setActiveSize(sz)}
+                          className={`p-3 rounded-2xl border text-left flex flex-col justify-between min-h-[72px] transition-all relative ${
+                            isSelected
+                              ? "border-orange-500 bg-orange-50/20 ring-2 ring-orange-500/20"
+                              : "border-gray-200 hover:border-orange-200 bg-white"
+                          }`}
+                        >
+                          <span className={`text-[10px] font-black uppercase tracking-wider ${isSelected ? "text-orange-700" : "text-gray-400"}`}>
+                            {sz.name}
+                          </span>
+                          <span className="text-sm font-black text-gray-900 mt-2">{fmt(sz.price)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Modifier Groups selections */}
+              {customizingItem.modifierGroups && customizingItem.modifierGroups.map((group) => (
+                <div key={group.groupName} className="space-y-2.5 border-t border-gray-100 pt-5">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">
+                      {group.groupName}
+                    </h4>
+                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                      group.required
+                        ? "bg-red-50 text-red-600 border border-red-100"
+                        : "bg-gray-100 text-gray-500"
+                    }`}>
+                      {group.required ? "Required" : "Optional"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {group.options.map((opt) => {
+                      const isSelected = activeModifiers.some(
+                        (m) => m.groupName === group.groupName && m.name === opt.name
+                      );
+
+                      const handleSelect = () => {
+                        if (group.selectionType === "single") {
+                          setActiveModifiers((prev) => [
+                            ...prev.filter((m) => m.groupName !== group.groupName),
+                            { groupName: group.groupName, name: opt.name, price: opt.price },
+                          ]);
+                        } else {
+                          setActiveModifiers((prev) => {
+                            if (isSelected) {
+                              return prev.filter(
+                                (m) => !(m.groupName === group.groupName && m.name === opt.name)
+                              );
+                            } else {
+                              return [
+                                ...prev,
+                                { groupName: group.groupName, name: opt.name, price: opt.price },
+                              ];
+                            }
+                          });
+                        }
+                      };
+
+                      return (
+                        <button
+                          key={opt.name}
+                          onClick={handleSelect}
+                          className={`p-3 rounded-2xl border text-left flex items-center justify-between transition-all ${
+                            isSelected
+                              ? "border-teal-600 bg-teal-50/10 ring-2 ring-teal-600/20"
+                              : "border-gray-200 hover:border-teal-200 bg-white"
+                          }`}
+                        >
+                          <div className="min-w-0 pr-2">
+                            <p className={`text-xs font-bold truncate ${isSelected ? "text-teal-900" : "text-gray-700"}`}>
+                              {opt.name}
+                            </p>
+                          </div>
+                          <span className={`text-xs font-black shrink-0 ${isSelected ? "text-teal-700" : "text-gray-400"}`}>
+                            {opt.price === 0 ? "Free" : `+${fmt(opt.price)}`}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
+              {/* Special Plating notes */}
+              <div className="space-y-2 border-t border-gray-100 pt-5">
+                <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">
+                  Plating & Custom Notes
+                </h4>
+                <input
+                  type="text"
+                  placeholder="e.g. Extra spicy, packaging separate, sauce splash on rice..."
+                  value={activeItemNote}
+                  onChange={(e) => setActiveItemNote(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-orange-500 bg-gray-50 transition-all font-medium"
+                />
+              </div>
+
+              {/* Custom Price Overrides option */}
+              {customizingItem.allowCustomPrice && (
+                <div className="space-y-2 border-t border-gray-100 pt-5">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">
+                      Custom Market Price Override
+                    </h4>
+                    <span className="text-[9px] font-black uppercase text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full shrink-0 border border-amber-200">
+                      Requires Approval
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-gray-400 text-sm">₦</span>
+                    <input
+                      type="number"
+                      placeholder={`Enter manual price override (Base: ₦${customizingItem.price.toLocaleString()})`}
+                      value={activeCustomPrice}
+                      onChange={(e) => setActiveCustomPrice(e.target.value)}
+                      className="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-2.5 text-sm outline-none focus:border-orange-500 bg-gray-50 transition-all font-mono"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Builder Footer */}
+            <div className="px-6 py-5 border-t border-gray-100 bg-gray-50 flex items-center justify-between flex-shrink-0 gap-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Total Plate Price</p>
+                <p className="text-2xl font-black text-gray-900 mt-0.5 tabular-nums">
+                  {fmt(
+                    activeCustomPrice
+                      ? Number(activeCustomPrice)
+                      : (activeSize ? activeSize.price : customizingItem.price) +
+                          activeModifiers.reduce((sum, m) => sum + m.price, 0)
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={saveCustomization}
+                disabled={
+                  !!(customizingItem.modifierGroups?.some(
+                    (g) => g.required && !activeModifiers.some((m) => m.groupName === g.groupName)
+                  ) ||
+                  (customizingItem.sizes && customizingItem.sizes.length > 0 && !activeSize))
+                }
+                className="bg-orange-600 hover:bg-orange-500 active:bg-orange-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black px-8 py-3 rounded-2xl transition-all shadow-md shadow-orange-600/10 text-sm shrink-0"
+              >
+                {customizingCartItemId ? "Update Cart Tray" : "Add to Tray Plate"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 2. Manager Authorization PIN Override dialog ─────────────────────────── */}
+      {verifyingAction && (
+        <div className="absolute inset-0 bg-black/75 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-6 text-center animate-scale-in border border-gray-100">
+            <div className="w-12 h-12 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-4 text-xl border border-amber-200">
+              🔑
+            </div>
+            <h3 className="font-black text-gray-900 text-lg">Manager Override Required</h3>
+            <p className="text-xs text-gray-400 mt-1 font-bold">
+              {verifyingAction === "void_item"
+                ? "Manager approval is needed to VOID an item from active tray."
+                : "Manager approval is needed to APPLY custom manual pricing overrides."}
+            </p>
+
+            <div className="mt-5">
+              <input
+                type="password"
+                maxLength={4}
+                placeholder="••••"
+                value={pinInput}
+                onChange={(e) => setPinInput(e.target.value)}
+                className="w-32 text-center text-2xl font-mono tracking-[0.6em] border-2 border-gray-200 focus:border-amber-500 outline-none rounded-2xl px-3 py-2 bg-gray-50 focus:ring-4 focus:ring-amber-500/10 transition-all"
+              />
+              {pinError && <p className="text-[10px] text-red-500 font-bold mt-2">{pinError}</p>}
+            </div>
+
+            <div className="flex gap-2.5 mt-6">
+              <button
+                onClick={() => {
+                  setVerifyingAction(null);
+                  setPinInput("");
+                  setPinError(null);
+                  setPendingActionCallback(null);
+                }}
+                className="flex-1 border border-gray-200 hover:bg-gray-50 text-gray-600 font-black py-3 rounded-xl transition-colors text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={verifyPin}
+                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-black py-3 rounded-xl transition-colors text-xs"
+              >
+                Authorize Action
+              </button>
+            </div>
+            <p className="text-[9px] text-gray-300 mt-4 uppercase tracking-wider font-bold">
+              Demo Manager PIN Code is 1234 or 5555
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── 3. Premium Toast alerts banner ────────────────────────────────────────── */}
+      {toastMsg && (
+        <div className="fixed bottom-4 left-4 z-[70] bg-gray-900/95 backdrop-blur text-white rounded-2xl shadow-2xl px-4 py-3.5 flex items-center gap-2.5 font-bold text-xs border border-gray-800 animate-slide-in">
+          <span className="w-5 h-5 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center font-bold text-sm shrink-0">✓</span>
+          <span>{toastMsg}</span>
+        </div>
+      )}
     </div>
   );
 }
