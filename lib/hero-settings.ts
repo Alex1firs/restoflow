@@ -48,7 +48,7 @@ export interface HeroSettings {
   menuTitleSize: number;
   menuLabelSize: number;
   menuDescriptionSize: number;
-  menuColumns: 1 | 2 | 3;
+  menuColumns: 1 | 2 | 3 | 4 | 5;
   menuCardBgStyle: "default" | "transparent" | "custom";
   menuCardCustomBgColor: string;
   menuCardBorderRadius: number;

@@ -34,6 +34,31 @@ export default function VisualCustomizer({
 
   const focalRef = useRef<HTMLDivElement>(null);
   const logoFocalRef = useRef<HTMLDivElement>(null);
+  const previewScrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto scroll preview section into view when activeTab changes
+  useEffect(() => {
+    if (!previewScrollContainerRef.current) return;
+    let targetId = "";
+    if (activeTab === "cover" || activeTab === "branding" || activeTab === "cta" || activeTab === "typography") {
+      targetId = "mockup-hero-section";
+    } else if (activeTab === "navbar") {
+      targetId = "mockup-navbar-section";
+    } else if (activeTab === "partners") {
+      targetId = "mockup-partners-section";
+    } else if (activeTab === "menu") {
+      targetId = "mockup-menu-section";
+    }
+
+    if (targetId) {
+      const targetElement = previewScrollContainerRef.current.querySelector(`#${targetId}`);
+      if (targetElement) {
+        setTimeout(() => {
+          targetElement.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }, 120);
+      }
+    }
+  }, [activeTab]);
 
   // Auto-inject Google Fonts for typography previews
   useEffect(() => {
@@ -802,6 +827,8 @@ export default function VisualCustomizer({
                         { value: "1", label: "1 Col" },
                         { value: "2", label: "2 Cols" },
                         { value: "3", label: "3 Cols" },
+                        { value: "4", label: "4 Cols" },
+                        { value: "5", label: "5 Cols" },
                       ]}
                       value={String(settings.menuColumns || 3)}
                       onChange={(v) => set("menuColumns", parseInt(v) as any)}
@@ -930,13 +957,17 @@ export default function VisualCustomizer({
 
             {/* PREVIEW CONTAINER */}
             <div
+              ref={previewScrollContainerRef}
               style={brandStyle}
-              className={`w-full overflow-hidden select-none bg-stone-100 flex flex-col relative transition-colors ${
-                viewport === "mobile" ? "flex-1 overflow-y-auto scrollbar-hide" : "rounded-3xl border border-[#EFECE6] shadow-md h-[400px]"
+              className={`w-full select-none bg-stone-100 flex flex-col relative transition-colors scroll-smooth ${
+                viewport === "mobile" 
+                  ? "flex-1 overflow-y-auto scrollbar-hide" 
+                  : "rounded-3xl border border-[#EFECE6] shadow-xl h-[600px] overflow-y-auto scrollbar-hide"
               }`}
             >
               {/* Storefront Hero section inside mockup */}
               <section
+                id="mockup-hero-section"
                 onClick={() => toggleTab("cover")}
                 className={`relative flex flex-col bg-stone-100 overflow-hidden cursor-pointer hover:ring-2 hover:ring-orange-500/50 transition-all ${justifyClass}`}
                 style={{
@@ -1175,6 +1206,7 @@ export default function VisualCustomizer({
               {/* Mockup Partner Brands Showcase Section */}
               {settings.showPartnersSection && (
                 <div
+                  id="mockup-partners-section"
                   onClick={(e) => {
                     e.stopPropagation();
                     toggleTab("partners");
@@ -1337,7 +1369,11 @@ export default function VisualCustomizer({
                         ? "grid-cols-1"
                         : settings.menuColumns === 2
                         ? "grid-cols-2"
-                        : "grid-cols-3"
+                        : settings.menuColumns === 3
+                        ? "grid-cols-3"
+                        : settings.menuColumns === 4
+                        ? "grid-cols-4"
+                        : "grid-cols-5"
                     }`}
                   >
                     {[

@@ -1099,7 +1099,11 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                     ? "grid-cols-1"
                     : hs.menuColumns === 2
                     ? "grid-cols-1 sm:grid-cols-2"
-                    : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                    : hs.menuColumns === 3
+                    ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                    : hs.menuColumns === 4
+                    ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+                    : "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
                 } ${fade("menu-grid")}`}
               >
                 {filteredItems.map((item, idx) => {
