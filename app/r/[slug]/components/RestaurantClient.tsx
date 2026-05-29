@@ -821,52 +821,6 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
         );
       })()}
 
-      {/* ── Operational Info Bar ─────────────────────────────────────────────── */}
-      <div className="bg-white dark:bg-[#141412] border-b border-[#EFECE6] dark:border-[#1F1F1C] px-6 py-6 shadow-[0_2px_15px_rgba(0,0,0,0.015)] transition-colors duration-300">
-        <div className="max-w-4xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-stone-50 dark:bg-stone-900 border border-[#EFECE6] dark:border-[#1F1F1C] flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5 text-[var(--brand-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-[10px] text-[#7A7368] dark:text-[#A19B91] uppercase font-bold tracking-wider">Address Location</p>
-              <p className="text-sm font-bold text-neutral-800 dark:text-neutral-200 mt-0.5">{restaurant.address || "Main Restaurant Outlet"}</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-stone-50 dark:bg-stone-900 border border-[#EFECE6] dark:border-[#1F1F1C] flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5 text-[var(--brand-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-[10px] text-[#7A7368] dark:text-[#A19B91] uppercase font-bold tracking-wider">Opening Hours</p>
-              <p className="text-sm font-bold text-neutral-800 dark:text-neutral-200 mt-0.5">{restaurant.todayHoursLabel || "Open 9:00 AM - 10:00 PM"}</p>
-            </div>
-          </div>
-          <div className="flex gap-2.5 w-full md:w-auto">
-            <button
-              onClick={() => scrollTo("menu")}
-              style={{ backgroundColor: primary }}
-              className="flex-1 md:flex-initial text-white font-bold py-3.5 px-6 rounded-2xl text-xs uppercase tracking-widest active:scale-95 transition-all shadow-md shadow-[var(--brand-primary-20)] hover:opacity-95"
-            >
-              Order Online
-            </button>
-            {!restaurant.isOpen && (
-              <button
-                onClick={() => setScheduleOpen(true)}
-                className="flex-1 md:flex-initial border border-[#EFECE6] dark:border-[#1F1F1C] bg-white dark:bg-[#141412] text-neutral-800 dark:text-neutral-200 hover:bg-stone-50 font-bold py-3.5 px-6 rounded-2xl text-xs uppercase tracking-widest active:scale-95 transition-all shadow-sm"
-              >
-                Schedule
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Dynamic CSS styles for B2B partners marquee scroll animation */}
       <style>{`
         @keyframes marqueeStorefront {

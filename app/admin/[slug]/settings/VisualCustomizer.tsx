@@ -963,19 +963,6 @@ export default function VisualCustomizer({
                 </div>
               )}
 
-              {/* Simulated storefront info section */}
-              {viewport === "mobile" && (
-                <div className="bg-white border-t border-gray-100 p-5 space-y-4">
-                  <div className="flex gap-2 items-center">
-                    <span className="w-1 h-4 bg-orange-500 rounded-full" />
-                    <span className="text-xs font-black uppercase tracking-wide text-neutral-800">Operational Hours</span>
-                  </div>
-                  <div className="bg-stone-50 border border-gray-100 rounded-2xl p-3 flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-gray-500">Every day 09:00 AM - 10:00 PM</span>
-                    <span className="text-[9px] font-bold bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full">WAT Time</span>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Bottom device bezel mockup */}
