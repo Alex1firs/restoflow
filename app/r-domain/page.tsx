@@ -65,7 +65,7 @@ function formatTodayHours(from: string, to: string): string {
   return `${fmt(from)} – ${fmt(to)}`;
 }
 
-interface RestaurantData extends DocumentData {
+interface RestaurantData {
   name: string;
   description: string;
   coverImage: string;
