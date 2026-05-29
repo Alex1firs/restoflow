@@ -11,7 +11,7 @@ import { DEFAULT_HERO_SETTINGS, type HeroSettings } from '@/lib/hero-settings';
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-export const revalidate = 0;
+export const dynamic = 'force-dynamic';
 
 interface RestaurantData extends DocumentData {
   name: string;
@@ -122,6 +122,7 @@ export default async function PreviewPage({
     rating: rData.rating ?? null,
     ordersToday: rData.ordersToday ?? null,
     deliveryTime: rData.deliveryTime ?? "",
+    hidePrices: (restaurant as any).hidePrices === true,
     heroSettings: ((restaurant as { heroSettings?: HeroSettings }).heroSettings ?? DEFAULT_HERO_SETTINGS),
   };
 

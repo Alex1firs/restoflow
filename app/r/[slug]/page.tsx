@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { Suspense } from 'react';
-import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, DocumentData } from 'firebase/firestore';
 import { getAdminDb } from "@/lib/firebase-admin";
 import RestaurantClient from './components/RestaurantClient';
 import { CartProvider } from './components/CartContext';
@@ -21,27 +19,30 @@ function formatTodayHours(from: string, to: string): string {
   return `${fmt(from)} – ${fmt(to)}`;
 }
 
-interface RestaurantData extends DocumentData {
+interface RestaurantData {
   name: string;
   description: string;
   coverImage: string;
   subscriptionStatus?: string;
-  subscriptionEndDate?: { toDate?: () => Date; seconds?: number };
+  subscriptionEndDate?: { toDate?: () => Date; seconds?: number; _seconds?: number };
   status?: string;
+  hidePrices?: boolean;
+  heroSettings?: HeroSettings;
 }
 
 function isExpired(restaurant: RestaurantData): boolean {
   if (restaurant.subscriptionEndDate) {
     const raw = restaurant.subscriptionEndDate;
-    const end = raw.toDate ? raw.toDate() : new Date((raw.seconds ?? 0) * 1000);
+    const end = raw.toDate
+      ? raw.toDate()
+      : new Date((raw.seconds ?? raw._seconds ?? 0) * 1000);
     const graceEndsAt = new Date(end.getTime() + GRACE_DAYS * 86_400_000);
     return graceEndsAt < new Date();
   }
-  // Fall back to stored status only if no end date exists
   return restaurant.subscriptionStatus === "expired";
 }
 
-interface MenuItemData extends DocumentData {
+interface MenuItemData {
   id: string;
   name: string;
   price: number;
@@ -52,7 +53,7 @@ interface MenuItemData extends DocumentData {
   restaurantId: string;
 }
 
-export const revalidate = 0;
+export const dynamic = 'force-dynamic';
 
 async function fetchSEOData(slug: string): Promise<RestaurantSEOData | null> {
   try {
@@ -123,12 +124,13 @@ export default async function RestaurantPage({
   const slug = resolvedParams.slug;
   const initialTable = resolvedSearch.table ?? "";
 
+  const adminDb = getAdminDb();
   const [seoData, docSnap] = await Promise.all([
     fetchSEOData(slug),
-    getDoc(doc(db, 'restaurants', slug)),
+    adminDb.collection('restaurants').doc(slug).get(),
   ]);
 
-  if (!docSnap.exists()) {
+  if (!docSnap.exists) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center p-8 bg-white rounded-2xl shadow-sm border">
@@ -179,8 +181,7 @@ export default async function RestaurantPage({
     );
   }
 
-  const menuQuery = query(collection(db, 'menu_items'), where('restaurantId', '==', slug));
-  const menuSnap = await getDocs(menuQuery);
+  const menuSnap = await adminDb.collection('menu_items').where('restaurantId', '==', slug).get();
   const menuItems = menuSnap.docs.map(d => ({ ...d.data(), id: d.id })) as MenuItemData[];
 
   const rData = restaurant as {
@@ -229,8 +230,8 @@ export default async function RestaurantPage({
     rating: rData.rating ?? null,
     ordersToday: rData.ordersToday ?? null,
     deliveryTime: rData.deliveryTime ?? "",
-    hidePrices: (docSnap.data()?.hidePrices as boolean) ?? false,
-    heroSettings: ((docSnap.data()?.heroSettings as HeroSettings) ?? DEFAULT_HERO_SETTINGS),
+    hidePrices: restaurant.hidePrices === true,
+    heroSettings: (restaurant.heroSettings ?? DEFAULT_HERO_SETTINGS),
   };
 
   return (

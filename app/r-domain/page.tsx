@@ -1,14 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getAdminDb } from "@/lib/firebase-admin";
-import { db } from "@/lib/firebase";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  type DocumentData,
-} from "firebase/firestore";
 import RestaurantClient from "@/app/r/[slug]/components/RestaurantClient";
 import { CartProvider } from "@/app/r/[slug]/components/CartContext";
 import Link from "next/link";
@@ -20,7 +12,7 @@ import {
 import { buildPageTitle, buildPageDescription, buildJsonLd, type RestaurantSEOData } from "@/lib/seo-utils";
 import { GRACE_DAYS } from "@/lib/constants";
 
-export const revalidate = 0;
+export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({
   searchParams,
@@ -91,7 +83,7 @@ function isExpired(restaurant: RestaurantData): boolean {
   return restaurant.subscriptionStatus === "expired";
 }
 
-interface MenuItemData extends DocumentData {
+interface MenuItemData {
   id: string;
   name: string;
   price: number;
@@ -190,12 +182,11 @@ export default async function RDomainPage({
     );
   }
 
-  // Fetch menu items from client SDK
-  const menuQuery = query(
-    collection(db, "menu_items"),
-    where("restaurantId", "==", slug)
-  );
-  const menuSnap = await getDocs(menuQuery);
+  // Fetch menu items from admin SDK
+  const menuSnap = await adminDb
+    .collection("menu_items")
+    .where("restaurantId", "==", slug)
+    .get();
   const menuItems = menuSnap.docs.map((doc) => ({
     ...doc.data(),
     id: doc.id,
@@ -255,7 +246,7 @@ export default async function RDomainPage({
     pickupEnabled: rData.pickupEnabled !== false,
     dineInEnabled: rData.dineInEnabled === true,
     todayHoursLabel,
-    hidePrices: (restaurantDoc.data().hidePrices as boolean) ?? false,
+    hidePrices: restaurantDoc.data().hidePrices === true,
   };
 
   return (
