@@ -269,7 +269,7 @@ export default function VisualCustomizer({
           <button
             onClick={() => {
               if (slug) {
-                window.open(`/r/${slug}`, "_blank");
+                window.open(`/admin/${slug}/preview`, "_blank");
               } else {
                 alert("Storefront URL is currently initializing.");
               }
