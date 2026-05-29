@@ -17,6 +17,13 @@ body {
   color: var(--foreground);
 }
 
+/* Ensure inputs, textareas, and selects default to dark text for readability on light/white containers */
+input:not([type="checkbox"]):not([type="radio"]),
+textarea,
+select {
+  color: #111827; /* Tailwind gray-900 */
+}
+
 /* Custom premium styling */
 .glass {
   background: rgba(255, 255, 255, 0.03);
