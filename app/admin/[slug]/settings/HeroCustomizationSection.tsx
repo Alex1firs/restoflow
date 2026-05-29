@@ -13,6 +13,9 @@ interface Props {
   description: string;
   primaryColor: string;
   accentColor: string;
+  onSave?: () => Promise<void>;
+  saving?: boolean;
+  slug?: string;
 }
 
 export default function HeroCustomizationSection({
@@ -24,6 +27,9 @@ export default function HeroCustomizationSection({
   description,
   primaryColor,
   accentColor,
+  onSave,
+  saving = false,
+  slug,
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -118,6 +124,9 @@ export default function HeroCustomizationSection({
           primaryColor={primaryColor}
           accentColor={accentColor}
           onClose={() => setIsOpen(false)}
+          onSave={onSave}
+          saving={saving}
+          slug={slug}
         />
       )}
     </div>

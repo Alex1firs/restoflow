@@ -13,6 +13,9 @@ interface Props {
   primaryColor: string;
   accentColor: string;
   onClose: () => void;
+  onSave?: () => Promise<void>;
+  saving?: boolean;
+  slug?: string;
 }
 
 type TabKey = "branding" | "cover" | "typography" | "cta" | "elements" | "navbar" | "partners" | "menu";
@@ -28,9 +31,13 @@ export default function VisualCustomizer({
   primaryColor,
   accentColor,
   onClose,
+  onSave,
+  saving = false,
+  slug,
 }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>("branding");
   const [viewport, setViewport] = useState<ViewportMode>("mobile");
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const focalRef = useRef<HTMLDivElement>(null);
   const logoFocalRef = useRef<HTMLDivElement>(null);
@@ -256,13 +263,67 @@ export default function VisualCustomizer({
           </button>
         </div>
 
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider text-gray-700 bg-white border border-[#EFECE6] hover:bg-stone-50 active:scale-95 transition shadow-sm"
-        >
-          Finish Customization
-        </button>
+        {/* Header Action Controls */}
+        <div className="flex items-center gap-2">
+          {/* Live Storefront Preview */}
+          <button
+            onClick={() => {
+              if (slug) {
+                window.open(`/r/${slug}`, "_blank");
+              } else {
+                alert("Storefront URL is currently initializing.");
+              }
+            }}
+            className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider text-orange-600 bg-orange-50 border border-orange-200 hover:bg-orange-100/50 active:scale-95 transition shadow-xs flex items-center gap-1.5"
+          >
+            <span>👁️</span> Live Preview
+          </button>
+
+          {/* Save Changes Button */}
+          <button
+            disabled={saving}
+            onClick={async () => {
+              if (onSave) {
+                try {
+                  await onSave();
+                  setSaveSuccess(true);
+                  setTimeout(() => setSaveSuccess(false), 2500);
+                } catch {
+                  // error handled
+                }
+              }
+            }}
+            className={`px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider text-white transition flex items-center gap-1.5 shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+              saveSuccess ? "bg-emerald-600 hover:bg-emerald-700" : "bg-neutral-900 hover:bg-neutral-800"
+            }`}
+          >
+            {saving ? (
+              <>
+                <svg className="animate-spin h-3 w-3 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <span>Saving...</span>
+              </>
+            ) : saveSuccess ? (
+              <>
+                <span>✓</span> Saved!
+              </>
+            ) : (
+              <>
+                <span>💾</span> Save Changes
+              </>
+            )}
+          </button>
+
+          {/* Close / Exit Button */}
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider text-gray-700 bg-white border border-[#EFECE6] hover:bg-stone-50 active:scale-95 transition shadow-xs"
+          >
+            Exit
+          </button>
+        </div>
       </header>
 
       {/* ── WORKSPACE CORE ──────────────────────────────────────── */}
@@ -1383,6 +1444,7 @@ export default function VisualCustomizer({
                         desc: "Smoky, spiced Jollof rice paired with a rich, steamed Moi-moi.",
                         badge: "Popular",
                         icon: "🍛",
+                        image: "https://images.unsplash.com/photo-1534483509719-3feaee7c30da?w=600&auto=format",
                       },
                       {
                         name: "Flame Grilled Quarter Chicken",
@@ -1390,6 +1452,7 @@ export default function VisualCustomizer({
                         desc: "Succulent chicken marinated in heritage spices, flame kissed and tender.",
                         badge: "Elite",
                         icon: "🍗",
+                        image: "https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=600&auto=format",
                       },
                     ].map((item, idx) => (
                       <div
@@ -1411,11 +1474,24 @@ export default function VisualCustomizer({
                         <div
                           style={{
                             height: `${settings.menuCardImageHeight || 180}px`,
+                            backgroundColor:
+                              settings.menuCardImageFit === "contain"
+                                ? settings.menuCardBgStyle === "custom"
+                                  ? settings.menuCardCustomBgColor || "#ffffff"
+                                  : "#ffffff"
+                                : undefined,
                           }}
-                          className="relative w-full bg-stone-100 flex items-center justify-center overflow-hidden"
+                          className="relative w-full bg-stone-100 flex items-center justify-center overflow-hidden transition-all duration-300"
                         >
-                          <span className="text-3xl select-none">{item.icon}</span>
-                          <span className="absolute top-2 left-2 bg-orange-500 text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full">
+                          <img
+                            src={item.image}
+                            alt={item.name}
+                            style={{
+                              objectFit: settings.menuCardImageFit || "cover",
+                            }}
+                            className="w-full h-full transition-transform duration-500 hover:scale-105"
+                          />
+                          <span className="absolute top-2 left-2 bg-orange-500 text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-sm">
                             {item.badge}
                           </span>
                         </div>

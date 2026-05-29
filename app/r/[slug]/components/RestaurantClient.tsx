@@ -1134,8 +1134,14 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                           height: `${hs.menuCardImageHeight || 180}px`,
                           borderTopLeftRadius: `${hs.menuCardBorderRadius ?? 16}px`,
                           borderTopRightRadius: `${hs.menuCardBorderRadius ?? 16}px`,
+                          backgroundColor:
+                            hs.menuCardImageFit === "contain"
+                              ? hs.menuCardBgStyle === "custom"
+                                ? hs.menuCardCustomBgColor || "#ffffff"
+                                : "#ffffff"
+                              : undefined,
                         }}
-                        className="relative overflow-hidden bg-stone-50 dark:bg-stone-900/60 flex-shrink-0"
+                        className="relative overflow-hidden bg-stone-50 dark:bg-stone-900/60 flex-shrink-0 transition-all duration-300"
                       >
                         {idx < 3 && item.available && (
                           <div

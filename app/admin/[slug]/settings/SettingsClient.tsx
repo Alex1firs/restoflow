@@ -253,6 +253,34 @@ export default function SettingsClient({ restaurant, aiEnabled = false }: Props)
             description={form.description}
             primaryColor={form.primaryColor}
             accentColor={form.accentColor}
+            slug={restaurant.slug}
+            saving={saving}
+            onSave={async () => {
+              setSaving(true);
+              setStatus("idle");
+              try {
+                const res = await fetch("/api/admin/settings", {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ ...form, openingHours, heroSettings }),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                  setErrorMsg(data.error ?? "Failed to save.");
+                  setStatus("error");
+                  throw new Error(data.error ?? "Failed to save.");
+                } else {
+                  setStatus("success");
+                  setTimeout(() => setStatus("idle"), 3000);
+                }
+              } catch (err) {
+                setErrorMsg("Network error. Please try again.");
+                setStatus("error");
+                throw err;
+              } finally {
+                setSaving(false);
+              }
+            }}
           />
         </Section>
 
