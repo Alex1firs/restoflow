@@ -41,6 +41,14 @@ service cloud.firestore {
       allow delete: if isManagerOrOwner(resource.data.restaurantId);
     }
 
+    // ─── Prepared Items ─────────────────────────────────────────────────────────
+    match /prepared_items/{itemId} {
+      allow read:   if true;
+      allow create: if isManagerOrOwner(request.resource.data.restaurantId);
+      allow update: if isManagerOrOwner(resource.data.restaurantId);
+      allow delete: if isManagerOrOwner(resource.data.restaurantId);
+    }
+
     // ─── Orders ─────────────────────────────────────────────────────────────────
     // Direct client reads are restricted to restaurant members only.
     // Public order tracking goes through /api/track/[orderId]/status which validates

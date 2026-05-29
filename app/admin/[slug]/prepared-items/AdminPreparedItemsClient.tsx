@@ -101,14 +101,22 @@ export default function AdminPreparedItemsClient({ restaurant, aiEnabled = false
       where("restaurantId", "==", restaurant.slug)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const itemsData = snapshot.docs.map((d) => ({
-        id: d.id,
-        ...d.data()
-      })) as PreparedItem[];
-      setItems(itemsData);
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const itemsData = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data()
+        })) as PreparedItem[];
+        setItems(itemsData);
+        setLoading(false);
+      },
+      (err) => {
+        console.error("Firestore onSnapshot error for prepared_items:", err);
+        setError("Failed to load counter trays due to a database permission or index issue.");
+        setLoading(false);
+      }
+    );
 
     return () => unsubscribe();
   }, [restaurant.slug]);
@@ -324,6 +332,14 @@ export default function AdminPreparedItemsClient({ restaurant, aiEnabled = false
               These items represent what is physically prepared at your counter today (e.g. white rice, sides, portions). The cashier will use these individual items to dynamically build plate trays. The storefront **Online Menu** remains completely unaffected, allowing you to manage counter items and online combos independently.
             </p>
           </div>
+        </div>
+      )}
+
+      {error && !showForm && (
+        <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-start gap-3.5 mb-8">
+          <p className="text-xs text-red-700 font-bold leading-relaxed">
+            ⚠️ {error}
+          </p>
         </div>
       )}
 
