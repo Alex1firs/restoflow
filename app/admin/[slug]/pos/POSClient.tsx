@@ -1834,558 +1834,569 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
             />
           )}
 
-          {rightTab === "order" && (<>
-          {/* Card 1: Context Header (Service Mode & Pricing Mode & Table) */}
-          <div className="p-3 pb-2 border-b border-gray-100 flex-shrink-0 bg-gray-50/20">
-            <div className="bg-white border border-gray-200/80 rounded-2xl p-3.5 space-y-3.5 shadow-sm">
-              <div>
-                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
-                  Service / Ordering Mode
-                </p>
-                <div className="flex rounded-xl overflow-hidden border border-gray-200 bg-gray-50 p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => switchServiceMode("counter")}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all ${
-                      serviceMode === "counter"
-                        ? "bg-white text-gray-900 shadow-sm border border-gray-200/50"
-                        : "text-gray-500 hover:text-gray-800"
-                    }`}
-                  >
-                    Counter Pickup
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => switchServiceMode("dine_in")}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all ${
-                      serviceMode === "dine_in"
-                        ? "bg-teal-600 text-white shadow-sm"
-                        : "text-gray-500 hover:text-teal-700 hover:bg-teal-50/50"
-                    }`}
-                  >
-                    Dine-In
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
-                  Pricing Tier Selector
-                </p>
-                <div className="flex rounded-xl overflow-hidden border border-gray-200 bg-gray-50 p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setPricingMode("regular")}
-                    className={`flex-1 py-1.5 rounded-lg text-[10px] font-black transition-all ${
-                      pricingMode === "regular"
-                        ? "bg-white text-gray-900 shadow-sm border border-gray-200/50"
-                        : "text-gray-500 hover:text-gray-800"
-                    }`}
-                  >
-                    Outside / Regular Menu
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPricingMode("indoor")}
-                    className={`flex-1 py-1.5 rounded-lg text-[10px] font-black transition-all ${
-                      pricingMode === "indoor"
-                        ? "bg-orange-600 text-white shadow-sm border border-orange-700/10"
-                        : "text-gray-500 hover:bg-orange-50/50 hover:text-orange-700"
-                    }`}
-                  >
-                    Indoor VIP Lounge
-                  </button>
-                </div>
-              </div>
-
-              {/* Table selector — dine-in only */}
-              {serviceMode === "dine_in" && (
-                <div className="pt-2 border-t border-gray-100 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
-                      Assign Table
+          {rightTab === "order" && (
+            <>
+              {/* ── Scrollable middle layout container ──────────────────────── */}
+              <div className="flex-1 overflow-y-auto min-h-0 p-3 space-y-3 bg-gray-50/20">
+                
+                {/* Card 1: Context Header (Service Mode & Pricing Mode & Table) */}
+                <div className="bg-white border border-gray-200/80 rounded-2xl p-3.5 space-y-3.5 shadow-sm">
+                  <div>
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
+                      Service / Ordering Mode
                     </p>
-                    {(tableLabel || tableLabelInput) && (
-                      <span className="text-[10px] font-black text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-100">
-                        {tableLabelInput.trim() || tableLabel}
-                      </span>
-                    )}
-                  </div>
-                  {/* Quick-tap table numbers */}
-                  <div className="flex flex-wrap gap-1.5 justify-between">
-                    {QUICK_TABLES.map((n) => {
-                      const label = `Table ${n}`;
-                      const isActive =
-                        !tableLabelInput.trim() && tableLabel === label;
-                      return (
-                        <button
-                          key={n}
-                          type="button"
-                          onClick={() => {
-                            setTableLabel(label);
-                            setTableLabelInput("");
-                            setOpenTabPromptDismissed(false);
-                            if (tabMode === "continue" && activeTab?.tableLabel !== label) {
-                              setTabMode("new");
-                              setActiveTab(null);
-                            }
-                          }}
-                          className={`w-8 h-8 rounded-xl text-xs font-black transition-all flex items-center justify-center ${
-                            isActive
-                              ? "bg-teal-600 text-white shadow-sm"
-                              : "bg-gray-50 text-gray-700 hover:bg-teal-50 hover:text-teal-700 border border-gray-200/60"
-                          }`}
-                        >
-                          {n}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {/* Free-text override */}
-                  <input
-                    type="text"
-                    placeholder="Or type custom: VIP 1, Deck A..."
-                    value={tableLabelInput}
-                    onChange={(e) => {
-                      setTableLabelInput(e.target.value);
-                      setOpenTabPromptDismissed(false);
-                      if (tabMode === "continue") { setTabMode("new"); setActiveTab(null); }
-                    }}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-teal-500 bg-gray-50/50 focus:bg-white transition-all placeholder-gray-400"
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Active Edit Order Card Alert */}
-          {editingOrderId && (
-            <div className="px-3 pt-3 flex-shrink-0">
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center justify-between gap-3 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                    <p className="text-[10px] font-black text-amber-800 uppercase tracking-widest">Active Editing Mode</p>
-                  </div>
-                  <p className="text-[11px] text-amber-600 font-bold font-mono mt-0.5">Order ID: #{editingOrderId.slice(-6).toUpperCase()}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingOrderId(null);
-                    resetPOS();
-                    showSystemToast("Order editing cancelled");
-                  }}
-                  className="bg-amber-100 hover:bg-amber-200 active:bg-amber-300 text-amber-800 text-[10px] font-black px-3 py-1.5 rounded-lg transition-colors border border-amber-200"
-                >
-                  Cancel Edit
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Cart header */}
-          <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-            <h2 className="font-black text-gray-900 text-sm">
-              {serviceMode === "dine_in" && resolvedTable
-                ? <span className="text-teal-700">{resolvedTable}</span>
-                : "Current Order"}
-              {" "}
-              {cartCount > 0 && (
-                <span className="text-orange-600 font-black">({cartCount})</span>
-              )}
-            </h2>
-            {cart.length > 0 && (
-              <button
-                onClick={() => setCart([])}
-                className="text-xs font-bold text-red-400 hover:text-red-600 transition-colors"
-              >
-                Clear all
-              </button>
-            )}
-          </div>
-
-          {/* ── Open tab prompt ─────────────────────────────────────── */}
-          {serviceMode === "dine_in" && resolvedTable && tabMode !== "continue" && openTabForTable && !openTabPromptDismissed && (
-            <div className="mx-3 mt-3 rounded-2xl border-2 border-teal-300 bg-teal-50 overflow-hidden flex-shrink-0">
-              <div className="bg-teal-600 px-3 py-1.5 flex items-center gap-1.5">
-                <span className="w-2 h-2 bg-white rounded-full animate-pulse flex-shrink-0" />
-                <span className="text-white font-black text-[11px] uppercase tracking-widest">
-                  Open Tab Found
-                </span>
-              </div>
-              <div className="px-3 py-2.5">
-                <p className="font-black text-teal-800 text-sm">{resolvedTable}</p>
-                <p className="text-teal-700 text-xs font-bold mt-0.5">
-                  {fmt(openTabForTable.total)} · {openTabForTable.items.length} item{openTabForTable.items.length !== 1 ? "s" : ""}
-                  {" · "}{openTabForTable.items.slice(0, 2).map(i => i.name).join(", ")}{openTabForTable.items.length > 2 ? "…" : ""}
-                </p>
-                <div className="flex gap-2 mt-2.5">
-                  <button
-                    onClick={() => {
-                      setActiveTab(openTabForTable);
-                      setTabMode("continue");
-                    }}
-                    className="flex-[2] bg-teal-600 hover:bg-teal-500 text-white font-black text-xs py-2 rounded-xl transition-colors"
-                  >
-                    Continue Tab
-                  </button>
-                  <button
-                    onClick={() => setOpenTabPromptDismissed(true)}
-                    className="flex-1 bg-white hover:bg-gray-50 text-gray-600 font-black text-xs py-2 rounded-xl border border-gray-200 transition-colors"
-                  >
-                    New Tab
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── Active tab banner ────────────────────────────────────── */}
-          {tabMode === "continue" && activeTab && (
-            <div className="mx-3 mt-3 rounded-xl bg-teal-700 px-3 py-2 flex items-center justify-between flex-shrink-0">
-              <div>
-                <p className="text-white font-black text-sm leading-tight">{activeTab.tableLabel}</p>
-                <p className="text-teal-200 text-[11px] font-bold">
-                  Running tab · {fmt(activeTab.total)} · Adding on
-                </p>
-              </div>
-              <button
-                onClick={() => { setTabMode("new"); setActiveTab(null); setOpenTabPromptDismissed(true); }}
-                className="text-teal-300 hover:text-white text-xs font-bold underline transition-colors flex-shrink-0 ml-2"
-              >
-                New Tab
-              </button>
-            </div>
-          )}
-
-          {/* Cart items list */}
-          <div className="flex-1 overflow-y-auto divide-y divide-gray-50 min-h-0">
-            {cart.length === 0 ? (
-              <div className="py-12 text-center text-gray-400 text-sm px-6">
-                <p className="text-2xl mb-2">🛒</p>
-                {tabMode === "continue" && activeTab
-                  ? `Add new items to ${activeTab.tableLabel}`
-                  : "Tap items from the menu to add them here."}
-              </div>
-            ) : (
-              cart.map((item) => {
-                const rawMenuItem = enrichedMenuItems.find((x) => x.id === item.id);
-                const isCustomizable = !!(
-                  rawMenuItem &&
-                  ((rawMenuItem.sizes && rawMenuItem.sizes.length > 0) ||
-                    (rawMenuItem.modifierGroups && rawMenuItem.modifierGroups.length > 0) ||
-                    rawMenuItem.allowCustomPrice)
-                );
-                return (
-                <div key={item.cartItemId} className="flex flex-col gap-1 px-4 py-3 border-b border-gray-50 bg-white hover:bg-gray-50/50 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <p className="font-bold text-gray-900 text-sm truncate">
-                          {item.name}
-                        </p>
-                        {item.selectedSize && (
-                          <span className="text-[9px] font-black bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full shrink-0">
-                            {item.selectedSize.name}
-                          </span>
-                        )}
-                        {isCustomizable && (
-                          <button
-                            onClick={() => triggerCustomize(item)}
-                            className="text-[9px] font-black px-2 py-0.5 rounded-full shrink-0 border transition-colors bg-gray-50 text-gray-400 border-gray-200 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200"
-                          >
-                            ✏ Edit
-                          </button>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500 font-medium">
-                        {fmt(itemUnitPrice(item))} each
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
+                    <div className="flex rounded-xl overflow-hidden border border-gray-200 bg-gray-50 p-0.5">
                       <button
-                        onClick={() => updateQuantity(item.cartItemId, -1)}
-                        className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-black text-sm flex items-center justify-center leading-none transition-colors"
-                      >
-                        −
-                      </button>
-                      <span className="w-7 text-center font-black text-sm tabular-nums">
-                        {item.quantity}
-                      </span>
-                      <button
-                        onClick={() => updateQuantity(item.cartItemId, 1)}
-                        className="w-6 h-6 rounded-full bg-orange-100 hover:bg-orange-200 text-orange-700 font-black text-sm flex items-center justify-center leading-none transition-colors"
-                      >
-                        +
-                      </button>
-                    </div>
-                    <p className="text-sm font-black text-gray-900 w-16 text-right flex-shrink-0 tabular-nums">
-                      {fmt(itemUnitPrice(item) * item.quantity)}
-                    </p>
-                    <button
-                      onClick={() => removeFromCart(item.cartItemId)}
-                      className="text-gray-300 hover:text-red-500 text-lg leading-none flex-shrink-0 w-5 text-center transition-colors"
-                      aria-label="Remove item"
-                    >
-                      ×
-                    </button>
-                  </div>
-                  {/* Modifiers extra options bullet layout */}
-                  {item.selectedModifiers && item.selectedModifiers.length > 0 && (
-                    <div className="pl-2 space-y-0.5 border-l border-gray-100 ml-1 mt-0.5">
-                      {item.selectedModifiers.map((mod, idx) => (
-                        <p key={idx} className="text-[10px] text-gray-400 font-bold">
-                          ↳ <span className="text-gray-500 font-black">{mod.groupName}:</span> {mod.name} (+{fmt(mod.price)})
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                  {/* Note override */}
-                  {item.itemNote && (
-                    <p className="text-[10px] text-orange-600 font-bold pl-2 italic mt-0.5">
-                      * Note: {item.itemNote}
-                    </p>
-                  )}
-                </div>
-                );
-              })
-            )}
-          </div>
-
-          {/* Payment panel */}
-          <div className="border-t border-gray-100 p-3 space-y-3.5 flex-shrink-0 bg-gray-50/20">
-            {/* Card 2: Attribution (Guest + Attendant) */}
-            <div className="bg-white border border-gray-200/80 rounded-2xl p-3 space-y-3 shadow-sm">
-              <div className="flex justify-between items-center border-b border-gray-50 pb-2">
-                <span className="text-xs font-black text-gray-800 uppercase tracking-widest">Attribution Details</span>
-                {tabMode === "continue" && activeTab && (
-                  <span className="text-[10px] font-black bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full border border-teal-100">
-                    Adding to Tab
-                  </span>
-                )}
-              </div>
-
-              {tabMode !== "continue" && (
-                <div>
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
-                    Customer Reference
-                  </p>
-                  <input
-                    type="text"
-                    placeholder="Enter guest/customer name (optional)"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-orange-500 bg-gray-50/50 focus:bg-white transition-all placeholder-gray-400"
-                  />
-                </div>
-              )}
-
-              <div>
-                <div className="flex justify-between items-center mb-1.5">
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
-                    Attendant / Waiter
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setShowWaiterManager(true)}
-                    className="text-[9px] font-black text-orange-600 hover:text-orange-700 flex items-center gap-1 hover:underline"
-                  >
-                    ⚙ Manage List
-                  </button>
-                </div>
-                <select
-                  value={selectedWaiterName || ""}
-                  onChange={(e) => setSelectedWaiterName(e.target.value || null)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-orange-500 bg-gray-50/50 focus:bg-white transition-all"
-                >
-                  <option value="">-- Select Assigned Attendant --</option>
-                  {waiters.map((w) => (
-                    <option key={w.id} value={w.name}>
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Card 3: Settlement details */}
-            {tabMode !== "continue" && (
-              <div className="bg-white border border-gray-200/80 rounded-2xl p-3 space-y-3.5 shadow-sm">
-                <div className="flex justify-between items-center border-b border-gray-50 pb-2">
-                  <span className="text-xs font-black text-gray-800 uppercase tracking-widest">Settlement Info</span>
-                </div>
-
-                {/* Payment method */}
-                <div>
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
-                    Payment Method
-                  </p>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {(
-                      ["cash", "bank_transfer", "card", "unpaid"] as PaymentMethod[]
-                    ).map((pm) => {
-                      const isActive = paymentMethod === pm;
-                      return (
-                        <button
-                          key={pm}
-                          type="button"
-                          onClick={() => setPaymentMethod(pm)}
-                          className={`py-2 px-2 rounded-xl text-[11px] font-black transition-all text-center leading-tight border ${
-                            isActive
-                              ? "bg-gray-900 border-gray-900 text-white shadow-sm"
-                              : "bg-gray-50 border-gray-200/60 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                          }`}
-                        >
-                          {PAYMENT_METHOD_LABELS[pm]}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Payment status */}
-                <div>
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
-                    Payment Status
-                  </p>
-                  <div className="grid grid-cols-4 gap-1">
-                    {(
-                      ["paid", "unpaid", "part_paid", "cancelled"] as PaymentStatus[]
-                    ).map((ps) => {
-                      const isActive = paymentStatus === ps;
-                      return (
-                        <button
-                          key={ps}
-                          type="button"
-                          onClick={() => setPaymentStatus(ps)}
-                          className={`py-1.5 rounded-lg text-[9px] font-black transition-all text-center border ${
-                            isActive
-                              ? ps === "paid"
-                                ? "bg-green-600 border-green-600 text-white shadow-sm"
-                                : ps === "cancelled"
-                                ? "bg-red-600 border-red-600 text-white shadow-sm"
-                                : "bg-yellow-500 border-yellow-500 text-white shadow-sm"
-                              : "bg-gray-50 border-gray-200/60 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
-                          }`}
-                        >
-                          {PAYMENT_STATUS_LABELS[ps]}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Note & Print Options Card */}
-            <div className="bg-white border border-gray-200/80 rounded-2xl p-3 space-y-3.5 shadow-sm">
-              <div>
-                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
-                  Order Note / Modifier
-                </p>
-                <input
-                  type="text"
-                  placeholder={tabMode === "continue" ? "E.g. Extra hot, extra sauce..." : "E.g. No onions, well done..."}
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-orange-500 bg-gray-50/50 focus:bg-white transition-all placeholder-gray-400"
-                />
-              </div>
-
-              {/* Print copies selector */}
-              <div>
-                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
-                  Physical Printer Tickets
-                </p>
-                <div className="flex rounded-xl overflow-hidden border border-gray-200 bg-gray-50 p-0.5">
-                  {([1, 2, 3] as const).map((copies) => {
-                    const isActive = printCopies === copies;
-                    return (
-                      <button
-                        key={copies}
                         type="button"
-                        onClick={() => setPrintCopies(copies)}
-                        className={`flex-1 py-1.5 rounded-lg text-[9px] font-black transition-all ${
-                          isActive
+                        onClick={() => switchServiceMode("counter")}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all ${
+                          serviceMode === "counter"
                             ? "bg-white text-gray-900 shadow-sm border border-gray-200/50"
                             : "text-gray-500 hover:text-gray-800"
                         }`}
                       >
-                        {copies === 1 ? "1 Copy" : copies === 2 ? "2 Copies (KOT)" : "3 Copies (Audit)"}
+                        Counter Pickup
                       </button>
-                    );
-                  })}
+                      <button
+                        type="button"
+                        onClick={() => switchServiceMode("dine_in")}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all ${
+                          serviceMode === "dine_in"
+                            ? "bg-teal-600 text-white shadow-sm"
+                            : "text-gray-500 hover:text-teal-700 hover:bg-teal-50/50"
+                        }`}
+                      >
+                        Dine-In
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
+                      Pricing Tier Selector
+                    </p>
+                    <div className="flex rounded-xl overflow-hidden border border-gray-200 bg-gray-50 p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setPricingMode("regular")}
+                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-black transition-all ${
+                          pricingMode === "regular"
+                            ? "bg-white text-gray-900 shadow-sm border border-gray-200/50"
+                            : "text-gray-500 hover:text-gray-800"
+                        }`}
+                      >
+                        Outside / Regular Menu
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPricingMode("indoor")}
+                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-black transition-all ${
+                          pricingMode === "indoor"
+                            ? "bg-orange-600 text-white shadow-sm border border-orange-700/10"
+                            : "text-gray-500 hover:bg-orange-50/50 hover:text-orange-700"
+                        }`}
+                      >
+                        Indoor VIP Lounge
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Table selector — dine-in only */}
+                  {serviceMode === "dine_in" && (
+                    <div className="pt-2 border-t border-gray-100 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                          Assign Table
+                        </p>
+                        {(tableLabel || tableLabelInput) && (
+                          <span className="text-[10px] font-black text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-100">
+                            {tableLabelInput.trim() || tableLabel}
+                          </span>
+                        )}
+                      </div>
+                      {/* Quick-tap table numbers */}
+                      <div className="flex flex-wrap gap-1.5 justify-between">
+                        {QUICK_TABLES.map((n) => {
+                          const label = `Table ${n}`;
+                          const isActive =
+                            !tableLabelInput.trim() && tableLabel === label;
+                          return (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => {
+                                setTableLabel(label);
+                                setTableLabelInput("");
+                                setOpenTabPromptDismissed(false);
+                                if (tabMode === "continue" && activeTab?.tableLabel !== label) {
+                                  setTabMode("new");
+                                  setActiveTab(null);
+                                }
+                              }}
+                              className={`w-8 h-8 rounded-xl text-xs font-black transition-all flex items-center justify-center ${
+                                isActive
+                                  ? "bg-teal-600 text-white shadow-sm"
+                                  : "bg-gray-50 text-gray-700 hover:bg-teal-50 hover:text-teal-700 border border-gray-200/60"
+                              }`}
+                            >
+                              {n}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {/* Free-text override */}
+                      <input
+                        type="text"
+                        placeholder="Or type custom: VIP 1, Deck A..."
+                        value={tableLabelInput}
+                        onChange={(e) => {
+                          setTableLabelInput(e.target.value);
+                          setOpenTabPromptDismissed(false);
+                          if (tabMode === "continue") { setTabMode("new"); setActiveTab(null); }
+                        }}
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-teal-500 bg-gray-50/50 focus:bg-white transition-all placeholder-gray-400"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Active Edit Order Card Alert */}
+                {editingOrderId && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center justify-between gap-3 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                        <p className="text-[10px] font-black text-amber-800 uppercase tracking-widest">Active Editing Mode</p>
+                      </div>
+                      <p className="text-[11px] text-amber-600 font-bold font-mono mt-0.5">Order ID: #{editingOrderId.slice(-6).toUpperCase()}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingOrderId(null);
+                        resetPOS();
+                        showSystemToast("Order editing cancelled");
+                      }}
+                      className="bg-amber-100 hover:bg-amber-200 active:bg-amber-300 text-amber-800 text-[10px] font-black px-3 py-1.5 rounded-lg transition-colors border border-amber-200"
+                    >
+                      Cancel Edit
+                    </button>
+                  </div>
+                )}
+
+                {/* ── Open tab prompt ─────────────────────────────────────── */}
+                {serviceMode === "dine_in" && resolvedTable && tabMode !== "continue" && openTabForTable && !openTabPromptDismissed && (
+                  <div className="rounded-2xl border-2 border-teal-300 bg-teal-50 overflow-hidden flex-shrink-0">
+                    <div className="bg-teal-600 px-3 py-1.5 flex items-center gap-1.5">
+                      <span className="w-2 h-2 bg-white rounded-full animate-pulse flex-shrink-0" />
+                      <span className="text-white font-black text-[11px] uppercase tracking-widest">
+                        Open Tab Found
+                      </span>
+                    </div>
+                    <div className="px-3 py-2.5">
+                      <p className="font-black text-teal-800 text-sm">{resolvedTable}</p>
+                      <p className="text-teal-700 text-xs font-bold mt-0.5">
+                        {fmt(openTabForTable.total)} · {openTabForTable.items.length} item{openTabForTable.items.length !== 1 ? "s" : ""}
+                        {" · "}{openTabForTable.items.slice(0, 2).map(i => i.name).join(", ")}{openTabForTable.items.length > 2 ? "…" : ""}
+                      </p>
+                      <div className="flex gap-2 mt-2.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveTab(openTabForTable);
+                            setTabMode("continue");
+                          }}
+                          className="flex-[2] bg-teal-600 hover:bg-teal-500 text-white font-black text-xs py-2 rounded-xl transition-colors"
+                        >
+                          Continue Tab
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setOpenTabPromptDismissed(true)}
+                          className="flex-1 bg-white hover:bg-gray-50 text-gray-600 font-black text-xs py-2 rounded-xl border border-gray-200 transition-colors"
+                        >
+                          New Tab
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Active tab banner ────────────────────────────────────── */}
+                {tabMode === "continue" && activeTab && (
+                  <div className="rounded-xl bg-teal-700 px-3 py-2 flex items-center justify-between flex-shrink-0">
+                    <div>
+                      <p className="text-white font-black text-sm leading-tight">{activeTab.tableLabel}</p>
+                      <p className="text-teal-200 text-[11px] font-bold">
+                        Running tab · {fmt(activeTab.total)} · Adding on
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setTabMode("new"); setActiveTab(null); setOpenTabPromptDismissed(true); }}
+                      className="text-teal-300 hover:text-white text-xs font-bold underline transition-colors flex-shrink-0 ml-2"
+                    >
+                      New Tab
+                    </button>
+                  </div>
+                )}
+
+                {/* Cart list card */}
+                <div className="bg-white border border-gray-200/80 rounded-2xl overflow-hidden shadow-sm">
+                  {/* Cart header */}
+                  <div className="px-4 py-3 border-b border-gray-150 flex items-center justify-between">
+                    <h2 className="font-black text-gray-900 text-sm flex items-center gap-1.5">
+                      <span>🛒</span>
+                      {serviceMode === "dine_in" && resolvedTable
+                        ? <span className="text-teal-700">{resolvedTable}</span>
+                        : "Current Order"}
+                      {" "}
+                      {cartCount > 0 && (
+                        <span className="text-orange-600 font-black">({cartCount})</span>
+                      )}
+                    </h2>
+                    {cart.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setCart([])}
+                        className="text-xs font-bold text-red-400 hover:text-red-600 transition-colors"
+                      >
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Cart items mapping */}
+                  <div className="divide-y divide-gray-100 max-h-[360px] overflow-y-auto min-h-0 bg-white">
+                    {cart.length === 0 ? (
+                      <div className="py-10 text-center text-gray-400 text-sm px-6">
+                        <p className="text-2xl mb-1">🛒</p>
+                        {tabMode === "continue" && activeTab
+                          ? `Add new items to ${activeTab.tableLabel}`
+                          : "Tap items from the menu to add them here."}
+                      </div>
+                    ) : (
+                      cart.map((item) => {
+                        const rawMenuItem = enrichedMenuItems.find((x) => x.id === item.id);
+                        const isCustomizable = !!(
+                          rawMenuItem &&
+                          ((rawMenuItem.sizes && rawMenuItem.sizes.length > 0) ||
+                            (rawMenuItem.modifierGroups && rawMenuItem.modifierGroups.length > 0) ||
+                            rawMenuItem.allowCustomPrice)
+                        );
+                        return (
+                          <div key={item.cartItemId} className="flex flex-col gap-1 px-4 py-3 bg-white hover:bg-gray-50/50 transition-colors">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p className="font-bold text-gray-900 text-sm truncate">
+                                    {item.name}
+                                  </p>
+                                  {item.selectedSize && (
+                                    <span className="text-[9px] font-black bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full shrink-0">
+                                      {item.selectedSize.name}
+                                    </span>
+                                  )}
+                                  {isCustomizable && (
+                                    <button
+                                      type="button"
+                                      onClick={() => triggerCustomize(item)}
+                                      className="text-[9px] font-black px-2 py-0.5 rounded-full shrink-0 border transition-colors bg-gray-50 text-gray-400 border-gray-200 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200"
+                                    >
+                                      ✏ Edit
+                                    </button>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500 font-medium">
+                                  {fmt(itemUnitPrice(item))} each
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => updateQuantity(item.cartItemId, -1)}
+                                  className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-black text-sm flex items-center justify-center leading-none transition-colors"
+                                >
+                                  −
+                                </button>
+                                <span className="w-6 text-center font-black text-xs tabular-nums">
+                                  {item.quantity}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => updateQuantity(item.cartItemId, 1)}
+                                  className="w-6 h-6 rounded-full bg-orange-100 hover:bg-orange-200 text-orange-700 font-black text-sm flex items-center justify-center leading-none transition-colors"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              <p className="text-sm font-black text-gray-900 w-16 text-right flex-shrink-0 tabular-nums">
+                                {fmt(itemUnitPrice(item) * item.quantity)}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => removeFromCart(item.cartItemId)}
+                                className="text-gray-300 hover:text-red-500 text-lg leading-none flex-shrink-0 w-5 text-center transition-colors"
+                                aria-label="Remove item"
+                              >
+                                ×
+                              </button>
+                            </div>
+                            {/* Modifiers extra options bullet layout */}
+                            {item.selectedModifiers && item.selectedModifiers.length > 0 && (
+                              <div className="pl-2 space-y-0.5 border-l border-gray-100 ml-1 mt-0.5">
+                                {item.selectedModifiers.map((mod, idx) => (
+                                  <p key={idx} className="text-[10px] text-gray-400 font-bold">
+                                    ↳ <span className="text-gray-500 font-black">{mod.groupName}:</span> {mod.name} (+{fmt(mod.price)})
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                            {/* Note override */}
+                            {item.itemNote && (
+                              <p className="text-[10px] text-orange-600 font-bold pl-2 italic mt-0.5">
+                                * Note: {item.itemNote}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Card 2: Attribution (Guest + Attendant) */}
+                <div className="bg-white border border-gray-200/80 rounded-2xl p-3 space-y-3 shadow-sm">
+                  <div className="flex justify-between items-center border-b border-gray-50 pb-2">
+                    <span className="text-xs font-black text-gray-800 uppercase tracking-widest">Attribution Details</span>
+                    {tabMode === "continue" && activeTab && (
+                      <span className="text-[10px] font-black bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full border border-teal-100">
+                        Adding to Tab
+                      </span>
+                    )}
+                  </div>
+
+                  {tabMode !== "continue" && (
+                    <div>
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
+                        Customer Reference
+                      </p>
+                      <input
+                        type="text"
+                        placeholder="Enter guest/customer name (optional)"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-orange-500 bg-gray-50/50 focus:bg-white transition-all placeholder-gray-400"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                        Attendant / Waiter
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowWaiterManager(true)}
+                        className="text-[9px] font-black text-orange-600 hover:text-orange-700 flex items-center gap-1 hover:underline"
+                      >
+                        ⚙ Manage List
+                      </button>
+                    </div>
+                    <select
+                      value={selectedWaiterName || ""}
+                      onChange={(e) => setSelectedWaiterName(e.target.value || null)}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-orange-500 bg-gray-50/50 focus:bg-white transition-all"
+                    >
+                      <option value="">-- Select Assigned Attendant --</option>
+                      {waiters.map((w) => (
+                        <option key={w.id} value={w.name}>
+                          {w.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Card 3: Settlement details */}
+                {tabMode !== "continue" && (
+                  <div className="bg-white border border-gray-200/80 rounded-2xl p-3 space-y-3.5 shadow-sm">
+                    <div className="flex justify-between items-center border-b border-gray-50 pb-2">
+                      <span className="text-xs font-black text-gray-800 uppercase tracking-widest">Settlement Info</span>
+                    </div>
+
+                    {/* Payment method */}
+                    <div>
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
+                        Payment Method
+                      </p>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {(
+                          ["cash", "bank_transfer", "card", "unpaid"] as PaymentMethod[]
+                        ).map((pm) => {
+                          const isActive = paymentMethod === pm;
+                          return (
+                            <button
+                              key={pm}
+                              type="button"
+                              onClick={() => setPaymentMethod(pm)}
+                              className={`py-2 px-2 rounded-xl text-[11px] font-black transition-all text-center leading-tight border ${
+                                isActive
+                                  ? "bg-gray-900 border-gray-900 text-white shadow-sm"
+                                  : "bg-gray-50 border-gray-200/60 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                              }`}
+                            >
+                              {PAYMENT_METHOD_LABELS[pm]}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Payment status */}
+                    <div>
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
+                        Payment Status
+                      </p>
+                      <div className="grid grid-cols-4 gap-1">
+                        {(
+                          ["paid", "unpaid", "part_paid", "cancelled"] as PaymentStatus[]
+                        ).map((ps) => {
+                          const isActive = paymentStatus === ps;
+                          return (
+                            <button
+                              key={ps}
+                              type="button"
+                              onClick={() => setPaymentStatus(ps)}
+                              className={`py-1.5 rounded-lg text-[9px] font-black transition-all text-center border ${
+                                isActive
+                                  ? ps === "paid"
+                                    ? "bg-green-600 border-green-600 text-white shadow-sm"
+                                    : ps === "cancelled"
+                                    ? "bg-red-600 border-red-600 text-white shadow-sm"
+                                    : "bg-yellow-500 border-yellow-500 text-white shadow-sm"
+                                  : "bg-gray-50 border-gray-200/60 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                              }`}
+                            >
+                              {PAYMENT_STATUS_LABELS[ps]}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Note & Print Options Card */}
+                <div className="bg-white border border-gray-200/80 rounded-2xl p-3 space-y-3.5 shadow-sm">
+                  <div>
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
+                      Order Note / Modifier
+                    </p>
+                    <input
+                      type="text"
+                      placeholder={tabMode === "continue" ? "E.g. Extra hot, extra sauce..." : "E.g. No onions, well done..."}
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-orange-500 bg-gray-50/50 focus:bg-white transition-all placeholder-gray-400"
+                    />
+                  </div>
+
+                  {/* Print copies selector */}
+                  <div>
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
+                      Physical Printer Tickets
+                    </p>
+                    <div className="flex rounded-xl overflow-hidden border border-gray-200 bg-gray-50 p-0.5">
+                      {([1, 2, 3] as const).map((copies) => {
+                        const isActive = printCopies === copies;
+                        return (
+                          <button
+                            key={copies}
+                            type="button"
+                            onClick={() => setPrintCopies(copies)}
+                            className={`flex-1 py-1.5 rounded-lg text-[9px] font-black transition-all ${
+                              isActive
+                                ? "bg-white text-gray-900 shadow-sm border border-gray-200/50"
+                                : "text-gray-500 hover:text-gray-800"
+                            }`}
+                          >
+                            {copies === 1 ? "1 Copy" : copies === 2 ? "2 Copies (KOT)" : "3 Copies (Audit)"}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Price display & Checkout Trigger */}
-            <div className="space-y-2 pt-1">
-              <div className="bg-white border border-gray-200/80 rounded-2xl p-3 flex items-center justify-between shadow-sm">
-                <span className="text-xs font-black text-gray-400 uppercase tracking-widest">
-                  {tabMode === "continue" ? "Running Additions" : "Total Invoice Amount"}
-                </span>
-                <span className="text-2xl font-black text-gray-900 tabular-nums">
-                  {fmt(cartTotal)}
-                </span>
-              </div>
-
-              {tabMode === "continue" && activeTab && cartTotal > 0 && (
-                <div className="bg-teal-50 border border-teal-200 rounded-xl px-3 py-2 flex justify-between items-center">
-                  <span className="text-[10px] font-black text-teal-700 uppercase tracking-wider">New Combined Tab Total</span>
-                  <span className="text-base font-black text-teal-700 tabular-nums">
-                    {fmt(activeTab.total + cartTotal)}
+              {/* ── Sticky Bottom payment Total & Checkout triggers ────────── */}
+              <div className="border-t border-gray-100 p-3.5 space-y-2 flex-shrink-0 bg-white shadow-[0_-4px_16px_rgba(0,0,0,0.03)] z-10">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                    {tabMode === "continue" ? "Running Additions" : "Total Invoice Amount"}
+                  </span>
+                  <span className="text-2xl font-black text-gray-900 tabular-nums">
+                    {fmt(cartTotal)}
                   </span>
                 </div>
-              )}
 
-              {error && (
-                <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 text-xs text-red-700 font-bold">
-                  ⚠️ {error}
-                </div>
-              )}
+                {tabMode === "continue" && activeTab && cartTotal > 0 && (
+                  <div className="bg-teal-50 border border-teal-200 rounded-xl px-3 py-2 flex justify-between items-center">
+                    <span className="text-[10px] font-black text-teal-700 uppercase tracking-wider">New Combined Tab Total</span>
+                    <span className="text-base font-black text-teal-700 tabular-nums">
+                      {fmt(activeTab.total + cartTotal)}
+                    </span>
+                  </div>
+                )}
 
-              {/* Confirm / Add-to-tab button */}
-              <button
-                onClick={handleSubmit}
-                disabled={cart.length === 0 || submitting || (serviceMode === "dine_in" && tabMode === "new" && !resolvedTable)}
-                className={`w-full disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-4 rounded-xl transition-all shadow-md active:translate-y-0.5 text-sm ${
-                  editingOrderId
-                    ? "bg-amber-600 hover:bg-amber-500 hover:shadow-amber-600/10 active:bg-amber-700"
-                    : tabMode === "continue"
-                    ? "bg-teal-700 hover:bg-teal-600 hover:shadow-teal-700/10 active:bg-teal-800"
+                {error && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700 font-bold">
+                    ⚠️ {error}
+                  </div>
+                )}
+
+                {/* Confirm / Add-to-tab button */}
+                <button
+                  onClick={handleSubmit}
+                  disabled={cart.length === 0 || submitting || (serviceMode === "dine_in" && tabMode === "new" && !resolvedTable)}
+                  className={`w-full disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-4 rounded-xl transition-all shadow-md active:translate-y-0.5 text-sm ${
+                    editingOrderId
+                      ? "bg-amber-600 hover:bg-amber-500 hover:shadow-amber-600/10 active:bg-amber-700"
+                      : tabMode === "continue"
+                      ? "bg-teal-700 hover:bg-teal-600 hover:shadow-teal-700/10 active:bg-teal-800"
+                      : serviceMode === "dine_in"
+                      ? "bg-teal-600 hover:bg-teal-500 hover:shadow-teal-600/10 active:bg-teal-700"
+                      : "bg-orange-600 hover:bg-orange-500 hover:shadow-orange-600/10 active:bg-orange-700"
+                  }`}
+                >
+                  {submitting
+                    ? editingOrderId
+                      ? "Saving Changes…"
+                      : tabMode === "continue"
+                      ? "Adding to Tab…"
+                      : "Creating Order…"
+                    : cart.length === 0
+                    ? tabMode === "continue" ? "Add items to continue" : "Add items to confirm"
+                    : editingOrderId
+                    ? `Save Changes · ${fmt(cartTotal)}`
+                    : tabMode === "continue" && activeTab
+                    ? `Add to ${activeTab.tableLabel ?? "Tab"} · ${fmt(cartTotal)}`
                     : serviceMode === "dine_in"
-                    ? "bg-teal-600 hover:bg-teal-500 hover:shadow-teal-600/10 active:bg-teal-700"
-                    : "bg-orange-600 hover:bg-orange-500 hover:shadow-orange-600/10 active:bg-orange-700"
-                }`}
-              >
-                {submitting
-                  ? editingOrderId
-                    ? "Saving Changes…"
-                    : tabMode === "continue"
-                    ? "Adding to Tab…"
-                    : "Creating Order…"
-                  : cart.length === 0
-                  ? tabMode === "continue" ? "Add items to continue" : "Add items to confirm"
-                  : editingOrderId
-                  ? `Save Changes · ${fmt(cartTotal)}`
-                  : tabMode === "continue" && activeTab
-                  ? `Add to ${activeTab.tableLabel ?? "Tab"} · ${fmt(cartTotal)}`
-                  : serviceMode === "dine_in"
-                  ? resolvedTable
-                    ? `Confirm · ${resolvedTable} · ${fmt(cartTotal)}`
-                    : `Select a table first`
-                  : `Confirm Order · ${fmt(cartTotal)}`}
-              </button>
-            </div>
+                    ? resolvedTable
+                      ? `Confirm · ${resolvedTable} · ${fmt(cartTotal)}`
+                      : `Select a table first`
+                    : `Confirm Order · ${fmt(cartTotal)}`}
+                </button>
 
-            <p className="text-center text-[11px] text-gray-400">
-              Cashier:{" "}
-              <span className="font-bold text-gray-600">{staffName}</span>
-            </p>
-          </div>
-          </>)}
+                <p className="text-center text-[10px] text-gray-400">
+                  Cashier:{" "}
+                  <span className="font-bold text-gray-600 uppercase">{staffName}</span>
+                </p>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
