@@ -55,10 +55,10 @@ export async function PATCH(
   }
 
   const data = snap.data()!;
-  const current = data.status as string | undefined;
+  const current = (data.status as string | undefined) || "draft";
   if (current !== "draft" && current !== "rejected") {
     return NextResponse.json(
-      { error: `Cannot submit from status: ${current ?? "unknown"}` },
+      { error: `Cannot submit from status: ${current}` },
       { status: 400 }
     );
   }

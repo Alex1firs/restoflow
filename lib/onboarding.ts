@@ -112,6 +112,7 @@ export async function processOnboarding(
     address,
     planId,
     ownerUid: uid,
+    status: "draft",
     subscriptionStatus: "trialing",
     subscriptionStartDate: now,
     subscriptionEndDate: trialEnd,   // used by getSubscriptionInfo
