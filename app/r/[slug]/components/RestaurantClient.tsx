@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useCart } from "./CartContext";
 import SEOSections from "./SEOSections";
+import LoyaltyCard from "@/app/components/LoyaltyCard";
 import { DEFAULT_HERO_SETTINGS, type HeroSettings } from "@/lib/hero-settings";
 
 type DeliveryType = "delivery" | "pickup" | "dine_in";
@@ -42,6 +43,7 @@ interface RestaurantClientProps {
     deliveryTime?: string;
     hidePrices?: boolean;
     heroSettings?: HeroSettings;
+    loyaltyEnabled?: boolean;
   };
   menuItems: MenuItemData[];
   seo?: {
@@ -101,6 +103,12 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
   const [promoDismissed, setPromoDismissed] = useState(false);
+  const [loyaltyOpen, setLoyaltyOpen] = useState(false);
+  const [loyaltyPhone, setLoyaltyPhone] = useState("");
+  const [loyaltyLoading, setLoyaltyLoading] = useState(false);
+  const [loyaltyProfile, setLoyaltyProfile] = useState<any | null>(null);
+  const [loyaltySearched, setLoyaltySearched] = useState(false);
+  const [loyaltyError, setLoyaltyError] = useState<string | null>(null);
 
   const categoryTabsRef = useRef<HTMLDivElement>(null);
   const menuSectionRef = useRef<HTMLElement>(null);
@@ -177,7 +185,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   // Keyboard accessibility
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { setCartOpen(false); setCheckoutOpen(false); }
+      if (e.key === "Escape") { setCartOpen(false); setCheckoutOpen(false); setLoyaltyOpen(false); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -208,9 +216,9 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
 
   // Modal body scroll lock
   useEffect(() => {
-    document.body.style.overflow = cartOpen || checkoutOpen || scheduleOpen ? "hidden" : "";
+    document.body.style.overflow = cartOpen || checkoutOpen || scheduleOpen || loyaltyOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [cartOpen, checkoutOpen, scheduleOpen]);
+  }, [cartOpen, checkoutOpen, scheduleOpen, loyaltyOpen]);
 
   // Active section tracking (sticky nav highlight)
   useEffect(() => {
@@ -257,6 +265,32 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
       }`,
     [visibleSections]
   );
+
+  const checkLoyaltyBalance = async () => {
+    if (!loyaltyPhone.trim()) {
+      setLoyaltyError("Please enter your phone number.");
+      return;
+    }
+    setLoyaltyLoading(true);
+    setLoyaltyError(null);
+    setLoyaltyProfile(null);
+    setLoyaltySearched(false);
+    try {
+      const params = new URLSearchParams({ slug: restaurant.slug, phone: loyaltyPhone.trim() });
+      const res = await fetch(`/api/customer/loyalty?${params}`);
+      const data = await res.json();
+      if (!res.ok || !data.enabled || !data.found) {
+        setLoyaltyError("No active loyalty account found. Start earning stamps on your first paid order!");
+      } else {
+        setLoyaltyProfile(data);
+      }
+      setLoyaltySearched(true);
+    } catch {
+      setLoyaltyError("Failed to check balance. Please check your internet connection.");
+    } finally {
+      setLoyaltyLoading(false);
+    }
+  };
 
   const scrollTo = (id: string) => {
     const el = document.getElementById(id);
@@ -676,6 +710,25 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
               </div>
 
               <div className="flex items-center gap-3">
+                {restaurant.loyaltyEnabled && (
+                  <button
+                    onClick={() => {
+                      setLoyaltyOpen(true);
+                      setLoyaltyPhone("");
+                      setLoyaltyProfile(null);
+                      setLoyaltySearched(false);
+                      setLoyaltyError(null);
+                    }}
+                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-wider shadow-sm transition-all hover:scale-105 active:scale-95 ${
+                      isLightNav
+                        ? "bg-orange-500/10 border-orange-500/30 text-orange-650 hover:bg-orange-500/20"
+                        : "bg-white/10 border-white/20 text-white hover:bg-white/20"
+                    }`}
+                  >
+                    <span>★</span>
+                    My Stamps
+                  </button>
+                )}
                 {hs.showOpenBadge !== false && (
                   restaurant.isOpen ? (
                     <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-wider shadow-sm backdrop-blur-md ${
@@ -1511,16 +1564,33 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
         <div className="fixed bottom-0 left-0 right-0 z-40 px-6 py-4 bg-white/95 dark:bg-[#141412]/95 backdrop-blur-md border-t border-[#EFECE6] dark:border-[#1F1F1C] shadow-[0_-8px_30px_rgba(0,0,0,0.04)] transition-all">
           <div className="max-w-4xl mx-auto flex items-center gap-4">
             {totalItems === 0 ? (
-              <button
-                onClick={() => scrollTo("menu")}
-                style={{ backgroundColor: primary }}
-                className="w-full text-white font-bold py-4.5 rounded-2xl flex items-center justify-center gap-2.5 transition-opacity hover:opacity-95 active:scale-[0.99] shadow-lg shadow-[var(--brand-primary-20)]"
-              >
-                <svg className="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                <span className="text-sm font-black uppercase tracking-wider">Browse Selection &amp; Preorder</span>
-              </button>
+              <div className="flex gap-2 w-full">
+                <button
+                  onClick={() => scrollTo("menu")}
+                  style={{ backgroundColor: primary }}
+                  className="flex-1 text-white font-bold py-4.5 rounded-2xl flex items-center justify-center gap-2.5 transition-opacity hover:opacity-95 active:scale-[0.99] shadow-lg shadow-[var(--brand-primary-20)]"
+                >
+                  <svg className="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  <span className="text-xs md:text-sm font-black uppercase tracking-wider">Browse &amp; Preorder</span>
+                </button>
+                {restaurant.loyaltyEnabled && (
+                  <button
+                    onClick={() => {
+                      setLoyaltyOpen(true);
+                      setLoyaltyPhone("");
+                      setLoyaltyProfile(null);
+                      setLoyaltySearched(false);
+                      setLoyaltyError(null);
+                    }}
+                    className="px-5 rounded-2xl bg-white dark:bg-[#1E1E1C] border border-[#EFECE6] dark:border-[#1F1F1C] hover:border-orange-500/40 dark:hover:border-orange-500/40 flex items-center justify-center gap-2 text-[#7A7368] dark:text-[#A19B91] hover:text-orange-650 active:scale-95 transition-all shadow-sm"
+                  >
+                    <span className="text-lg">⭐</span>
+                    <span className="hidden sm:inline text-xs font-black uppercase tracking-wider">Loyalty Stamps</span>
+                  </button>
+                )}
+              </div>
             ) : (
               <button
                 onClick={() => setCartOpen(true)}
@@ -2139,6 +2209,97 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                     {isSubmitting ? "Scheduling preorder safely…" : "Confirm Scheduled Preorder"}
                   </button>
                 </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CUSTOMER LOYALTY LOOKUP MODAL ────────────────────────────────────── */}
+      {loyaltyOpen && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center animate-fadeIn">
+          <div
+            className="absolute inset-0 bg-neutral-900/60 dark:bg-black/85 backdrop-blur-xs transition-opacity duration-300"
+            onClick={() => setLoyaltyOpen(false)}
+          />
+          <div className="relative bg-white dark:bg-[#141412] w-full md:max-w-md rounded-t-[32px] md:rounded-[32px] max-h-[92vh] overflow-y-auto shadow-2xl border border-[#EFECE6] dark:border-[#1F1F1C] animate-slideUp transition-colors duration-300 p-6">
+            <div className="flex items-center justify-between pb-4 border-b border-[#EFECE6] dark:border-[#1F1F1C] mb-6">
+              <div>
+                <h2 className="text-lg font-extrabold text-neutral-900 dark:text-neutral-50 tracking-tight leading-none">Loyalty Program</h2>
+                <p className="text-[10px] text-[#7A7368] dark:text-[#A19B91] uppercase font-bold tracking-wider mt-1">Check your stamps &amp; rewards</p>
+              </div>
+              <button
+                onClick={() => setLoyaltyOpen(false)}
+                className="w-9 h-9 bg-stone-50 dark:bg-[#1E1E1C] rounded-2xl flex items-center justify-center text-[#7A7368] hover:text-neutral-900 hover:bg-stone-100 dark:hover:bg-stone-900 transition-colors border border-[#EFECE6] dark:border-[#1F1F1C]"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {/* Lookup Form */}
+              {!loyaltyProfile && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-black text-[#7A7368] uppercase tracking-wider mb-2">
+                      Enter your phone number
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="tel"
+                        value={loyaltyPhone}
+                        onChange={(e) => {
+                          setLoyaltyPhone(e.target.value);
+                          setLoyaltyError(null);
+                        }}
+                        placeholder="+2348012345678"
+                        className="flex-1 border border-[#EFECE6] dark:border-[#1F1F1C] rounded-xl px-4 py-2.5 text-sm outline-none focus:border-orange-500 bg-stone-50 dark:bg-[#0D0C0B]"
+                      />
+                      <button
+                        onClick={checkLoyaltyBalance}
+                        disabled={loyaltyLoading || !loyaltyPhone.trim()}
+                        style={{ backgroundColor: primary }}
+                        className="px-5 py-2.5 text-white font-bold text-sm rounded-xl transition-all hover:opacity-95 active:scale-95 disabled:bg-stone-200 dark:disabled:bg-stone-850"
+                      >
+                        {loyaltyLoading ? "..." : "Check"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {loyaltyError && (
+                    <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-200/50 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 text-xs font-semibold px-4 py-3 rounded-xl leading-relaxed">
+                      {loyaltyError}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Stamp Card Result */}
+              {loyaltyProfile && (
+                <div className="space-y-4 animate-scaleUp">
+                  <LoyaltyCard
+                    restaurantSlug={restaurant.slug}
+                    phone={loyaltyPhone}
+                    restaurantName={restaurant.name}
+                    preloaded={{
+                      tickGoal: loyaltyProfile.settings.tickGoal,
+                      reward: loyaltyProfile.settings.reward,
+                      currentTicks: loyaltyProfile.profile.currentTicks,
+                      rewardUnlocked: loyaltyProfile.profile.unredeemedRewards > 0,
+                      unredeemedRewards: loyaltyProfile.profile.unredeemedRewards,
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      setLoyaltyProfile(null);
+                      setLoyaltyPhone("");
+                      setLoyaltySearched(false);
+                    }}
+                    className="w-full py-2.5 bg-stone-50 hover:bg-stone-150 dark:bg-[#1E1E1C] dark:hover:bg-stone-900 text-neutral-800 dark:text-neutral-200 font-bold text-xs rounded-xl transition-colors border border-[#EFECE6] dark:border-[#1F1F1C] uppercase tracking-wider"
+                  >
+                    Check Another Number
+                  </button>
+                </div>
               )}
             </div>
           </div>

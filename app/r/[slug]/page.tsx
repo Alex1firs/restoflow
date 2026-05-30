@@ -232,6 +232,7 @@ export default async function RestaurantPage({
     deliveryTime: rData.deliveryTime ?? "",
     hidePrices: restaurant.hidePrices === true,
     heroSettings: (restaurant.heroSettings ?? DEFAULT_HERO_SETTINGS),
+    loyaltyEnabled: !!(restaurant as any).loyalty?.enabled,
   };
 
   return (

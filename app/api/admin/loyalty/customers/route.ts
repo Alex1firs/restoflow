@@ -10,10 +10,12 @@ export async function GET() {
   }
 
   const db = getAdminDb();
+  const customersCol = db.collection("restaurants").doc(user.restaurantSlug).collection("loyalty_customers");
 
-  const [customersSnap, restaurantSnap] = await Promise.all([
-    db.collection("restaurants").doc(user.restaurantSlug).collection("loyalty_customers").orderBy("totalTicks", "desc").limit(100).get(),
+  const [customersSnap, restaurantSnap, countSnap] = await Promise.all([
+    customersCol.orderBy("totalTicks", "desc").limit(100).get(),
     db.collection("restaurants").doc(user.restaurantSlug).get(),
+    customersCol.count().get(),
   ]);
 
   const settings: LoyaltySettings = { ...DEFAULT_LOYALTY, ...(restaurantSnap.data()?.loyalty ?? {}) };
@@ -34,7 +36,7 @@ export async function GET() {
 
   const tickGoal = settings.tickGoal;
   const analytics = {
-    totalCustomers: customers.length,
+    totalCustomers: countSnap.data().count,
     nearReward: customers.filter((c) => c.currentTicks >= tickGoal - 2 && c.currentTicks < tickGoal).length,
     totalRewardsEarned: customers.reduce((s, c) => s + c.rewardsEarned, 0),
     totalRewardsRedeemed: customers.reduce((s, c) => s + c.rewardsRedeemed, 0),
