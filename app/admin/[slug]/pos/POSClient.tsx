@@ -9,6 +9,9 @@ import {
   orderBy,
   onSnapshot,
   Timestamp,
+  addDoc,
+  deleteDoc,
+  doc,
 } from "firebase/firestore";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -18,6 +21,7 @@ type MenuItem = {
   name: string;
   description: string;
   price: number;
+  indoorPrice?: number | null;
   category: string;
   available: boolean;
   image: string;
@@ -89,6 +93,8 @@ type TodayOrder = {
   itemBatches?: any[];
   status: string;
   createdAt: Timestamp;
+  waiterName?: string | null;
+  pricingMode?: string | null;
   isOffline?: boolean;
   auditLog?: any[];
 };
@@ -187,12 +193,18 @@ function playCashierAlert() {
 
 // ── Reprint via popup window ──────────────────────────────────────────────────
 
-function openReprintWindow(
-  order: TodayOrder,
+function openPOSReceiptWindow(
+  order: any,
   restaurantName: string,
-  staffName: string
+  staffName: string,
+  copies: number = 2
 ) {
-  const createdAt = order.createdAt?.toDate?.() ?? new Date();
+  const createdAt = order.createdAt instanceof Date 
+    ? order.createdAt 
+    : order.createdAt?.toDate?.() 
+    ? order.createdAt.toDate() 
+    : new Date();
+
   const dateStr = createdAt.toLocaleDateString("en-NG", {
     weekday: "short",
     year: "numeric",
@@ -219,95 +231,151 @@ function openReprintWindow(
     cancelled: "Cancelled",
   };
 
-  const itemsHtml = order.items
-    .map((i: any) => {
-      const sizeStr = i.selectedSize ? ` (${i.selectedSize.name})` : "";
-      let modsHtml = "";
-      if (i.selectedModifiers && i.selectedModifiers.length > 0) {
-        modsHtml = i.selectedModifiers.map((m: any) => `<div class="mod-row">- ${m.name}</div>`).join("");
-      }
-      const noteHtml = i.itemNote ? `<div class="note-row">* Note: ${i.itemNote}</div>` : "";
-      return `<div class="item-block">
-        <div class="row">
-          <span class="qty">${i.quantity}×</span>
-          <span class="name">${i.name}${sizeStr}</span>
-          <span class="price">₦${(i.price * i.quantity).toLocaleString("en-NG")}</span>
-        </div>
-        ${modsHtml}
-        ${noteHtml}
-      </div>`;
-    })
-    .join("");
+  // Helper to generate a single page block
+  const generatePageHtml = (label: string, isKitchen: boolean) => {
+    const itemsHtml = order.items
+      .map((i: any) => {
+        const sizeStr = i.selectedSize ? ` (${i.selectedSize.name})` : "";
+        let modsHtml = "";
+        if (i.selectedModifiers && i.selectedModifiers.length > 0) {
+          modsHtml = i.selectedModifiers.map((m: any) => `<div class="mod-row">- ${m.name}</div>`).join("");
+        }
+        const noteHtml = i.itemNote ? `<div class="note-row">* Note: ${i.itemNote}</div>` : "";
+        
+        const priceSection = isKitchen 
+          ? "" 
+          : `<span class="price">₦${(i.price * i.quantity).toLocaleString("en-NG")}</span>`;
 
-  const sourceHtml = isDineIn
-    ? `<div class="kv"><span class="kl">Service</span><span class="kv-v">Dine-In</span></div>
-       <div class="kv"><span class="kl">Table</span><span class="kv-v kv-table">${order.tableLabel ?? ""}</span></div>`
-    : `<div class="kv"><span class="kl">Source</span><span class="kv-v">Counter / POS</span></div>`;
+        return `<div class="item-block">
+          <div class="row">
+            <span class="qty">${i.quantity}×</span>
+            <span class="name">${i.name}${sizeStr}</span>
+            ${priceSection}
+          </div>
+          ${modsHtml}
+          ${noteHtml}
+        </div>`;
+      })
+      .join("");
+
+    const totalsSection = isKitchen 
+      ? "" 
+      : `<div class="div"></div>
+         <div class="kv"><span class="kl">Subtotal</span><span class="kv-v">₦${(order.itemsTotal ?? order.total).toLocaleString("en-NG")}</span></div>
+         <div class="total"><span>Total</span><span>₦${order.total.toLocaleString("en-NG")}</span></div>
+         <div class="div"></div>
+         <div class="kv"><span class="kl">Payment</span><span class="kv-v">${pmLabels[order.paymentMethod] ?? order.paymentMethod}</span></div>
+         <div class="kv"><span class="kl">Status</span><span class="badge ${order.paymentStatus === "paid" ? "badge-paid" : "badge-unpaid"}">${psLabels[order.paymentStatus] ?? order.paymentStatus}</span></div>`;
+
+    const sourceHtml = isDineIn
+      ? `<div class="kv"><span class="kl">Service</span><span class="kv-v">Dine-In</span></div>
+         <div class="kv"><span class="kl">Table</span><span class="kv-v kv-table">${order.tableLabel ?? ""}</span></div>`
+      : `<div class="kv"><span class="kl">Source</span><span class="kv-v">Counter / POS</span></div>`;
+
+    const waiterHtml = order.waiterName 
+      ? `<div class="kv"><span class="kl">Waiter</span><span class="kv-v text-teal font-black">${order.waiterName}</span></div>` 
+      : "";
+
+    const customerHtml = order.customerName && order.customerName !== order.tableLabel 
+      ? `<div class="kv"><span class="kl">Customer</span><span class="kv-v">${order.customerName}</span></div>` 
+      : "";
+
+    return `
+    <div class="print-page">
+      <div class="center">
+        <div class="lbl">${label}</div>
+        <h1>${restaurantName}</h1>
+        <div class="service-badge ${isDineIn ? "badge-teal" : "badge-orange"}">${isDineIn ? "Dine-In" : "Counter Pickup"}</div>
+        ${isDineIn && order.tableLabel ? `<div class="table-lbl">${order.tableLabel}</div>` : ""}
+        <div class="meta">${dateStr} · ${timeStr}</div>
+      </div>
+      <div class="div"></div>
+      <div class="kv"><span class="kl">Order #</span><span class="kv-v" style="font-family:monospace">${(order.orderId || order.id).slice(-8).toUpperCase()}</span></div>
+      ${customerHtml}
+      <div class="kv"><span class="kl">Cashier</span><span class="kv-v">${staffName}</span></div>
+      ${waiterHtml}
+      ${sourceHtml}
+      <div class="div"></div>
+      
+      <div class="items-header">
+        <span>QTY & ITEM</span>
+        ${isKitchen ? "" : "<span>PRICE</span>"}
+      </div>
+      <div class="div" style="margin:4px 0"></div>
+      
+      ${itemsHtml}
+      ${totalsSection}
+      ${order.note ? `<div class="kv" style="margin-top:6px"><span class="kl">Note</span><span class="kv-v">${order.note}</span></div>` : ""}
+      
+      <div class="footer">
+        <div>${isKitchen ? "--- KITCHEN COPY ---" : isDineIn ? "Enjoy your meal!" : "Thank you for your patronage!"}</div>
+        <div style="font-size:8px;margin-top:2px">Powered by Restaflow</div>
+      </div>
+    </div>`;
+  };
+
+  const pages: string[] = [];
+  if (copies >= 1) {
+    pages.push(generatePageHtml("CUSTOMER RECEIPT", false));
+  }
+  if (copies >= 2) {
+    pages.push(generatePageHtml("KITCHEN TICKET (UNPAID)", true));
+  }
+  if (copies >= 3) {
+    pages.push(generatePageHtml("CASHIER AUDIT COPY", false));
+  }
 
   const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8"/>
-  <title>Receipt #${order.id.slice(-8).toUpperCase()}</title>
+  <title>POS Print Job</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:-apple-system,system-ui,sans-serif;font-size:13px;max-width:300px;margin:0 auto;padding:20px 10px}
+    body{font-family:-apple-system,system-ui,sans-serif;font-size:12px;max-width:300px;margin:0 auto;color:#111;background:white}
+    .print-page{padding:12px 6px;width:100%}
     .center{text-align:center}
-    .lbl{font-size:9px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#999;margin-bottom:4px}
-    h1{font-size:18px;font-weight:900;margin-bottom:4px}
-    .service-badge{display:inline-block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;padding:3px 10px;border-radius:20px;margin-bottom:6px;${isDineIn ? "background:#e0f2f1;color:#00796b" : "background:#fff3e0;color:#e65100"}}
-    .table-lbl{font-size:16px;font-weight:900;color:#00796b;margin-bottom:4px}
-    .meta{font-size:11px;color:#777}
-    .div{border-top:1px dashed #ddd;margin:10px 0}
-    .item-block{margin:6px 0}
-    .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:4px 0}
-    .qty{font-weight:900;color:#777;flex-shrink:0}
-    .name{font-weight:600;flex:1}
-    .price{font-weight:700;flex-shrink:0}
-    .mod-row{font-size:11px;color:#555;padding-left:20px;font-weight:500;margin-top:2px}
-    .note-row{font-size:11px;color:#d97706;padding-left:20px;font-style:italic;margin-top:2px}
-    .kv{display:flex;justify-content:space-between;font-size:12px;margin:3px 0}
-    .kl{color:#777;font-weight:600}
+    .lbl{font-size:8px;font-weight:900;letter-spacing:2px;text-transform:uppercase;color:#666;margin-bottom:3px}
+    h1{font-size:16px;font-weight:900;margin-bottom:2px}
+    .service-badge{display:inline-block;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;padding:2px 8px;border-radius:20px;margin-bottom:4px}
+    .badge-teal{background:#e0f2f1;color:#00796b}
+    .badge-orange{background:#fff3e0;color:#e65100}
+    .table-lbl{font-size:15px;font-weight:900;color:#00796b;margin-bottom:2px}
+    .meta{font-size:10px;color:#666}
+    .div{border-top:1px dashed #ccc;margin:8px 0}
+    .item-block{margin:5px 0}
+    .row{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin:3px 0}
+    .qty{font-weight:900;color:#333;flex-shrink:0;font-mono;margin-right:4px}
+    .name{font-weight:700;flex:1;text-transform:uppercase}
+    .price{font-weight:700;flex-shrink:0;font-family:monospace}
+    .mod-row{font-size:10px;color:#444;padding-left:16px;font-weight:600;margin-top:1px}
+    .note-row{font-size:10px;color:#d97706;padding-left:16px;font-style:italic;margin-top:1px;font-weight:600}
+    .kv{display:flex;justify-content:space-between;font-size:11px;margin:2px 0}
+    .kl{color:#666;font-weight:600}
     .kv-v{font-weight:700}
-    .kv-table{font-size:14px;color:#00796b}
-    .total{display:flex;justify-content:space-between;font-size:15px;font-weight:900;margin-top:6px}
-    .badge{font-size:9px;font-weight:800;text-transform:uppercase;padding:2px 6px;border-radius:20px;background:#f0f0f0}
-    .footer{text-align:center;color:#bbb;font-size:10px;margin-top:16px}
-    @media print{body{margin:0;padding:8px}}
+    .text-teal{color:#00796b}
+    .font-black{font-weight:900}
+    .kv-table{font-size:13px;color:#00796b}
+    .total{display:flex;justify-content:space-between;font-size:14px;font-weight:900;margin-top:4px}
+    .badge{font-size:8px;font-weight:800;text-transform:uppercase;padding:2px 6px;border-radius:20px}
+    .badge-paid{background:#d1fae5;color:#065f46}
+    .badge-unpaid{background:#fee2e2;color:#991b1b}
+    .items-header{display:flex;justify-content:space-between;font-size:9px;font-weight:800;color:#777;letter-spacing:1px}
+    .footer{text-align:center;color:#888;font-size:9px;margin-top:14px;border-top:1px dashed #eee;padding-top:8px}
+    @media print{
+      body{margin:0;padding:0}
+      .print-page{page-break-after:always;min-height:100vh}
+      .print-page:last-child{page-break-after:avoid}
+    }
   </style>
 </head>
 <body>
-  <div class="center">
-    <div class="lbl">Restaflow POS · Reprint</div>
-    <h1>${restaurantName}</h1>
-    <div class="service-badge">${isDineIn ? "Dine-In" : "Counter Pickup"}</div>
-    ${isDineIn && order.tableLabel ? `<div class="table-lbl">${order.tableLabel}</div>` : ""}
-    <div class="meta">${dateStr} · ${timeStr}</div>
-  </div>
-  <div class="div"></div>
-  <div class="kv"><span class="kl">Order #</span><span class="kv-v" style="font-family:monospace">${order.id.slice(-8).toUpperCase()}</span></div>
-  ${order.customerName && order.customerName !== order.tableLabel ? `<div class="kv"><span class="kl">Customer</span><span class="kv-v">${order.customerName}</span></div>` : ""}
-  <div class="kv"><span class="kl">Cashier</span><span class="kv-v">${staffName}</span></div>
-  ${sourceHtml}
-  <div class="div"></div>
-  ${itemsHtml}
-  <div class="div"></div>
-  <div class="kv"><span class="kl">Subtotal</span><span class="kv-v">₦${(order.itemsTotal ?? order.total).toLocaleString("en-NG")}</span></div>
-  <div class="total"><span>Total</span><span>₦${order.total.toLocaleString("en-NG")}</span></div>
-  <div class="div"></div>
-  <div class="kv"><span class="kl">Payment</span><span class="kv-v">${pmLabels[order.paymentMethod] ?? order.paymentMethod}</span></div>
-  <div class="kv"><span class="kl">Status</span><span class="badge">${psLabels[order.paymentStatus] ?? order.paymentStatus}</span></div>
-  ${order.note ? `<div class="kv"><span class="kl">Note</span><span class="kv-v">${order.note}</span></div>` : ""}
-  <div class="footer"><div>Thank you!</div><div>Powered by Restaflow</div></div>
-  <script>window.onload=function(){setTimeout(function(){window.print();},80)};</script>
+  ${pages.join("")}
+  <script>window.onload=function(){setTimeout(function(){window.print();window.close();},100)};</script>
 </body>
 </html>`;
 
-  const w = window.open(
-    "",
-    "_blank",
-    "width=380,height=680,menubar=no,toolbar=no,scrollbars=yes"
-  );
+  const w = window.open("", "_blank", "width=380,height=680,menubar=no,toolbar=no,scrollbars=yes");
   if (w) {
     w.document.write(html);
     w.document.close();
@@ -508,6 +576,15 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
   const [error, setError] = useState<string | null>(null);
   const [completedOrder, setCompletedOrder] = useState<CompletedOrder | null>(null);
 
+  // New Table Service States
+  const [pricingMode, setPricingMode] = useState<"regular" | "indoor">("regular");
+  const [selectedWaiterName, setSelectedWaiterName] = useState<string | null>(null);
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [waiters, setWaiters] = useState<{ id: string; name: string }[]>([]);
+  const [showWaiterManager, setShowWaiterManager] = useState(false);
+  const [newWaiterName, setNewWaiterName] = useState("");
+  const [printCopies, setPrintCopies] = useState<1 | 2 | 3>(2);
+
   // Customizer Drawer / Modal State
   const [customizingItem, setCustomizingItem] = useState<MenuItem | null>(null);
   const [customizingCartItemId, setCustomizingCartItemId] = useState<string | null>(null);
@@ -577,6 +654,24 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
       }
     }
   }, []);
+
+  // Load waiters in real-time
+  useEffect(() => {
+    const q = query(
+      collection(db, "waiters"),
+      where("restaurantId", "==", restaurant.slug)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const wList: { id: string; name: string }[] = [];
+      snapshot.forEach((doc) => {
+        const d = doc.data();
+        wList.push({ id: doc.id, name: d.name as string });
+      });
+      wList.sort((a, b) => a.name.localeCompare(b.name));
+      setWaiters(wList);
+    });
+    return () => unsubscribe();
+  }, [restaurant.slug]);
 
   // Persist draft cart changes
   useEffect(() => {
@@ -826,14 +921,21 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
     if (item.allowCustomPrice && item.customPrice !== undefined && item.customPrice !== null) {
       return item.customPrice;
     }
-    const base = item.selectedSize ? item.selectedSize.price : item.basePrice;
+    
+    // Dynamically retrieve indoor pricing if active and available
+    const dbItem = enrichedMenuItems.find((m) => m.id === item.id);
+    const resolvedBasePrice = (pricingMode === "indoor" && dbItem?.indoorPrice && dbItem.indoorPrice > 0)
+      ? dbItem.indoorPrice
+      : item.basePrice;
+
+    const base = item.selectedSize ? item.selectedSize.price : resolvedBasePrice;
     const mods = item.selectedModifiers.reduce((sum, m) => sum + m.price, 0);
     return base + mods;
   };
 
   const cartTotal = useMemo(
     () => cart.reduce((sum, item) => sum + itemUnitPrice(item) * item.quantity, 0),
-    [cart]
+    [cart, pricingMode, enrichedMenuItems]
   );
 
   const cartCount = useMemo(
@@ -1172,8 +1274,57 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
     setOpenTabPromptDismissed(false);
     setAddOnReceipt(null);
     setAuditLog([]);
+    setEditingOrderId(null);
+    setSelectedWaiterName(null);
+    setPricingMode("regular");
+    setPrintCopies(2);
     localStorage.removeItem("rf_pos_draft_cart");
   };
+
+  const handleEditOrder = useCallback((bill: TodayOrder) => {
+    // Load items into cart
+    const loadedCart: CartItem[] = bill.items.map((item) => ({
+      cartItemId: `cart-${Math.random().toString(36).substring(2, 9)}-${Date.now()}`,
+      id: item.id,
+      name: item.name,
+      category: item.category || "Other",
+      image: item.image || "",
+      kitchenStation: item.kitchenStation || "kitchen",
+      allowCustomPrice: item.allowCustomPrice || false,
+      basePrice: item.basePrice ?? item.price ?? 0,
+      selectedSize: item.selectedSize || null,
+      selectedModifiers: item.selectedModifiers || [],
+      customPrice: item.customPrice || null,
+      quantity: item.quantity,
+      itemNote: item.itemNote || "",
+    }));
+
+    setCart(loadedCart);
+    setCustomerName(bill.customerName === "Walk-in Customer" || bill.customerName === bill.tableLabel ? "" : bill.customerName || "");
+    setServiceMode(bill.serviceMode as ServiceMode);
+    
+    if (bill.serviceMode === "dine_in") {
+      if (bill.tableLabel?.startsWith("Table ")) {
+        setTableLabel(bill.tableLabel);
+        setTableLabelInput("");
+      } else {
+        setTableLabel("");
+        setTableLabelInput(bill.tableLabel || "");
+      }
+    } else {
+      setTableLabel("");
+      setTableLabelInput("");
+    }
+    
+    setNote(bill.note || "");
+    setPaymentMethod((bill.paymentMethod as PaymentMethod) || "cash");
+    setPaymentStatus((bill.paymentStatus as PaymentStatus) || "unpaid");
+    setSelectedWaiterName(bill.waiterName || null);
+    setPricingMode((bill.pricingMode as "regular" | "indoor") || "regular");
+    setEditingOrderId(bill.id);
+    setRightTab("order");
+    showSystemToast(`Loaded Order #${bill.id.slice(-6).toUpperCase()} for editing`);
+  }, []);
 
   const handleSubmit = async () => {
     if (cart.length === 0 || submitting) return;
@@ -1206,23 +1357,29 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
       staffName,
       serviceMode,
       tableLabel: finalTableLabel,
+      waiterName: selectedWaiterName,
+      pricingMode,
       auditLog,
     };
 
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/pos", {
-        method: "POST",
+      const url = editingOrderId ? `/api/admin/pos/${editingOrderId}` : "/api/admin/pos";
+      const method = editingOrderId ? "PATCH" : "POST";
+      
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(orderPayload),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Failed to create order");
+        setError(data.error ?? "Failed to save order");
         return;
       }
-      setCompletedOrder({
+      
+      const completed = {
         orderId: data.orderId,
         items: data.items,
         itemsTotal: data.itemsTotal,
@@ -1233,8 +1390,13 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
         note: note.trim(),
         serviceMode,
         tableLabel: finalTableLabel,
+        waiterName: selectedWaiterName,
+        pricingMode,
         createdAt: new Date(),
-      });
+      };
+      
+      setCompletedOrder(completed);
+      openPOSReceiptWindow(completed, restaurant.name, staffName, printCopies);
       localStorage.removeItem("rf_pos_draft_cart");
     } catch {
       // Offline fallback: cache order and show success page
@@ -1311,6 +1473,7 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
         restaurant={restaurant}
         staffName={staffName}
         onNewOrder={resetPOS}
+        onPrint={() => openPOSReceiptWindow(completedOrder, restaurant.name, staffName, printCopies)}
       />
     );
   }
@@ -1359,6 +1522,100 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
           }
         />
       )}
+
+      {/* ── Waiter Manager Modal overlay ─────────────────────────── */}
+      {showWaiterManager && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-4 flex items-center justify-between">
+              <h3 className="text-white font-black text-lg">Manage Waiters</h3>
+              <button
+                type="button"
+                onClick={() => setShowWaiterManager(false)}
+                className="text-white/85 hover:text-white font-black text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              {/* Add form */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Enter waiter's full name"
+                  value={newWaiterName}
+                  onChange={(e) => setNewWaiterName(e.target.value)}
+                  className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-orange-500 bg-gray-50 font-semibold"
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const nameTrim = newWaiterName.trim();
+                    if (!nameTrim) return;
+                    try {
+                      await addDoc(collection(db, "waiters"), {
+                        restaurantId: restaurant.slug,
+                        name: nameTrim,
+                        createdAt: Timestamp.now(),
+                      });
+                      setNewWaiterName("");
+                      showSystemToast(`Added waiter "${nameTrim}" successfully`);
+                    } catch (e) {
+                      showSystemToast("Failed to add waiter");
+                    }
+                  }}
+                  className="bg-orange-600 hover:bg-orange-500 text-white font-black px-4 py-2.5 rounded-xl text-sm transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+
+              {/* Waiters List */}
+              <div className="border border-gray-100 rounded-2xl overflow-hidden max-h-60 overflow-y-auto divide-y divide-gray-100">
+                {waiters.length === 0 ? (
+                  <div className="p-6 text-center text-gray-400 text-xs font-bold bg-gray-50/30">
+                    No waiters registered yet.
+                  </div>
+                ) : (
+                  waiters.map((w) => (
+                    <div key={w.id} className="px-4 py-3 flex items-center justify-between gap-3 bg-white hover:bg-gray-50/50">
+                      <span className="font-bold text-gray-800 text-sm">{w.name}</span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (confirm(`Are you sure you want to remove ${w.name}?`)) {
+                            try {
+                              await deleteDoc(doc(db, "waiters", w.id));
+                              showSystemToast(`Removed waiter "${w.name}"`);
+                            } catch (e) {
+                              showSystemToast("Failed to remove waiter");
+                            }
+                          }
+                        }}
+                        className="text-red-500 hover:text-red-700 font-bold text-xs px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+            {/* Footer */}
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowWaiterManager(false)}
+                className="bg-gray-900 hover:bg-gray-850 text-white font-black px-5 py-2.5 rounded-xl text-xs transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* ── Ready-order alert banner ──────────────────────────────── */}
       {readyOrders.length > 0 && (
         <ReadyOrdersPanel
@@ -1370,7 +1627,7 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
           onToggleCollapse={() => setAlertCollapsed((v) => !v)}
           onMarkServed={markServed}
           onReprint={(order) =>
-            openReprintWindow(order, restaurant.name, staffName)
+            openPOSReceiptWindow(order, restaurant.name, staffName, 1)
           }
         />
       )}
@@ -1563,12 +1820,13 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
                 setSettleBillId(id);
                 setSettlementResult(null);
               }}
+              onEdit={handleEditOrder}
             />
           )}
 
           {/* ── Service mode selector ─────────────────────────────── */}
           {rightTab === "order" && (<>
-          <div className="px-4 pt-3 pb-2 border-b border-gray-100 flex-shrink-0">
+          <div className="px-4 pt-3 pb-2 border-b border-gray-100 flex-shrink-0 space-y-2.5">
             <div className="flex rounded-xl overflow-hidden border border-gray-200">
               <button
                 onClick={() => switchServiceMode("counter")}
@@ -1589,6 +1847,32 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
                 }`}
               >
                 Dine-In
+              </button>
+            </div>
+
+            {/* Pricing Mode Toggle Segment */}
+            <div className="flex rounded-xl overflow-hidden border border-gray-200 bg-gray-50/50 p-0.5">
+              <button
+                type="button"
+                onClick={() => setPricingMode("regular")}
+                className={`flex-1 py-1.5 rounded-lg text-[10px] font-black transition-colors ${
+                  pricingMode === "regular"
+                    ? "bg-white text-gray-900 shadow-sm border border-gray-150"
+                    : "text-gray-500 hover:text-gray-800"
+                }`}
+              >
+                Outside / Regular Menu
+              </button>
+              <button
+                type="button"
+                onClick={() => setPricingMode("indoor")}
+                className={`flex-1 py-1.5 rounded-lg text-[10px] font-black transition-colors ${
+                  pricingMode === "indoor"
+                    ? "bg-orange-600 text-white shadow-sm border border-orange-700/10"
+                    : "text-gray-500 hover:bg-orange-50 hover:text-orange-700"
+                }`}
+              >
+                Indoor VIP Lounge
               </button>
             </div>
 
@@ -1649,6 +1933,26 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
               </div>
             )}
           </div>
+
+          {/* Editing Active Bill Banner */}
+          {editingOrderId && (
+            <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-black text-amber-800 uppercase tracking-wide">Editing Active Bill</p>
+                <p className="text-[10px] text-amber-600 font-bold font-mono">Order ID: #{editingOrderId.slice(-6).toUpperCase()}</p>
+              </div>
+              <button
+                onClick={() => {
+                  setEditingOrderId(null);
+                  resetPOS();
+                  showSystemToast("Order editing cancelled");
+                }}
+                className="bg-amber-100 hover:bg-amber-200 active:bg-amber-300 text-amber-800 text-[10px] font-black px-2.5 py-1.5 rounded-lg transition-colors"
+              >
+                Cancel Edit
+              </button>
+            </div>
+          )}
 
           {/* Cart header */}
           <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
@@ -1852,6 +2156,34 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
               />
             )}
 
+            {/* Waiter selection */}
+            <div>
+              <div className="flex justify-between items-center mb-1.5">
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                  Attendant / Waiter
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowWaiterManager(true)}
+                  className="text-[10px] font-bold text-orange-600 hover:text-orange-700 hover:underline"
+                >
+                  Manage Waiters
+                </button>
+              </div>
+              <select
+                value={selectedWaiterName || ""}
+                onChange={(e) => setSelectedWaiterName(e.target.value || null)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-orange-500 bg-gray-50 transition-colors font-semibold"
+              >
+                <option value="">-- Assign Attendant (Optional) --</option>
+                {waiters.map((w) => (
+                  <option key={w.id} value={w.name}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Payment method — hidden in continue mode (payment settled at bill close) */}
             {tabMode !== "continue" && (
               <div>
@@ -1917,6 +2249,33 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-orange-500 bg-gray-50 transition-colors"
             />
 
+            {/* Print copies selector */}
+            <div>
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                Print Tickets
+              </p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {([1, 2, 3] as const).map((copies) => (
+                  <button
+                    key={copies}
+                    type="button"
+                    onClick={() => setPrintCopies(copies)}
+                    className={`py-1.5 rounded-xl text-xs font-black transition-colors ${
+                      printCopies === copies
+                        ? "bg-orange-600 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200"
+                    }`}
+                  >
+                    {copies === 1
+                      ? "1 Copy (Customer)"
+                      : copies === 2
+                      ? "2 Copies (Cust+KOT)"
+                      : "3 Copies (Cust+KOT+Audit)"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 text-sm text-red-700 font-medium">
                 {error}
@@ -1928,7 +2287,9 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
               onClick={handleSubmit}
               disabled={cart.length === 0 || submitting || (serviceMode === "dine_in" && tabMode === "new" && !resolvedTable)}
               className={`w-full disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-3.5 rounded-xl transition-colors text-sm ${
-                tabMode === "continue"
+                editingOrderId
+                  ? "bg-amber-600 hover:bg-amber-500 active:bg-amber-700"
+                  : tabMode === "continue"
                   ? "bg-teal-700 hover:bg-teal-600 active:bg-teal-800"
                   : serviceMode === "dine_in"
                   ? "bg-teal-600 hover:bg-teal-500 active:bg-teal-700"
@@ -1936,9 +2297,15 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
               }`}
             >
               {submitting
-                ? tabMode === "continue" ? "Adding to Tab…" : "Creating Order…"
+                ? editingOrderId
+                  ? "Saving Changes…"
+                  : tabMode === "continue"
+                  ? "Adding to Tab…"
+                  : "Creating Order…"
                 : cart.length === 0
                 ? tabMode === "continue" ? "Add items to continue" : "Add items to confirm"
+                : editingOrderId
+                ? `Save Changes · ${fmt(cartTotal)}`
                 : tabMode === "continue" && activeTab
                 ? `Add to ${activeTab.tableLabel ?? "Tab"} · ${fmt(cartTotal)}`
                 : serviceMode === "dine_in"
@@ -2338,9 +2705,11 @@ function AddOnReceiptView({
 function OpenBillsPanel({
   bills,
   onSettle,
+  onEdit,
 }: {
   bills: TodayOrder[];
   onSettle: (orderId: string) => void;
+  onEdit: (bill: TodayOrder) => void;
 }) {
   if (bills.length === 0) {
     return (
@@ -2375,7 +2744,7 @@ function OpenBillsPanel({
             className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm"
           >
             {/* Table label + amount */}
-            <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="flex items-start justify-between gap-3 mb-2">
               <div className="min-w-0">
                 <p className="font-black text-teal-700 text-xl leading-tight truncate">
                   {bill.tableLabel || `#${shortId}`}
@@ -2398,6 +2767,21 @@ function OpenBillsPanel({
               </div>
             </div>
 
+            {/* Customer, Waiter, and Pricing Mode Info */}
+            {(bill.customerName || bill.waiterName || bill.pricingMode === "indoor") && (
+              <div className="bg-gray-50 rounded-xl px-3 py-2 text-[11px] space-y-1 text-gray-600 font-semibold mb-3 border border-gray-100">
+                {bill.customerName && bill.customerName !== bill.tableLabel && (
+                  <div>👤 Cust: <span className="font-bold text-gray-800">{bill.customerName}</span></div>
+                )}
+                {bill.waiterName && (
+                  <div>🤵 Waiter: <span className="font-bold text-gray-800">{bill.waiterName}</span></div>
+                )}
+                {bill.pricingMode === "indoor" && (
+                  <div className="text-orange-600 font-bold">✨ Indoor VIP Pricing Active</div>
+                )}
+              </div>
+            )}
+
             {/* Status indicators */}
             {bill.status === "completed" && (
               <p className="text-xs font-bold text-green-600 mb-2.5">✓ Food served</p>
@@ -2406,12 +2790,22 @@ function OpenBillsPanel({
               <p className="text-xs font-bold text-purple-600 mb-2.5">🟣 Ready to serve</p>
             )}
 
-            <button
-              onClick={() => onSettle(bill.id)}
-              className="w-full bg-teal-600 hover:bg-teal-500 active:bg-teal-700 text-white font-black text-sm py-3.5 rounded-xl transition-colors"
-            >
-              Settle Bill
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => onEdit(bill)}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 font-black text-sm py-3.5 rounded-xl transition-colors border border-gray-200"
+              >
+                Edit Order
+              </button>
+              <button
+                type="button"
+                onClick={() => onSettle(bill.id)}
+                className="flex-1 bg-teal-600 hover:bg-teal-500 active:bg-teal-700 text-white font-black text-sm py-3.5 rounded-xl transition-colors"
+              >
+                Settle Bill
+              </button>
+            </div>
           </div>
         );
       })}
@@ -2855,11 +3249,13 @@ function ReceiptView({
   restaurant,
   staffName,
   onNewOrder,
+  onPrint,
 }: {
   order: CompletedOrder;
   restaurant: { name: string; slug: string };
   staffName: string;
   onNewOrder: () => void;
+  onPrint: () => void;
 }) {
   const isDineIn = order.serviceMode === "dine_in";
 
@@ -2882,7 +3278,7 @@ function ReceiptView({
             ← New Order
           </button>
           <button
-            onClick={() => window.print()}
+            onClick={onPrint}
             className="flex items-center gap-1.5 text-sm font-bold bg-orange-600 text-white px-4 py-2.5 rounded-xl hover:bg-orange-500 transition-colors"
           >
             Print Receipt
@@ -3030,7 +3426,7 @@ function ReceiptView({
             New Order
           </button>
           <button
-            onClick={() => window.print()}
+            onClick={onPrint}
             className="flex-1 border-2 border-orange-600 text-orange-600 hover:bg-orange-50 font-black py-3.5 rounded-xl transition-colors text-sm"
           >
             Print Receipt

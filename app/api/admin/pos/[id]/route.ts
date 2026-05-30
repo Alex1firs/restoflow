@@ -12,7 +12,13 @@ type PaymentMethod = (typeof VALID_PAYMENT_METHODS)[number];
 type PaymentStatus = (typeof VALID_PAYMENT_STATUSES)[number];
 type ServiceMode = (typeof VALID_SERVICE_MODES)[number];
 
-export async function POST(request: NextRequest) {
+type Props = {
+  params: Promise<{ id: string }>;
+};
+
+export async function PATCH(request: NextRequest, { params }: Props) {
+  const { id: orderId } = await params;
+
   let user: Awaited<ReturnType<typeof getAuthenticatedUser>>;
   try {
     user = await getAuthenticatedUser();
@@ -47,11 +53,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Order must contain at least one item" }, { status: 400 });
   }
 
-  if (!VALID_PAYMENT_METHODS.includes(paymentMethod as PaymentMethod)) {
+  if (paymentMethod && !VALID_PAYMENT_METHODS.includes(paymentMethod as PaymentMethod)) {
     return NextResponse.json({ error: "Invalid payment method" }, { status: 400 });
   }
 
-  if (!VALID_PAYMENT_STATUSES.includes(paymentStatus as PaymentStatus)) {
+  if (paymentStatus && !VALID_PAYMENT_STATUSES.includes(paymentStatus as PaymentStatus)) {
     return NextResponse.json({ error: "Invalid payment status" }, { status: 400 });
   }
 
@@ -74,6 +80,22 @@ export async function POST(request: NextRequest) {
   try {
     const db = getAdminDb();
     const restaurantSlug = user.restaurantSlug;
+
+    const orderRef = db.collection("orders").doc(orderId);
+    const orderSnap = await orderRef.get();
+
+    if (!orderSnap.exists) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    const orderData = orderSnap.data()!;
+    if (orderData.restaurantId !== restaurantSlug) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (orderData.paymentStatus === "paid") {
+      return NextResponse.json({ error: "Cannot edit a settled bill" }, { status: 400 });
+    }
 
     const menuSnap = await db
       .collection("prepared_items")
@@ -123,7 +145,7 @@ export async function POST(request: NextRequest) {
         }
         unitPrice = Number(item.customPrice);
       } else {
-        const resolvedPricingMode = typeof pricingMode === "string" ? pricingMode : "regular";
+        const resolvedPricingMode = typeof pricingMode === "string" ? pricingMode : (orderData.pricingMode || "regular");
         const resolvedBasePrice = (resolvedPricingMode === "indoor" && dbItem.indoorPrice && dbItem.indoorPrice > 0)
           ? Number(dbItem.indoorPrice)
           : Number(dbItem.basePrice ?? dbItem.price ?? 0);
@@ -153,59 +175,53 @@ export async function POST(request: NextRequest) {
     const total = itemsTotal;
     const isDineIn = resolvedServiceMode === "dine_in";
 
-    const auditLog = (body as any).auditLog || [];
-    auditLog.push({
-      action: "order_created",
+    const existingAudit = orderData.auditLog || [];
+    const updatedAudit = [...existingAudit];
+    updatedAudit.push({
+      action: "order_edited",
       staffId: user.uid,
       staffName: typeof staffName === "string" ? staffName.trim() : "Staff",
       timestamp: new Date().toISOString(),
-      details: `Created counter POS order with ${validatedItems.length} items. Total: ₦${itemsTotal.toLocaleString("en-NG")}`,
+      details: `Edited POS order. New items: ${validatedItems.length}. New Total: ₦${itemsTotal.toLocaleString("en-NG")}`,
     });
 
-    const orderRef = await db.collection("orders").add({
-      restaurantId: restaurantSlug,
+    const updatePayload: Record<string, any> = {
+      items: validatedItems,
+      itemsTotal,
+      total,
       customerName:
         typeof customerName === "string" && customerName.trim()
           ? customerName.trim()
           : isDineIn
           ? resolvedTableLabel
           : "Walk-in Customer",
-      phone: "",
-      address: "",
       note: typeof note === "string" ? note.trim() : "",
+      paymentMethod: paymentMethod || orderData.paymentMethod,
+      paymentStatus: paymentStatus || orderData.paymentStatus,
+      serviceMode: resolvedServiceMode,
+      deliveryType: isDineIn ? "dine_in" : "counter",
+      tableLabel: resolvedTableLabel,
+      waiterName: typeof waiterName === "string" ? waiterName.trim() : (waiterName === null ? null : orderData.waiterName || null),
+      pricingMode: pricingMode || orderData.pricingMode || "regular",
+      staffId: user.uid,
+      staffName: typeof staffName === "string" ? staffName.trim() : (orderData.staffName || ""),
+      updatedAt: FieldValue.serverTimestamp(),
+      auditLog: updatedAudit,
+    };
+
+    await orderRef.update(updatePayload);
+
+    return NextResponse.json({
+      success: true,
+      orderId,
       items: validatedItems,
       itemsTotal,
-      deliveryFee: 0,
       total,
-      paymentMethod,
-      paymentStatus,
-      status: "pending",
-      deliveryType: isDineIn ? "dine_in" : "counter",
-      orderType: "normal",
-      orderSource: "counter",
       serviceMode: resolvedServiceMode,
-      ...(isDineIn ? { tableLabel: resolvedTableLabel } : {}),
-      waiterName: typeof waiterName === "string" ? waiterName.trim() : null,
-      pricingMode: typeof pricingMode === "string" ? pricingMode : "regular",
-      staffId: user.uid,
-      staffName: typeof staffName === "string" ? staffName.trim() : "",
-      createdAt: FieldValue.serverTimestamp(),
-      auditLog,
+      tableLabel: resolvedTableLabel,
     });
-
-    return NextResponse.json(
-      {
-        orderId: orderRef.id,
-        items: validatedItems,
-        itemsTotal,
-        total,
-        serviceMode: resolvedServiceMode,
-        tableLabel: resolvedTableLabel,
-      },
-      { status: 201 }
-    );
   } catch (error) {
-    console.error("POS order creation failed:", error);
-    return NextResponse.json({ error: "Failed to create order. Please try again." }, { status: 500 });
+    console.error("POS order edit failed:", error);
+    return NextResponse.json({ error: "Failed to edit order. Please try again." }, { status: 500 });
   }
 }

@@ -39,6 +39,7 @@ export default async function POSPage({ params }: Props) {
       name: (d.name as string) ?? "",
       description: (d.description as string) ?? "",
       price: (d.price as number) ?? 0,
+      indoorPrice: (d.indoorPrice as number | undefined) ?? null,
       category: (d.category as string) ?? "Other",
       available: (d.available as boolean) ?? true,
       image: (d.image as string) ?? "",

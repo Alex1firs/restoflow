@@ -38,6 +38,7 @@ type PreparedItem = {
   name: string;
   category: string;
   price: number; // base price
+  indoorPrice?: number | null;
   image: string;
   description: string;
   available: boolean;
@@ -70,6 +71,7 @@ export default function AdminPreparedItemsClient({ restaurant, aiEnabled = false
   // Form State
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
+  const [indoorPrice, setIndoorPrice] = useState("");
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
   const [image, setImage] = useState("");
@@ -124,6 +126,7 @@ export default function AdminPreparedItemsClient({ restaurant, aiEnabled = false
   const resetForm = () => {
     setName("");
     setPrice("");
+    setIndoorPrice("");
     setCategory("");
     setDescription("");
     setImage("");
@@ -171,6 +174,7 @@ export default function AdminPreparedItemsClient({ restaurant, aiEnabled = false
     setEditingItem(item);
     setName(item.name);
     setPrice(item.price.toString());
+    setIndoorPrice(item.indoorPrice ? item.indoorPrice.toString() : "");
     setCategory(item.category);
     setDescription(item.description);
     setImage(item.image);
@@ -252,11 +256,18 @@ export default function AdminPreparedItemsClient({ restaurant, aiEnabled = false
       return;
     }
 
+    const indoorPriceNum = indoorPrice.trim() ? parseFloat(indoorPrice) : null;
+    if (indoorPrice.trim() && (isNaN(Number(indoorPrice)) || Number(indoorPrice) < 0)) {
+      setError("Indoor Price must be a valid non-negative number or left blank.");
+      return;
+    }
+
     try {
       const itemData = {
         restaurantId: restaurant.slug,
         name: name.trim(),
         price: priceNum,
+        indoorPrice: indoorPriceNum,
         category: category.trim(),
         description: description.trim(),
         image: image || "",
@@ -369,7 +380,7 @@ export default function AdminPreparedItemsClient({ restaurant, aiEnabled = false
                   />
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-black text-gray-700 uppercase tracking-wide mb-1.5">Base Price (₦) *</label>
                     <input
@@ -378,6 +389,17 @@ export default function AdminPreparedItemsClient({ restaurant, aiEnabled = false
                       value={price}
                       onChange={(e) => setPrice(e.target.value)}
                       placeholder="e.g. 1000"
+                      className="w-full p-3.5 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none transition-all text-sm font-medium bg-gray-50/50 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-gray-700 uppercase tracking-wide mb-1.5">Indoor Price (₦)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={indoorPrice}
+                      onChange={(e) => setIndoorPrice(e.target.value)}
+                      placeholder="Optional"
                       className="w-full p-3.5 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none transition-all text-sm font-medium bg-gray-50/50 font-mono"
                     />
                   </div>
@@ -724,7 +746,12 @@ export default function AdminPreparedItemsClient({ restaurant, aiEnabled = false
               <div className="p-6 flex flex-col flex-1">
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="font-black text-lg text-gray-900 capitalize">{item.name}</h3>
-                  <span className="font-black text-orange-600 font-mono text-base">₦{item.price.toFixed(2)}</span>
+                  <div className="text-right">
+                    <span className="font-black text-orange-600 font-mono text-base block">₦{item.price.toFixed(2)}</span>
+                    {item.indoorPrice && (
+                      <span className="text-[10px] text-teal-600 font-black font-mono block">Indoor: ₦{Number(item.indoorPrice).toFixed(2)}</span>
+                    )}
+                  </div>
                 </div>
                 
                 <p className="text-xs text-gray-500 line-clamp-2 italic mb-4">{item.description || "No description set."}</p>
