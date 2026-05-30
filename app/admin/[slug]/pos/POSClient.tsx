@@ -1555,15 +1555,19 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
                     const nameTrim = newWaiterName.trim();
                     if (!nameTrim) return;
                     try {
-                      await addDoc(collection(db, "waiters"), {
-                        restaurantId: restaurant.slug,
-                        name: nameTrim,
-                        createdAt: Timestamp.now(),
+                      const res = await fetch("/api/admin/waiters", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ name: nameTrim }),
                       });
+                      if (!res.ok) {
+                        const data = await res.json();
+                        throw new Error(data.error || "Failed to add waiter");
+                      }
                       setNewWaiterName("");
                       showSystemToast(`Added waiter "${nameTrim}" successfully`);
-                    } catch (e) {
-                      showSystemToast("Failed to add waiter");
+                    } catch (e: any) {
+                      showSystemToast(e.message || "Failed to add waiter");
                     }
                   }}
                   className="bg-orange-600 hover:bg-orange-500 text-white font-black px-4 py-2.5 rounded-xl text-sm transition-colors"
@@ -1587,10 +1591,16 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
                         onClick={async () => {
                           if (confirm(`Are you sure you want to remove ${w.name}?`)) {
                             try {
-                              await deleteDoc(doc(db, "waiters", w.id));
+                              const res = await fetch(`/api/admin/waiters?id=${w.id}`, {
+                                method: "DELETE",
+                              });
+                              if (!res.ok) {
+                                const data = await res.json();
+                                throw new Error(data.error || "Failed to remove waiter");
+                              }
                               showSystemToast(`Removed waiter "${w.name}"`);
-                            } catch (e) {
-                              showSystemToast("Failed to remove waiter");
+                            } catch (e: any) {
+                              showSystemToast(e.message || "Failed to remove waiter");
                             }
                           }
                         }}
