@@ -43,12 +43,19 @@ export async function sendNewOrderAlert(params: NewOrderAlertParams): Promise<vo
       (alertPreference === "telegram" || alertPreference === "both");
 
     if (sendTelegram) {
-      tasks.push(
-        dispatchTelegram({ ...params, restaurantName, telegramChatId })
-          .catch((err: any) => {
-            console.error("[notifications] Telegram alert failed:", err.message);
-          })
-      );
+      const chatIds = telegramChatId
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean);
+
+      for (const chatId of chatIds) {
+        tasks.push(
+          dispatchTelegram({ ...params, restaurantName, telegramChatId: chatId })
+            .catch((err: any) => {
+              console.error(`[notifications] Telegram alert failed for chatId ${chatId}:`, err.message);
+            })
+        );
+      }
     }
 
     if (tasks.length > 0) await Promise.allSettled(tasks);

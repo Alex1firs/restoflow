@@ -34,11 +34,24 @@ export async function POST(req: NextRequest) {
       `Your Telegram Alerts are now successfully linked and active for <b>${restaurantName}</b>!\n\n` +
       `⚡ You will receive instant notifications here whenever a new customer order is placed.`;
 
-    const result = await sendTelegramAlert(telegramChatId, message);
+    const chatIds = telegramChatId
+      .split(",")
+      .map((id: string) => id.trim())
+      .filter(Boolean);
 
-    if (!result.success) {
+    if (chatIds.length === 0) {
+      return NextResponse.json({ error: "Telegram Chat ID is required" }, { status: 400 });
+    }
+
+    const results = await Promise.all(
+      chatIds.map((id: string) => sendTelegramAlert(id, message))
+    );
+
+    const failed = results.filter((r) => !r.success);
+    if (failed.length > 0) {
+      const errors = failed.map((f) => f.error).join(", ");
       return NextResponse.json(
-        { error: result.error || "Failed to send Telegram test alert" },
+        { error: `Failed for some Chat IDs: ${errors}` },
         { status: 502 }
       );
     }
