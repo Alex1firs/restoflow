@@ -488,6 +488,80 @@ function openAddOnReprintWindow(receipt: AddOnReceipt, restaurantName: string, s
   if (w) { w.document.write(html); w.document.close(); }
 }
 
+// ── Kitchen order slip (counter orders placed but not yet paid) ───────────────
+
+function openKitchenSlip(order: any, restaurantName: string, cashierName: string) {
+  const createdAt = order.createdAt instanceof Date ? order.createdAt : new Date();
+  const dateStr = createdAt.toLocaleDateString("en-NG", { weekday: "short", year: "numeric", month: "short", day: "numeric" });
+  const timeStr = createdAt.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" });
+  const shortId = order.orderId?.slice(-8).toUpperCase() ?? "NEW";
+
+  const totalQty = (order.items as any[]).reduce((s: number, i: any) => s + i.quantity, 0);
+
+  const itemsHtml = (order.items as any[]).map((i: any) => {
+    const sizeStr = i.selectedSize ? ` (${i.selectedSize.name})` : "";
+    const modsHtml = i.selectedModifiers?.length
+      ? i.selectedModifiers.map((m: any) => `<div class="mod">+ ${m.name}</div>`).join("")
+      : "";
+    const noteHtml = i.itemNote ? `<div class="note">* ${i.itemNote}</div>` : "";
+    return `<div class="item">
+      <div class="row"><span class="qty">${i.quantity}×</span><span class="name">${i.name}${sizeStr}</span></div>
+      ${modsHtml}${noteHtml}
+    </div>`;
+  }).join("");
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<title>Order Slip · #${shortId}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,system-ui,sans-serif;font-size:13px;max-width:300px;margin:0 auto;padding:16px 10px}
+  .center{text-align:center}
+  h1{font-size:17px;font-weight:900;margin-bottom:2px}
+  .lbl{font-size:9px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#888;margin-bottom:3px}
+  .order-id{font-size:20px;font-weight:900;letter-spacing:1px;color:#111;margin:4px 0}
+  .meta{font-size:11px;color:#666;margin-bottom:2px}
+  .div{border-top:1px dashed #bbb;margin:10px 0}
+  .item{margin-bottom:7px}
+  .row{display:flex;gap:6px;align-items:baseline}
+  .qty{font-weight:900;min-width:22px;color:#333}
+  .name{font-weight:700;flex:1}
+  .mod,.note{font-size:11px;color:#666;padding-left:28px;margin-top:1px}
+  .summary{margin-top:8px}
+  .kv{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#444}
+  .kv.strong{font-weight:900;font-size:14px;color:#111;border-top:2px solid #111;margin-top:4px;padding-top:6px}
+  .kv.balance{font-weight:900;font-size:15px;color:#c00;border-top:1px dashed #bbb;margin-top:6px;padding-top:6px}
+  .pending{display:block;margin:10px auto 0;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:2px;color:#e65100;border:2px solid #e65100;border-radius:20px;padding:4px 14px;width:fit-content}
+  .footer{font-size:9px;color:#aaa;margin-top:14px}
+</style></head>
+<body>
+<div class="center">
+  <div class="lbl">${restaurantName}</div>
+  <div class="lbl">Counter Order Slip</div>
+  <div class="order-id">#${shortId}</div>
+  <div class="meta">${dateStr} · ${timeStr}</div>
+  ${order.customerName && order.customerName !== "Walk-in Customer" ? `<div class="meta" style="font-weight:700">👤 ${order.customerName}</div>` : ""}
+  <div class="meta">Cashier: ${cashierName}</div>
+</div>
+<div class="div"></div>
+${itemsHtml}
+<div class="div"></div>
+<div class="summary">
+  <div class="kv"><span>Total Item(s) Ordered</span><span>${totalQty}</span></div>
+  <div class="kv"><span>Total Item(s) Delivered</span><span>0</span></div>
+  <div class="kv"><span>Total Item(s) Due</span><span>${totalQty}</span></div>
+  <div class="kv"><span>Subtotal</span><span>₦${(order.total ?? order.itemsTotal ?? 0).toLocaleString("en-NG")}</span></div>
+  <div class="kv strong"><span>TOTAL</span><span>₦${(order.total ?? order.itemsTotal ?? 0).toLocaleString("en-NG")}</span></div>
+  <div class="kv balance"><span>Balance Due</span><span>₦${(order.total ?? order.itemsTotal ?? 0).toLocaleString("en-NG")}</span></div>
+</div>
+<span class="pending">⏳ Awaiting Payment</span>
+<div class="center footer" style="margin-top:16px">Powered by Restaflow</div>
+<script>window.onload=function(){window.print();}<\/script>
+</body></html>`;
+
+  const w = window.open("", "_blank", "width=380,height=620,toolbar=0,menubar=0");
+  if (w) { w.document.write(html); w.document.close(); }
+}
+
 // ── Settled-bill receipt popup ────────────────────────────────────────────────
 
 function openSettledBillWindow(order: TodayOrder, result: SettlementResult, restaurantName: string) {
@@ -588,7 +662,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   const [activeCategory, setActiveCategory] = useState("All");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("paid");
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("unpaid");
   const [customerName, setCustomerName] = useState("");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -1091,11 +1165,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
     setTabMode("new");
     setActiveTab(null);
     setOpenTabPromptDismissed(false);
-    if (mode === "dine_in") {
-      setPaymentStatus("unpaid");
-    } else {
-      setPaymentStatus("paid");
-    }
+    setPaymentStatus("unpaid");
   };
 
   // ── Ready-order Firestore listener ────────────────────────────────────────
@@ -1516,7 +1586,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
     setTableLabel("");
     setTableLabelInput("");
     setPaymentMethod("cash");
-    setPaymentStatus("paid");
+    setPaymentStatus("unpaid");
     setCustomerName("");
     setNote("");
     setError(null);
@@ -1654,9 +1724,24 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
         createdAt: new Date(),
       };
       
+      localStorage.removeItem("rf_pos_draft_cart");
+
+      // New unpaid counter order → print kitchen slip, stay in Open Bills
+      if (!editingOrderId && serviceMode === "counter" && paymentStatus === "unpaid") {
+        openKitchenSlip(completed, restaurant.name, activeCashierName);
+        // Reset cart and show Open Bills so cashier can track the order
+        setCart([]);
+        setCustomerName("");
+        setNote("");
+        setEditingOrderId(null);
+        setRightTab("bills");
+        showSystemToast(`Order #${data.orderId.slice(-6).toUpperCase()} placed — awaiting payment`);
+        return;
+      }
+
+      // Paid or dine-in → full payment receipt
       setCompletedOrder(completed);
       openPOSReceiptWindow(completed, restaurant.name, activeCashierName, printCopies);
-      localStorage.removeItem("rf_pos_draft_cart");
     } catch (err) {
       // Robust Offline Fallback: Write complete audit stamped transaction into IndexedDB
       const mockOfflineId = `offline-${Math.random().toString(36).substring(2, 9)}-${Date.now()}`;
@@ -2870,6 +2955,8 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                       ? "Saving Changes…"
                       : tabMode === "continue"
                       ? "Adding to Tab…"
+                      : serviceMode === "counter" && paymentStatus === "unpaid"
+                      ? "Placing Order…"
                       : "Creating Order…"
                     : cart.length === 0
                     ? tabMode === "continue" ? "Add items to continue" : "Add items to confirm"
@@ -2881,7 +2968,9 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                     ? resolvedTable
                       ? `Confirm · ${resolvedTable} · ${fmt(cartTotal)}`
                       : `Select a table first`
-                    : `Confirm Order · ${fmt(cartTotal)}`}
+                    : paymentStatus === "unpaid"
+                    ? `Place Order · ${fmt(cartTotal)}`
+                    : `Confirm & Pay · ${fmt(cartTotal)}`}
                 </button>
 
                 <p className="text-center text-[10px] text-gray-400">
