@@ -1843,8 +1843,10 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
       setCompletedOrder(completed);
       openPOSReceiptWindow(completed, restaurant.name, activeCashierName, printCopies);
     } catch (err) {
-      // Robust Offline Fallback: Write complete audit stamped transaction into IndexedDB
-      const mockOfflineId = `offline-${Math.random().toString(36).substring(2, 9)}-${Date.now()}`;
+      // Robust Offline Fallback: Write complete audit stamped transaction into IndexedDB.
+      // If we are editing an existing offline order, reuse its localOrderId to overwrite/update it,
+      // avoiding duplicate order creation in IndexedDB.
+      const mockOfflineId = editingOrderId || `offline-${Math.random().toString(36).substring(2, 9)}-${Date.now()}`;
       
       const offlineOrderRecord = {
         localOrderId: mockOfflineId,
