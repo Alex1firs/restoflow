@@ -23,6 +23,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ st
   if (typeof body.disabled === "boolean") update.disabled = body.disabled;
   if (["manager", "staff"].includes(body.role)) update.role = body.role;
 
+  if (body.pin) {
+    if (typeof body.pin !== "string" || !/^\d{4}$/.test(body.pin)) {
+      return NextResponse.json({ error: "PIN must be exactly 4 digits" }, { status: 400 });
+    }
+    const { pbkdf2Sync, randomBytes } = await import("crypto");
+    const salt = randomBytes(16).toString("hex");
+    const hash = pbkdf2Sync(body.pin, Buffer.from(salt, "hex"), 100000, 32, "sha256").toString("hex");
+    update.pinSalt = salt;
+    update.pinHash = hash;
+  }
+
   await getAdminDb().collection("users").doc(staffId).update(update);
 
   if (typeof body.disabled === "boolean") {

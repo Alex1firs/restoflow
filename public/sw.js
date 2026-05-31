@@ -1,4 +1,5 @@
 const CACHE_NAME = 'restaflow-static-v1';
+const POS_HTML_CACHE = 'restoflow-pos-html-v1';
 
 // Only cache truly static shell assets — never operational data
 const STATIC_ASSETS = [
@@ -6,6 +7,9 @@ const STATIC_ASSETS = [
   '/icons/icon-192.png',
   '/icons/icon-512.png',
 ];
+
+// POS route pattern: /admin/<slug>/pos (with optional trailing slash)
+const POS_ROUTE_PATTERN = /^\/admin\/[^/]+\/pos\/?$/;
 
 // Patterns that must NEVER be served from cache (always network-first or passthrough)
 const BYPASS_PATTERNS = [
@@ -35,7 +39,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key !== CACHE_NAME)
+          .filter((key) => key !== CACHE_NAME && key !== POS_HTML_CACHE)
           .map((key) => caches.delete(key))
       )
     )
@@ -49,6 +53,28 @@ self.addEventListener('fetch', (event) => {
 
   // Skip non-GET and non-http(s) requests
   if (request.method !== 'GET' || !url.protocol.startsWith('http')) return;
+
+  // ── POS navigation: network-first, cache the HTML shell, offline fallback ──
+  // Must run before the BYPASS_PATTERNS check since /admin/ is in that list.
+  if (request.mode === 'navigate' && POS_ROUTE_PATTERN.test(url.pathname)) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(POS_HTML_CACHE).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() =>
+          caches.match(request).then((cached) => {
+            if (cached) return cached;
+            return caches.match('/offline.html');
+          })
+        )
+    );
+    return;
+  }
 
   // Always bypass operational/API/auth routes — no cache, no interference
   const shouldBypass = BYPASS_PATTERNS.some((pattern) => pattern.test(request.url));

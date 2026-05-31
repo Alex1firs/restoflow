@@ -13,6 +13,22 @@ import {
   deleteDoc,
   doc,
 } from "firebase/firestore";
+import {
+  openOfflineDB,
+  verifyOfflinePin,
+  getDeviceId,
+  getTerminalName,
+  setTerminalName,
+  getLastSyncTime,
+  setLastSyncTime,
+  dbPut,
+  dbGetAll,
+  dbDelete,
+  dbClear,
+  OfflineStaff,
+  OfflineMenuItem,
+  OfflineOrder
+} from "@/lib/offline-db";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -563,7 +579,7 @@ function openSettledBillWindow(order: TodayOrder, result: SettlementResult, rest
 
 // ── POSClient ─────────────────────────────────────────────────────────────────
 
-export default function POSClient({ restaurant, menuItems, staffName, role }: Props) {
+export default function POSClient({ restaurant, menuItems, staffName, staffId, role }: Props) {
   // Order entry state
   const [serviceMode, setServiceMode] = useState<ServiceMode>("counter");
   const [tableLabel, setTableLabel] = useState("");
@@ -608,6 +624,25 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
   const [syncingOffline, setSyncingOffline] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
+  // Strengthened PWA Offline POS States
+  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [lastSyncText, setLastSyncText] = useState<string>("Never");
+  const [pendingOfflineCount, setPendingOfflineCount] = useState<number>(0);
+  const [syncFailed, setSyncFailed] = useState<boolean>(false);
+  const [staffSyncFailed, setStaffSyncFailed] = useState<boolean>(false);
+  const [terminalId, setTerminalId] = useState<string>("");
+  const [termName, setTermName] = useState<string>("Terminal 1");
+
+  // Cashier Offline Authentication states
+  const [activeCashierName, setActiveCashierName] = useState<string>(staffName);
+  const [activeCashierId, setActiveCashierId] = useState<string>(staffId);
+  const [activeCashierRole, setActiveCashierRole] = useState<string>(role);
+  const [isTerminalLocked, setIsTerminalLocked] = useState<boolean>(true); // Locked by default for security on load
+  const [failedAttempts, setFailedAttempts] = useState<number>(0);
+  const [lockoutTime, setLockoutTime] = useState<number>(0); // lockout cooldown time
+  const [showTerminalSetup, setShowTerminalSetup] = useState<boolean>(false);
+  const [terminalNameInput, setTerminalNameInput] = useState<string>("");
+
   // Ready-order alert state
   const [readyOrders, setReadyOrders] = useState<TodayOrder[]>([]);
   const [alertMuted, setAlertMuted] = useState<boolean>(() => {
@@ -641,23 +676,269 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
     mutedRef.current = alertMuted;
   }, [alertMuted]);
 
-  // Load draft cart and offline sync queue on page mount
+  const triggerBackgroundSync = useCallback(async () => {
+    if (typeof window === "undefined" || !navigator.onLine || syncingOffline) return;
+    
+    setSyncingOffline(true);
+    setSyncFailed(false);
+
+    try {
+      const queue = await dbGetAll<any>("ordersQueue");
+      const pendingOrders = queue.filter(o => o.syncStatus === "pending" || o.syncStatus === "failed");
+
+      if (pendingOrders.length === 0) {
+        setSyncingOffline(false);
+        return;
+      }
+
+      for (const order of pendingOrders) {
+        const syncingOrder = { ...order, syncStatus: "syncing" as const };
+        await dbPut("ordersQueue", syncingOrder);
+
+        try {
+          const res = await fetch(`/api/admin/pos/sync`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(order),
+          });
+
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || "Sync failed on server");
+          }
+
+          // Remove from local IndexedDB on successful sync to avoid bloated data
+          await dbDelete("ordersQueue", order.localOrderId);
+        } catch (err: any) {
+          console.error(`Failed to sync offline order ${order.localOrderId}:`, err);
+          const failedOrder = { 
+            ...order, 
+            syncStatus: "failed" as const, 
+            syncError: err.message || "Unknown error" 
+          };
+          await dbPut("ordersQueue", failedOrder);
+          setSyncFailed(true);
+        }
+      }
+
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setLastSyncTime(`Today at ${timeStr}`);
+      setLastSyncText(`Today at ${timeStr}`);
+
+    } catch (err) {
+      console.error("Offline sync manager crashed:", err);
+      setSyncFailed(true);
+    } finally {
+      const updatedQueue = await dbGetAll<any>("ordersQueue");
+      setPendingOfflineCount(updatedQueue.filter(o => o.syncStatus === "pending" || o.syncStatus === "failed").length);
+      setSyncingOffline(false);
+    }
+  }, [syncingOffline]);
+
+  // Load PWA states and offline engine on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
       const draft = localStorage.getItem("rf_pos_draft_cart");
       if (draft) {
-        try {
-          setCart(JSON.parse(draft));
-        } catch (_) { /* ignore format issues */ }
+        try { setCart(JSON.parse(draft)); } catch (_) {}
       }
-      const queued = localStorage.getItem("rf_pos_offline_orders");
-      if (queued) {
-        try {
-          setOfflineOrders(JSON.parse(queued));
-        } catch (_) { /* ignore format issues */ }
+
+      const devId = getDeviceId();
+      setTerminalId(devId);
+      
+      const tName = getTerminalName();
+      setTermName(tName);
+      setTerminalNameInput(tName);
+      
+      if (!localStorage.getItem("rf_pos_terminal_name")) {
+        setShowTerminalSetup(true);
+      }
+
+      setLastSyncText(getLastSyncTime());
+      dbGetAll("ordersQueue").then((queue: any[]) => {
+        const count = queue.filter(o => o.syncStatus === "pending" || o.syncStatus === "failed").length;
+        setPendingOfflineCount(count);
+      });
+
+      const handleOnline = () => {
+        setIsOnline(true);
+        triggerBackgroundSync();
+      };
+      const handleOffline = () => {
+        setIsOnline(false);
+      };
+      window.addEventListener("online", handleOnline);
+      window.addEventListener("offline", handleOffline);
+      setIsOnline(navigator.onLine);
+
+      if (navigator.onLine) {
+        fetch(`/api/admin/pos/staff-sync`)
+          .then(res => res.json())
+          .then(async (data) => {
+            if (data.staff && Array.isArray(data.staff)) {
+              for (const member of data.staff) {
+                if (!member.isActive) {
+                  await dbDelete("staff", member.staffId);
+                } else {
+                  await dbPut("staff", member);
+                }
+              }
+              setStaffSyncFailed(false);
+            }
+          }).catch(async (err) => {
+            console.error("Offline staff sync failed:", err);
+            const cached = await dbGetAll<any>("staff").catch(() => []);
+            if (cached.length === 0) setStaffSyncFailed(true);
+          });
+
+        if (menuItems && Array.isArray(menuItems)) {
+          menuItems.forEach((item) => {
+            dbPut("menu", {
+              itemId: item.id,
+              name: item.name,
+              price: item.price,
+              indoorPrice: item.indoorPrice || 0,
+              isActive: item.available
+            });
+          });
+        }
+
+        triggerBackgroundSync();
+      }
+
+      return () => {
+        window.removeEventListener("online", handleOnline);
+        window.removeEventListener("offline", handleOffline);
+      };
+    }
+  }, [menuItems, triggerBackgroundSync]);
+
+  // Idle Auto-lock Timeout (5 minutes)
+  useEffect(() => {
+    if (typeof window === "undefined" || isTerminalLocked) return;
+
+    let timeoutId: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        setIsTerminalLocked(true);
+        showSystemToast("Terminal locked due to inactivity");
+      }, 300000); // 5 minutes
+    };
+
+    window.addEventListener("mousemove", resetTimer);
+    window.addEventListener("keydown", resetTimer);
+    window.addEventListener("click", resetTimer);
+    
+    resetTimer();
+
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener("mousemove", resetTimer);
+      window.removeEventListener("keydown", resetTimer);
+      window.removeEventListener("click", resetTimer);
+    };
+  }, [isTerminalLocked]);
+
+  // Lockout penalty timer countdown
+  useEffect(() => {
+    if (lockoutTime <= 0) return;
+    const interval = setInterval(() => {
+      setLockoutTime(prev => prev - 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lockoutTime]);
+
+  const [cachedStaffList, setCachedStaffList] = useState<any[]>([]);
+
+  // Load cached staff from IndexedDB when locked or synced
+  const loadCachedStaff = useCallback(async () => {
+    try {
+      const list = await dbGetAll<any>("staff");
+      setCachedStaffList(list);
+      if (list.length > 0 && !activeCashierId) {
+        setActiveCashierId(list[0].staffId);
+        setActiveCashierName(list[0].staffName);
+        setActiveCashierRole(list[0].role);
+      }
+    } catch (err) {
+      console.error("Failed to load offline staff cache list:", err);
+    }
+  }, [activeCashierId]);
+
+  useEffect(() => {
+    loadCachedStaff();
+  }, [isTerminalLocked, loadCachedStaff]);
+
+  const handleKeypadPress = (val: string) => {
+    if (lockoutTime > 0) return;
+    setPinError(null);
+    if (pinInput.length < 4) {
+      const newPin = pinInput + val;
+      setPinInput(newPin);
+      if (newPin.length === 4) {
+        setTimeout(() => triggerUnlock(newPin), 80);
       }
     }
-  }, []);
+  };
+
+  const handleOfflineUnlock = () => {
+    if (pinInput.length !== 4) {
+      setPinError("Enter exactly 4 digits");
+      return;
+    }
+    triggerUnlock(pinInput);
+  };
+
+  const triggerUnlock = async (pin: string) => {
+    if (lockoutTime > 0) return;
+    
+    // Fallback path: if they enter standard owner details and there are zero offline staff cached yet
+    if (cachedStaffList.length === 0 && activeCashierId === staffId) {
+      setIsTerminalLocked(false);
+      setPinInput("");
+      showSystemToast(`Welcome back, ${activeCashierName} (Offline Bypass Mode)`);
+      return;
+    }
+
+    const staffMember = cachedStaffList.find(x => x.staffId === activeCashierId) || 
+                         (activeCashierId === staffId ? { staffId, staffName, role: "owner", pinSalt: "", pinHash: "", isActive: true } : null);
+
+    if (!staffMember) {
+      setPinError("Staff member not found");
+      setPinInput("");
+      return;
+    }
+
+    if (!staffMember.pinHash) {
+      setIsTerminalLocked(false);
+      setPinInput("");
+      showSystemToast(`Terminal unlocked. Set a 4-digit PIN in settings!`);
+      return;
+    }
+
+    const isMatch = await verifyOfflinePin(pin, staffMember.pinSalt, staffMember.pinHash);
+
+    if (isMatch) {
+      setIsTerminalLocked(false);
+      setPinInput("");
+      setFailedAttempts(0);
+      showSystemToast(`Welcome back, ${staffMember.staffName}!`);
+    } else {
+      const newFailed = failedAttempts + 1;
+      setFailedAttempts(newFailed);
+      setPinInput("");
+
+      if (newFailed >= 5) {
+        setLockoutTime(30);
+        setPinError("Too many failed attempts. Terminal locked for 30s.");
+        setFailedAttempts(0);
+      } else {
+        setPinError(`Incorrect PIN passcode. Attempt ${newFailed}/5`);
+      }
+    }
+  };
 
   // Load waiters in real-time
   useEffect(() => {
@@ -1183,38 +1464,7 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
     }
   };
 
-  // ── Offline resilience retries ──
-  const syncOfflineQueue = async () => {
-    if (offlineOrders.length === 0 || syncingOffline) return;
-    setSyncingOffline(true);
-    let successCount = 0;
-    const remaining = [...offlineOrders];
 
-    try {
-      while (remaining.length > 0) {
-        const nextOrder = remaining[0];
-        const res = await fetch("/api/admin/pos", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(nextOrder),
-        });
-        if (res.ok) {
-          remaining.shift();
-          successCount++;
-        } else {
-          break; // Stop retry queue if api fails
-        }
-      }
-      setOfflineOrders(remaining);
-      if (successCount > 0) {
-        showSystemToast(`Successfully synced ${successCount} cached offline order${successCount > 1 ? "s" : ""}!`);
-      }
-    } catch (_) {
-      showSystemToast("Sync failed. Check connection.");
-    } finally {
-      setSyncingOffline(false);
-    }
-  };
 
   const handleAddToTab = async () => {
     if (!activeTab || cart.length === 0 || submitting) return;
@@ -1358,7 +1608,7 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
       paymentStatus,
       customerName: customerName.trim() || "",
       note: note.trim(),
-      staffName,
+      staffName: activeCashierName,
       serviceMode,
       tableLabel: finalTableLabel,
       waiterName: selectedWaiterName,
@@ -1369,9 +1619,14 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
     setSubmitting(true);
     setError(null);
     try {
+      // When offline, skip the API entirely and go straight to the IndexedDB queue.
+      // The API route verifies the session cookie against Firebase (checkRevoked: true),
+      // which requires internet — so it returns 401 even for valid sessions when offline.
+      if (!navigator.onLine) throw new Error("offline");
+
       const url = editingOrderId ? `/api/admin/pos/${editingOrderId}` : "/api/admin/pos";
       const method = editingOrderId ? "PATCH" : "POST";
-      
+
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -1400,13 +1655,14 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
       };
       
       setCompletedOrder(completed);
-      openPOSReceiptWindow(completed, restaurant.name, staffName, printCopies);
+      openPOSReceiptWindow(completed, restaurant.name, activeCashierName, printCopies);
       localStorage.removeItem("rf_pos_draft_cart");
-    } catch {
-      // Offline fallback: cache order and show success page
+    } catch (err) {
+      // Robust Offline Fallback: Write complete audit stamped transaction into IndexedDB
       const mockOfflineId = `offline-${Math.random().toString(36).substring(2, 9)}-${Date.now()}`;
-      const offlineOrder: CompletedOrder = {
-        orderId: mockOfflineId,
+      
+      const offlineOrderRecord = {
+        localOrderId: mockOfflineId,
         items: cart.map((c) => ({
           id: c.id,
           name: c.name,
@@ -1416,24 +1672,48 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
           selectedModifiers: c.selectedModifiers,
           itemNote: c.itemNote,
         })),
-        itemsTotal: cartTotal,
         total: cartTotal,
-        paymentMethod,
-        paymentStatus,
-        customerName: customerName.trim() || (serviceMode === "dine_in" ? finalTableLabel : "Walk-in Guest"),
-        note: note.trim(),
-        serviceMode,
-        tableLabel: finalTableLabel,
-        waiterName: selectedWaiterName,
-        pricingMode,
-        createdAt: new Date(),
-        isOffline: true,
+        cashierId: activeCashierId,
+        cashierName: activeCashierName,
+        deviceId: terminalId,
+        terminalName: termName,
+        syncStatus: "pending" as const,
+        createdAt: Date.now(),
+        orderSource: "counter" as const
       };
 
-      setOfflineOrders((prev) => [...prev, orderPayload]);
-      setCompletedOrder(offlineOrder);
-      showSystemToast("Internet offline. Order stored locally.");
-      localStorage.removeItem("rf_pos_draft_cart");
+      try {
+        await dbPut("ordersQueue", offlineOrderRecord);
+        
+        // Update count of pending orders
+        const queue = await dbGetAll("ordersQueue");
+        setPendingOfflineCount(queue.filter((o: any) => o.syncStatus === "pending" || o.syncStatus === "failed").length);
+
+        const completed = {
+          orderId: mockOfflineId,
+          items: offlineOrderRecord.items,
+          itemsTotal: cartTotal,
+          total: cartTotal,
+          paymentMethod,
+          paymentStatus,
+          customerName: customerName.trim() || (serviceMode === "dine_in" ? finalTableLabel : "Walk-in Guest"),
+          note: note.trim(),
+          serviceMode,
+          tableLabel: finalTableLabel,
+          waiterName: selectedWaiterName,
+          pricingMode,
+          createdAt: new Date(),
+          isOffline: true,
+        };
+
+        setCompletedOrder(completed);
+        openPOSReceiptWindow(completed, restaurant.name, activeCashierName, printCopies);
+        showSystemToast("Internet offline. Order stored locally in IndexedDB.");
+        localStorage.removeItem("rf_pos_draft_cart");
+      } catch (dbErr) {
+        console.error("IndexedDB write failed:", dbErr);
+        setError("Failed to save offline order to local database storage");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -1496,6 +1776,172 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
       className="flex flex-col overflow-hidden relative"
       style={{ height: "calc(100vh - 56px)" }}
     >
+      {/* ── Offline PWA Lock Screen keypads and settings configuration overlays ── */}
+      {showTerminalSetup && (
+        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[99999] flex items-center justify-center p-4 select-none">
+          <div className="w-full max-w-sm bg-white p-6 rounded-3xl shadow-xl border border-gray-100 flex flex-col">
+            <div className="w-12 h-12 rounded-xl bg-orange-50/50 flex items-center justify-center text-xl mb-4 border border-orange-100">
+              🖥️
+            </div>
+            <h3 className="text-lg font-black text-gray-900 mb-1">
+              Configure Terminal Name
+            </h3>
+            <p className="text-gray-500 text-xs mb-4">
+              Give this register a human-readable name (e.g. "Main Register", "Bar iPad") so the manager can track offline sales.
+            </p>
+
+            <input
+              type="text"
+              className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:border-orange-500 transition-all mb-4 bg-gray-50 text-gray-800"
+              placeholder="Main Register"
+              value={terminalNameInput}
+              onChange={(e) => setTerminalNameInput(e.target.value)}
+            />
+
+            <button
+              onClick={() => {
+                const name = terminalNameInput.trim() || "Terminal 1";
+                setTerminalName(name);
+                setTermName(name);
+                setShowTerminalSetup(false);
+                showSystemToast(`Terminal name configured to: ${name}`);
+              }}
+              className="w-full py-3 bg-orange-500 hover:bg-orange-600 active:scale-98 text-white font-black text-sm rounded-2xl transition-all shadow-sm shadow-orange-500/10"
+            >
+              Save Configuration
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isTerminalLocked && (
+        <div className="fixed inset-0 bg-slate-900/98 backdrop-blur-md z-[9999] flex flex-col items-center justify-center p-4 select-none">
+          <div className="w-full max-w-md bg-slate-800/80 border border-slate-700/50 p-8 rounded-3xl shadow-2xl flex flex-col items-center">
+            <div className="w-16 h-16 rounded-2xl bg-orange-500/10 flex items-center justify-center border border-orange-500/20 mb-6">
+              <span className="text-3xl">🔒</span>
+            </div>
+
+            <h2 className="text-2xl font-black text-white tracking-tight mb-1">
+              Terminal Locked
+            </h2>
+            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-8 text-center">
+              {termName} • {restaurant.name}
+            </p>
+
+            {lockoutTime > 0 ? (
+              <div className="w-full text-center bg-red-500/10 border border-red-500/20 py-3 px-4 rounded-2xl mb-6">
+                <p className="text-red-400 text-xs font-bold uppercase tracking-wide">
+                  Terminal Lockout Active
+                </p>
+                <p className="text-red-300 text-[10px] mt-0.5">
+                  Too many failed attempts. Retry in {lockoutTime} seconds.
+                </p>
+              </div>
+            ) : pinError ? (
+              <div className="w-full text-center bg-red-500/10 border border-red-500/20 py-2 px-4 rounded-xl mb-4">
+                <p className="text-red-400 text-xs font-bold">{pinError}</p>
+              </div>
+            ) : null}
+
+            {staffSyncFailed && cachedStaffList.length === 0 && (
+              <div className="w-full text-center bg-yellow-500/10 border border-yellow-500/20 py-3 px-4 rounded-2xl mb-6">
+                <p className="text-yellow-400 text-xs font-bold uppercase tracking-wide">
+                  Offline Login Not Ready
+                </p>
+                <p className="text-yellow-300/80 text-[10px] mt-1 leading-relaxed">
+                  Cashier profiles have not been synced to this device yet. Connect to the internet once to enable PIN login for your staff.
+                </p>
+              </div>
+            )}
+
+            <div className="w-full mb-6">
+              <label className="block text-slate-400 text-[10px] font-black uppercase tracking-wider mb-2">
+                Select Cashier / Staff
+              </label>
+              <select
+                value={activeCashierId}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setActiveCashierId(id);
+                  const s = cachedStaffList.find(x => x.staffId === id);
+                  if (s) {
+                    setActiveCashierName(s.staffName);
+                    setActiveCashierRole(s.role);
+                  } else if (id === staffId) {
+                    setActiveCashierName(staffName);
+                    setActiveCashierRole(role);
+                  }
+                  setPinInput("");
+                  setPinError(null);
+                }}
+                className="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3.5 text-white font-bold text-sm outline-none focus:border-orange-500 transition-all cursor-pointer text-gray-100"
+              >
+                {cachedStaffList.length === 0 ? (
+                  <option value={staffId} className="bg-slate-900">{staffName} (Default Owner)</option>
+                ) : (
+                  <>
+                    {cachedStaffList.map((s: any) => (
+                      <option key={s.staffId} value={s.staffId} className="bg-slate-900">
+                        {s.staffName} ({s.role.toUpperCase()})
+                      </option>
+                    ))}
+                    {!cachedStaffList.some((x: any) => x.staffId === staffId) && (
+                      <option value={staffId} className="bg-slate-900">{staffName} ({role.toUpperCase()})</option>
+                    )}
+                  </>
+                )}
+              </select>
+            </div>
+
+            <div className="flex gap-4 mb-8 justify-center">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`w-4 h-4 rounded-full border-2 transition-all duration-150 ${
+                    i < pinInput.length
+                      ? "bg-orange-500 border-orange-500 scale-110 shadow-lg shadow-orange-500/20"
+                      : "border-slate-600 bg-transparent"
+                  }`}
+                />
+              ))}
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 w-full max-w-[280px]">
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
+                <button
+                  key={num}
+                  onClick={() => handleKeypadPress(num)}
+                  disabled={lockoutTime > 0}
+                  className="aspect-square bg-slate-800 hover:bg-slate-700/80 active:bg-slate-700 border border-slate-700/50 rounded-2xl text-white font-black text-xl flex items-center justify-center transition-all duration-100 shadow-sm active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+                >
+                  {num}
+                </button>
+              ))}
+              <button
+                onClick={() => setPinInput("")}
+                className="aspect-square rounded-2xl text-slate-400 font-bold text-xs flex items-center justify-center hover:bg-slate-700/30 active:scale-95 transition-all"
+              >
+                Clear
+              </button>
+              <button
+                key="0"
+                onClick={() => handleKeypadPress("0")}
+                disabled={lockoutTime > 0}
+                className="aspect-square bg-slate-800 hover:bg-slate-700/80 active:bg-slate-700 border border-slate-700/50 rounded-2xl text-white font-black text-xl flex items-center justify-center transition-all duration-100 shadow-sm active:scale-95 disabled:opacity-50"
+              >
+                0
+              </button>
+              <button
+                onClick={handleOfflineUnlock}
+                disabled={lockoutTime > 0}
+                className="aspect-square bg-orange-500 hover:bg-orange-600 text-white font-black text-sm rounded-2xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-50"
+              >
+                Enter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* ── Settle Bill Modal overlay ─────────────────────────────── */}
       {settleOrder && !settlementResult && (
         <SettleBillModal
@@ -1655,24 +2101,63 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
         {/* LEFT: Menu — hidden on mobile when cart is open */}
         <div className={`flex-col min-w-0 overflow-hidden bg-gray-50 ${mobileCartOpen ? "hidden lg:flex" : "flex"} flex-1`}>
           {/* Top bar with offline status pills */}
-          <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between flex-shrink-0 gap-3">
-            <div className="flex items-center gap-3">
-              <h1 className="font-black text-gray-900 text-base whitespace-nowrap hidden sm:block">
+          <div className="bg-white border-b border-gray-200 px-4 py-3 flex flex-wrap items-center justify-between flex-shrink-0 gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="font-black text-gray-900 text-base whitespace-nowrap hidden xl:block">
                 POS / Counter Sales
               </h1>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Online Mode</span>
-              </div>
-              {offlineOrders.length > 0 && (
+              
+              {/* Terminal identity pill */}
+              <button
+                onClick={() => {
+                  setTerminalNameInput(termName);
+                  setShowTerminalSetup(true);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 rounded-full font-bold text-[10px] uppercase tracking-wider transition-all"
+                title="Click to rename terminal"
+              >
+                🖥️ {termName}
+              </button>
+
+              {/* Active Cashier pill */}
+              <div className="flex items-center gap-2 px-3 py-1 bg-gray-50 border border-gray-200 text-gray-700 rounded-full font-bold text-[10px] uppercase tracking-wider">
+                👤 {activeCashierName}
                 <button
-                  onClick={syncOfflineQueue}
-                  disabled={syncingOffline}
-                  className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-full font-black text-[10px] uppercase tracking-wider transition-all border border-amber-200 animate-pulse shrink-0"
+                  onClick={() => setIsTerminalLocked(true)}
+                  className="ml-1 bg-gray-200 hover:bg-gray-300 text-gray-700 w-4 h-4 rounded-full flex items-center justify-center text-[8px] transition-all"
+                  title="Lock terminal or switch cashier"
                 >
-                  ⚠️ {syncingOffline ? "Syncing..." : `${offlineOrders.length} Offline Pending (Sync)`}
+                  🔒
+                </button>
+              </div>
+
+              {/* Connection status pill */}
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-gray-100 text-[10px] font-bold uppercase tracking-wider">
+                <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-green-500 animate-pulse" : "bg-amber-500 animate-pulse"}`} />
+                <span className={isOnline ? "text-green-700" : "text-amber-700"}>
+                  {isOnline ? "Online" : "Offline Mode"}
+                </span>
+              </div>
+
+              {/* Sync status indicators */}
+              {pendingOfflineCount > 0 && (
+                <button
+                  onClick={triggerBackgroundSync}
+                  disabled={syncingOffline || !isOnline}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full font-black text-[10px] uppercase tracking-wider transition-all border shrink-0 ${
+                    syncFailed 
+                      ? "bg-red-50 hover:bg-red-100 text-red-700 border-red-200" 
+                      : "bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200 animate-pulse"
+                  }`}
+                >
+                  {syncFailed ? "⚠️ Sync Failed" : syncingOffline ? "🔄 Syncing..." : `⚠️ ${pendingOfflineCount} Offline Sales`}
                 </button>
               )}
+
+              {/* Last sync time */}
+              <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">
+                Sync: {lastSyncText}
+              </span>
             </div>
             <div className="flex-1 max-w-md">
               <input
