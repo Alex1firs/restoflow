@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
     auditLog.push({
       action: "offline_order_synced",
       staffId: user.uid,
-      staffName: user.displayName || "POS System",
+      staffName: "POS System",
       timestamp: new Date().toISOString(),
       details: `Synchronized transaction to Firestore. Total: ₦${itemsTotal.toLocaleString("en-NG")}`,
     });

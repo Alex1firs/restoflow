@@ -103,7 +103,7 @@ export async function verifyOfflinePin(
   try {
     const encoder = new TextEncoder();
     const pinBuffer = encoder.encode(enteredPin);
-    const saltBuffer = hexToBytes(storedSaltHex);
+    const saltBuffer = hexToBytes(storedSaltHex).buffer as ArrayBuffer;
 
     // Import the raw PIN bits as cryptographic base key material
     const baseKey = await crypto.subtle.importKey(
