@@ -719,10 +719,11 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
 
   // Ready-order alert state
   const [readyOrders, setReadyOrders] = useState<TodayOrder[]>([]);
-  const [alertMuted, setAlertMuted] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("rf_pos_muted") === "true";
-  });
+  const [alertMuted, setAlertMuted] = useState<boolean>(false);
+  // Defer localStorage read to avoid SSR/client hydration mismatch
+  useEffect(() => {
+    setAlertMuted(localStorage.getItem("rf_pos_muted") === "true");
+  }, []);
   const [servingId, setServingId] = useState<string | null>(null);
   const [alertCollapsed, setAlertCollapsed] = useState(false);
 
@@ -746,10 +747,17 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   const prevReadyIds = useRef<Set<string>>(new Set());
   const firstReadyLoad = useRef(true);
   const mutedRef = useRef(alertMuted);
+  // Ref-based guard for triggerBackgroundSync so the function stays stable
+  // and doesn't force the mount useEffect to re-run on every sync cycle.
+  const syncingOfflineRef = useRef(false);
 
   useEffect(() => {
     mutedRef.current = alertMuted;
   }, [alertMuted]);
+
+  useEffect(() => {
+    syncingOfflineRef.current = syncingOffline;
+  }, [syncingOffline]);
 
   // Convert an IDB offline order into a TodayOrder-shaped object for Open Bills
   const loadOfflineQueueBills = useCallback(async () => {
@@ -823,7 +831,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   }, [loadOfflineQueueBills]);
 
   const triggerBackgroundSync = useCallback(async () => {
-    if (typeof window === "undefined" || !navigator.onLine || syncingOffline) return;
+    if (typeof window === "undefined" || !navigator.onLine || syncingOfflineRef.current) return;
     
     setSyncingOffline(true);
     setSyncFailed(false);
@@ -880,7 +888,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
       loadOfflineQueueBills();
       setSyncingOffline(false);
     }
-  }, [syncingOffline]);
+  }, [loadOfflineQueueBills]);
 
   // Load PWA states and offline engine on mount
   useEffect(() => {
@@ -892,11 +900,11 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
 
       const devId = getDeviceId();
       setTerminalId(devId);
-      
+
       const tName = getTerminalName();
       setTermName(tName);
       setTerminalNameInput(tName);
-      
+
       if (!localStorage.getItem("rf_pos_terminal_name")) {
         setShowTerminalSetup(true);
       }
@@ -908,17 +916,9 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
       });
       loadOfflineQueueBills();
 
-      const handleOnline = () => {
-        setIsOnline(true);
-        triggerBackgroundSync();
-      };
-      const handleOffline = () => {
-        setIsOnline(false);
-      };
-      window.addEventListener("online", handleOnline);
-      window.addEventListener("offline", handleOffline);
-      setIsOnline(navigator.onLine);
-
+      // Staff-sync and menu cache: runs once on mount, not on every sync cycle.
+      // triggerBackgroundSync is intentionally excluded from deps here — it is
+      // called via the separate online/offline listener effect below.
       if (navigator.onLine) {
         fetch(`/api/admin/pos/staff-sync`)
           .then(res => res.json())
@@ -934,7 +934,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
               setStaffSyncFailed(false);
             }
           }).catch(async (err) => {
-            console.error("Offline staff sync failed:", err);
+            console.error("Staff sync failed on mount:", err);
             const cached = await dbGetAll<any>("staff").catch(() => []);
             if (cached.length === 0) setStaffSyncFailed(true);
           });
@@ -950,16 +950,32 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
             });
           });
         }
-
-        triggerBackgroundSync();
       }
-
-      return () => {
-        window.removeEventListener("online", handleOnline);
-        window.removeEventListener("offline", handleOffline);
-      };
     }
-  }, [menuItems, triggerBackgroundSync]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menuItems]); // intentionally omit triggerBackgroundSync — see listener effect below
+
+  // Online/offline listeners — separated so that re-creation of triggerBackgroundSync
+  // (which no longer depends on syncingOffline) does not restart the mount effect.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    setIsOnline(navigator.onLine);
+    if (navigator.onLine) triggerBackgroundSync();
+
+    const handleOnline = () => {
+      setIsOnline(true);
+      triggerBackgroundSync();
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [triggerBackgroundSync]);
 
   // Idle Auto-lock Timeout (5 minutes)
   useEffect(() => {
