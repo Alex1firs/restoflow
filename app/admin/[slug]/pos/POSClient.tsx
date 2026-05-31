@@ -1900,6 +1900,9 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
           isOffline: true,
         };
 
+        // Force reload the offline queue state so it populates the Open Bills list immediately
+        await loadOfflineQueueBills();
+
         // Offline + unpaid counter → kitchen slip + Open Bills (same UX as online path)
         if (!editingOrderId && serviceMode === "counter" && paymentStatus === "unpaid") {
           openKitchenSlip(completed, restaurant.name, activeCashierName);
