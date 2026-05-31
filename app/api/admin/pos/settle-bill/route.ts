@@ -62,10 +62,6 @@ export async function POST(request: NextRequest) {
         return { outcome: "error", message: "Forbidden", status: 403 };
       }
 
-      if (order.serviceMode !== "dine_in") {
-        return { outcome: "error", message: "Only dine-in orders can be settled here", status: 400 };
-      }
-
       if (order.status === "rejected") {
         return { outcome: "error", message: "Cannot settle a cancelled order", status: 400 };
       }
