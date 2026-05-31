@@ -1704,7 +1704,11 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Failed to save order");
+        // 401 means Firebase couldn't verify the session (network flaky or session expired).
+        // For new counter/dine-in orders, fall through to the offline queue so the order
+        // isn't lost. For edits, show the error — we can't safely queue an edit offline.
+        if (res.status === 401 && !editingOrderId) throw new Error("offline");
+        setError(res.status === 401 ? "Session expired — please sign out and back in." : (data.error ?? "Failed to save order"));
         return;
       }
       
