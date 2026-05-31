@@ -653,6 +653,10 @@ function openSettledBillWindow(order: TodayOrder, result: SettlementResult, rest
 
 // ── POSClient ─────────────────────────────────────────────────────────────────
 
+// Module-level guard: staff-sync should only run once per page session regardless
+// of React Strict Mode double-mounts or concurrent rendering re-invocations.
+let _staffSyncPending = false;
+
 export default function POSClient({ restaurant, menuItems, staffName, staffId, role }: Props) {
   // Order entry state
   const [serviceMode, setServiceMode] = useState<ServiceMode>("counter");
@@ -918,7 +922,8 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
     });
     loadOfflineQueueBills();
 
-    if (navigator.onLine) {
+    if (navigator.onLine && !_staffSyncPending) {
+      _staffSyncPending = true;
       fetch(`/api/admin/pos/staff-sync`)
         .then(res => res.json())
         .then(async (data) => {
@@ -936,6 +941,9 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
           console.error("Staff sync failed on mount:", err);
           const cached = await dbGetAll<any>("staff").catch(() => []);
           if (cached.length === 0) setStaffSyncFailed(true);
+        }).finally(() => {
+          // Reset so next full page reload can sync again
+          _staffSyncPending = false;
         });
 
       if (menuItems && Array.isArray(menuItems)) {
