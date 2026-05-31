@@ -33,6 +33,9 @@ export type OfflineOrder = {
     price: number;
     quantity: number;
     notes?: string;
+    selectedSize?: { name: string; price: number } | null;
+    selectedModifiers?: { groupName: string; name: string; price: number }[];
+    itemNote?: string;
   }>;
   total: number;
   cashierId: string;
@@ -43,6 +46,15 @@ export type OfflineOrder = {
   syncError?: string;
   createdAt: number;
   orderSource: "counter";
+  // Full order context saved at creation time
+  paymentMethod?: string;
+  paymentStatus?: string;
+  customerName?: string;
+  note?: string;
+  waiterName?: string | null;
+  pricingMode?: string;
+  serviceMode?: string;
+  tableLabel?: string;
 };
 
 // Open IndexedDB database
@@ -53,7 +65,7 @@ export function openOfflineDB(): Promise<IDBDatabase> {
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
 
-    request.onupgradeneeded = (event) => {
+    request.onupgradeneeded = (_event) => {
       const db = request.result;
       
       // Store 1: staff authentication cache

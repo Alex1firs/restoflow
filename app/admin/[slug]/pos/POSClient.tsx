@@ -728,6 +728,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
 
   // Open bills state
   const [openBills, setOpenBills] = useState<TodayOrder[]>([]);
+  const [offlineQueueBills, setOfflineQueueBills] = useState<TodayOrder[]>([]);
   const [rightTab, setRightTab] = useState<"order" | "bills">("order");
   const [settleBillId, setSettleBillId] = useState<string | null>(null);
   const [settlementResult, setSettlementResult] = useState<SettlementResult | null>(null);
@@ -749,6 +750,77 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   useEffect(() => {
     mutedRef.current = alertMuted;
   }, [alertMuted]);
+
+  // Convert an IDB offline order into a TodayOrder-shaped object for Open Bills
+  const loadOfflineQueueBills = useCallback(async () => {
+    try {
+      const queue = await dbGetAll<any>("ordersQueue");
+      const bills: TodayOrder[] = queue
+        .filter((o: any) => (o.syncStatus === "pending" || o.syncStatus === "failed") && o.paymentStatus === "unpaid")
+        .map((o: any) => ({
+          id: o.localOrderId,
+          localOrderId: o.localOrderId,
+          customerName: o.customerName || "Walk-in Guest",
+          items: o.items,
+          itemsTotal: o.total,
+          total: o.total,
+          paymentMethod: o.paymentMethod || "cash",
+          paymentStatus: o.paymentStatus || "unpaid",
+          note: o.note || "",
+          orderSource: "counter" as const,
+          serviceMode: o.serviceMode || "counter",
+          tableLabel: o.tableLabel || "",
+          status: "pending",
+          createdAt: { toDate: () => new Date(o.createdAt) } as any,
+          waiterName: o.waiterName ?? null,
+          pricingMode: o.pricingMode ?? "regular",
+          isOffline: true,
+        }));
+      setOfflineQueueBills(bills);
+    } catch (err) {
+      console.error("Failed to load offline queue bills:", err);
+    }
+  }, []);
+
+  // Mark an offline IDB order as paid and update the queue for sync
+  const settleOfflineOrder = useCallback(async (
+    localOrderId: string,
+    paymentMethod: string,
+    settlementNote: string,
+    restaurantName: string,
+    cashierName: string,
+  ) => {
+    try {
+      const queue = await dbGetAll<any>("ordersQueue");
+      const order = queue.find((o: any) => o.localOrderId === localOrderId);
+      if (!order) return;
+
+      const settled = { ...order, paymentMethod, paymentStatus: "paid", settlementNote };
+      await dbPut("ordersQueue", settled);
+
+      // Print payment receipt
+      openPOSReceiptWindow({
+        orderId: localOrderId,
+        items: order.items,
+        itemsTotal: order.total,
+        total: order.total,
+        paymentMethod,
+        paymentStatus: "paid",
+        customerName: order.customerName || "Walk-in Guest",
+        note: settlementNote || order.note || "",
+        serviceMode: order.serviceMode || "counter",
+        tableLabel: order.tableLabel || "",
+        waiterName: order.waiterName,
+        pricingMode: order.pricingMode,
+        createdAt: new Date(order.createdAt),
+      }, restaurantName, cashierName, 1);
+
+      await loadOfflineQueueBills();
+      showSystemToast(`Bill #${localOrderId.slice(-6).toUpperCase()} settled offline — will sync when online`);
+    } catch (err) {
+      console.error("Failed to settle offline order:", err);
+    }
+  }, [loadOfflineQueueBills]);
 
   const triggerBackgroundSync = useCallback(async () => {
     if (typeof window === "undefined" || !navigator.onLine || syncingOffline) return;
@@ -805,6 +877,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
     } finally {
       const updatedQueue = await dbGetAll<any>("ordersQueue");
       setPendingOfflineCount(updatedQueue.filter(o => o.syncStatus === "pending" || o.syncStatus === "failed").length);
+      loadOfflineQueueBills();
       setSyncingOffline(false);
     }
   }, [syncingOffline]);
@@ -833,6 +906,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
         const count = queue.filter(o => o.syncStatus === "pending" || o.syncStatus === "failed").length;
         setPendingOfflineCount(count);
       });
+      loadOfflineQueueBills();
 
       const handleOnline = () => {
         setIsOnline(true);
@@ -1768,7 +1842,16 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
         terminalName: termName,
         syncStatus: "pending" as const,
         createdAt: Date.now(),
-        orderSource: "counter" as const
+        orderSource: "counter" as const,
+        // Full context so the order can be displayed and settled while offline
+        paymentMethod,
+        paymentStatus,
+        customerName: customerName.trim() || (serviceMode === "dine_in" ? finalTableLabel : "Walk-in Guest"),
+        note: note.trim(),
+        waiterName: selectedWaiterName,
+        pricingMode,
+        serviceMode,
+        tableLabel: finalTableLabel,
       };
 
       try {
@@ -1795,9 +1878,20 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
           isOffline: true,
         };
 
-        setCompletedOrder(completed);
-        openPOSReceiptWindow(completed, restaurant.name, activeCashierName, printCopies);
-        showSystemToast("Internet offline. Order stored locally in IndexedDB.");
+        // Offline + unpaid counter → kitchen slip + Open Bills (same UX as online path)
+        if (!editingOrderId && serviceMode === "counter" && paymentStatus === "unpaid") {
+          openKitchenSlip(completed, restaurant.name, activeCashierName);
+          setCart([]);
+          setCustomerName("");
+          setNote("");
+          setEditingOrderId(null);
+          setRightTab("bills");
+          showSystemToast(`Order #${mockOfflineId.slice(-6).toUpperCase()} saved offline — awaiting payment`);
+        } else {
+          setCompletedOrder(completed);
+          openPOSReceiptWindow(completed, restaurant.name, activeCashierName, printCopies);
+          showSystemToast("Internet offline. Order stored locally.");
+        }
         localStorage.removeItem("rf_pos_draft_cart");
       } catch (dbErr) {
         console.error("IndexedDB write failed:", dbErr);
@@ -2394,11 +2488,11 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
               }`}
             >
               Open Bills
-              {openBills.length > 0 && (
+              {(openBills.length + offlineQueueBills.length) > 0 && (
                 <span className={`ml-1.5 text-[10px] font-black px-1.5 py-0.5 rounded-full ${
                   rightTab === "bills" ? "bg-teal-600 text-white" : "bg-teal-100 text-teal-700"
                 }`}>
-                  {openBills.length}
+                  {openBills.length + offlineQueueBills.length}
                 </span>
               )}
             </button>
@@ -2407,12 +2501,20 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
           {/* ── Open Bills panel ──────────────────────────────────── */}
           {rightTab === "bills" && (
             <OpenBillsPanel
-              bills={openBills}
+              bills={[
+                // Offline queue orders first (most urgent — no internet)
+                ...offlineQueueBills,
+                // Then Firestore live orders (dedup by id in case both appear briefly during sync)
+                ...openBills.filter(b => !offlineQueueBills.some(o => o.id === b.id)),
+              ]}
               onSettle={(id) => {
                 setSettleBillId(id);
                 setSettlementResult(null);
                 setSettledOrder(null);
               }}
+              onSettleOffline={(localOrderId, method, note) =>
+                settleOfflineOrder(localOrderId, method, note, restaurant.name, activeCashierName)
+              }
               onEdit={handleEditOrder}
             />
           )}
@@ -3368,12 +3470,17 @@ function AddOnReceiptView({
 function OpenBillsPanel({
   bills,
   onSettle,
+  onSettleOffline,
   onEdit,
 }: {
   bills: TodayOrder[];
   onSettle: (orderId: string) => void;
+  onSettleOffline: (localOrderId: string, method: string, note: string) => void;
   onEdit: (bill: TodayOrder) => void;
 }) {
+  const [offlineSettleId, setOfflineSettleId] = useState<string | null>(null);
+  const [offlineMethod, setOfflineMethod] = useState<"cash" | "bank_transfer" | "card">("cash");
+
   if (bills.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-12">
@@ -3493,6 +3600,53 @@ function OpenBillsPanel({
               <p className="text-xs font-bold text-purple-600 mb-2.5">🟣 Ready to serve</p>
             )}
 
+            {/* Offline badge */}
+            {bill.isOffline && (
+              <div className="mb-2 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block"></span>
+                <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wide">Saved Offline · Syncs when online</span>
+              </div>
+            )}
+
+            {/* Inline payment method picker for offline orders */}
+            {bill.isOffline && offlineSettleId === bill.id && (
+              <div className="mb-3 bg-teal-50 border border-teal-200 rounded-2xl p-3">
+                <p className="text-[10px] font-black text-teal-700 uppercase tracking-wider mb-2">Payment Method</p>
+                <div className="grid grid-cols-3 gap-1.5 mb-3">
+                  {(["cash","bank_transfer","card"] as const).map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setOfflineMethod(m)}
+                      className={`text-[10px] font-black py-2 rounded-xl border transition-all ${
+                        offlineMethod === m
+                          ? "bg-teal-600 text-white border-teal-600"
+                          : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                      }`}
+                    >
+                      {m === "cash" ? "Cash" : m === "bank_transfer" ? "Transfer" : "Card"}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setOfflineSettleId(null)}
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-black text-xs py-2.5 rounded-xl border border-gray-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { onSettleOffline(bill.id, offlineMethod, ""); setOfflineSettleId(null); }}
+                    className="flex-1 bg-teal-600 hover:bg-teal-500 text-white font-black text-xs py-2.5 rounded-xl"
+                  >
+                    Confirm Payment
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-2">
               <button
                 type="button"
@@ -3503,7 +3657,14 @@ function OpenBillsPanel({
               </button>
               <button
                 type="button"
-                onClick={() => onSettle(bill.id)}
+                onClick={() => {
+                  if (bill.isOffline) {
+                    setOfflineMethod("cash");
+                    setOfflineSettleId(offlineSettleId === bill.id ? null : bill.id);
+                  } else {
+                    onSettle(bill.id);
+                  }
+                }}
                 className="flex-1 bg-teal-600 hover:bg-teal-500 active:bg-teal-700 text-white font-black text-sm py-3.5 rounded-xl transition-colors"
               >
                 Settle Bill
