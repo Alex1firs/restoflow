@@ -26,6 +26,7 @@ type Order = {
   orderType?: "normal" | "scheduled";
   scheduledFor?: string | Timestamp;
   createdAt: Timestamp;
+  orderSource?: string;
 };
 
 type FilterTab = "active" | "completed" | "all";
@@ -96,7 +97,12 @@ export default function AdminOrdersClient({ restaurant }: Props) {
         return;
       }
 
-      const added = [...currentIds].filter((id) => !prevIds.current.has(id));
+      const added = [...currentIds].filter((id) => {
+        if (prevIds.current.has(id)) return false;
+        const oDoc = snap.docs.find((d) => d.id === id);
+        const oData = oDoc?.data() as any;
+        return oData?.orderSource !== "counter";
+      });
       if (added.length > 0) {
         playBeep();
         setNewOrderIds((prev) => new Set([...prev, ...added]));
@@ -166,7 +172,9 @@ export default function AdminOrdersClient({ restaurant }: Props) {
 
   const activeStatuses: OrderStatus[] = ["scheduled", "pending", "preparing", "ready"];
   const todayOrders = orders.filter((o) => isToday(o.createdAt));
-  const activeOrders = orders.filter((o) => activeStatuses.includes(o.status));
+  const activeOrders = orders.filter(
+    (o) => activeStatuses.includes(o.status) && o.orderSource !== "counter"
+  );
 
   const filtered =
     tab === "active" ? activeOrders :
@@ -336,47 +344,58 @@ export default function AdminOrdersClient({ restaurant }: Props) {
 
                     {/* Actions */}
                     <div className="space-y-2 mt-auto">
-                      {order.status === "scheduled" && (
-                        <>
-                          <button onClick={() => advance(order.id, "preparing")} disabled={busy} className="w-full py-4 rounded-2xl bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest transition-all active:scale-95">
-                            {busy ? "…" : "Accept & Start Preparing"}
-                          </button>
-                          <button onClick={() => reject(order.id)} disabled={busy} className="w-full py-3.5 rounded-2xl bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-600 font-black text-sm uppercase tracking-widest transition-all border border-red-100">
-                            {busy ? "…" : "Reject"}
-                          </button>
-                        </>
-                      )}
-                      {order.status === "pending" && (
-                        <>
-                          <button onClick={() => advance(order.id, "preparing")} disabled={busy} className="w-full py-4 rounded-2xl bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest transition-all active:scale-95">
-                            {busy ? "…" : "Accept Order"}
-                          </button>
-                          <button onClick={() => reject(order.id)} disabled={busy} className="w-full py-3.5 rounded-2xl bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-600 font-black text-sm uppercase tracking-widest transition-all border border-red-100">
-                            {busy ? "…" : "Reject"}
-                          </button>
-                        </>
-                      )}
-                      {order.status === "preparing" && (
-                        <button onClick={() => advance(order.id, "ready")} disabled={busy} className="w-full py-4 rounded-2xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest transition-all active:scale-95">
-                          {busy ? "…" : "Mark as Ready"}
-                        </button>
-                      )}
-                      {order.status === "ready" && (
-                        <button onClick={() => advance(order.id, "completed")} disabled={busy} className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest transition-all active:scale-95">
-                          {busy ? "…" : "Mark Completed"}
-                        </button>
-                      )}
-                      {order.status === "completed" && (
-                        <div className="flex items-center justify-center gap-2 text-green-600 font-bold text-sm py-2">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-                          Fulfilled
+                      {order.orderSource === "counter" ? (
+                        <div className="flex flex-col items-center justify-center gap-1 p-3 bg-gray-50 border border-gray-100 rounded-2xl">
+                          <span className="text-sm">🖥️ POS Transaction</span>
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-orange-100 text-orange-800">
+                            Fulfilled at Counter
+                          </span>
                         </div>
-                      )}
-                      {order.status === "rejected" && (
-                        <div className="flex items-center justify-center gap-2 text-red-500 font-bold text-sm py-2">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                          Rejected
-                        </div>
+                      ) : (
+                        <>
+                          {order.status === "scheduled" && (
+                            <>
+                              <button onClick={() => advance(order.id, "preparing")} disabled={busy} className="w-full py-4 rounded-2xl bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest transition-all active:scale-95">
+                                {busy ? "…" : "Accept & Start Preparing"}
+                              </button>
+                              <button onClick={() => reject(order.id)} disabled={busy} className="w-full py-3.5 rounded-2xl bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-600 font-black text-sm uppercase tracking-widest transition-all border border-red-100">
+                                {busy ? "…" : "Reject"}
+                              </button>
+                            </>
+                          )}
+                          {order.status === "pending" && (
+                            <>
+                              <button onClick={() => advance(order.id, "preparing")} disabled={busy} className="w-full py-4 rounded-2xl bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest transition-all active:scale-95">
+                                {busy ? "…" : "Accept Order"}
+                              </button>
+                              <button onClick={() => reject(order.id)} disabled={busy} className="w-full py-3.5 rounded-2xl bg-red-50 hover:bg-red-100 disabled:opacity-50 text-red-600 font-black text-sm uppercase tracking-widest transition-all border border-red-100">
+                                {busy ? "…" : "Reject"}
+                              </button>
+                            </>
+                          )}
+                          {order.status === "preparing" && (
+                            <button onClick={() => advance(order.id, "ready")} disabled={busy} className="w-full py-4 rounded-2xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest transition-all active:scale-95">
+                              {busy ? "…" : "Mark as Ready"}
+                            </button>
+                          )}
+                          {order.status === "ready" && (
+                            <button onClick={() => advance(order.id, "completed")} disabled={busy} className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest transition-all active:scale-95">
+                              {busy ? "…" : "Mark Completed"}
+                            </button>
+                          )}
+                          {order.status === "completed" && (
+                            <div className="flex items-center justify-center gap-2 text-green-600 font-bold text-sm py-2">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                              Fulfilled
+                            </div>
+                          )}
+                          {order.status === "rejected" && (
+                            <div className="flex items-center justify-center gap-2 text-red-500 font-bold text-sm py-2">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                              Rejected
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
