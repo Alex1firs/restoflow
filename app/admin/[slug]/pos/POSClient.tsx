@@ -890,70 +890,68 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
     }
   }, [loadOfflineQueueBills]);
 
-  // Load PWA states and offline engine on mount
+  // Load PWA states — runs exactly once on mount (empty deps).
+  // Staff-sync and menu cache are here intentionally: they must not re-run
+  // on every sync cycle. menuItems is captured via closure; the prop value
+  // is stable across re-renders (it comes from the server component).
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const draft = localStorage.getItem("rf_pos_draft_cart");
-      if (draft) {
-        try { setCart(JSON.parse(draft)); } catch (_) {}
-      }
+    const draft = localStorage.getItem("rf_pos_draft_cart");
+    if (draft) {
+      try { setCart(JSON.parse(draft)); } catch (_) {}
+    }
 
-      const devId = getDeviceId();
-      setTerminalId(devId);
+    const devId = getDeviceId();
+    setTerminalId(devId);
 
-      const tName = getTerminalName();
-      setTermName(tName);
-      setTerminalNameInput(tName);
+    const tName = getTerminalName();
+    setTermName(tName);
+    setTerminalNameInput(tName);
 
-      if (!localStorage.getItem("rf_pos_terminal_name")) {
-        setShowTerminalSetup(true);
-      }
+    if (!localStorage.getItem("rf_pos_terminal_name")) {
+      setShowTerminalSetup(true);
+    }
 
-      setLastSyncText(getLastSyncTime());
-      dbGetAll("ordersQueue").then((queue: any[]) => {
-        const count = queue.filter(o => o.syncStatus === "pending" || o.syncStatus === "failed").length;
-        setPendingOfflineCount(count);
-      });
-      loadOfflineQueueBills();
+    setLastSyncText(getLastSyncTime());
+    dbGetAll("ordersQueue").then((queue: any[]) => {
+      const count = queue.filter((o: any) => o.syncStatus === "pending" || o.syncStatus === "failed").length;
+      setPendingOfflineCount(count);
+    });
+    loadOfflineQueueBills();
 
-      // Staff-sync and menu cache: runs once on mount, not on every sync cycle.
-      // triggerBackgroundSync is intentionally excluded from deps here — it is
-      // called via the separate online/offline listener effect below.
-      if (navigator.onLine) {
-        fetch(`/api/admin/pos/staff-sync`)
-          .then(res => res.json())
-          .then(async (data) => {
-            if (data.staff && Array.isArray(data.staff)) {
-              for (const member of data.staff) {
-                if (!member.isActive) {
-                  await dbDelete("staff", member.staffId);
-                } else {
-                  await dbPut("staff", member);
-                }
+    if (navigator.onLine) {
+      fetch(`/api/admin/pos/staff-sync`)
+        .then(res => res.json())
+        .then(async (data) => {
+          if (data.staff && Array.isArray(data.staff)) {
+            for (const member of data.staff) {
+              if (!member.isActive) {
+                await dbDelete("staff", member.staffId);
+              } else {
+                await dbPut("staff", member);
               }
-              setStaffSyncFailed(false);
             }
-          }).catch(async (err) => {
-            console.error("Staff sync failed on mount:", err);
-            const cached = await dbGetAll<any>("staff").catch(() => []);
-            if (cached.length === 0) setStaffSyncFailed(true);
-          });
+            setStaffSyncFailed(false);
+          }
+        }).catch(async (err) => {
+          console.error("Staff sync failed on mount:", err);
+          const cached = await dbGetAll<any>("staff").catch(() => []);
+          if (cached.length === 0) setStaffSyncFailed(true);
+        });
 
-        if (menuItems && Array.isArray(menuItems)) {
-          menuItems.forEach((item) => {
-            dbPut("menu", {
-              itemId: item.id,
-              name: item.name,
-              price: item.price,
-              indoorPrice: item.indoorPrice || 0,
-              isActive: item.available
-            });
+      if (menuItems && Array.isArray(menuItems)) {
+        menuItems.forEach((item) => {
+          dbPut("menu", {
+            itemId: item.id,
+            name: item.name,
+            price: item.price,
+            indoorPrice: item.indoorPrice || 0,
+            isActive: item.available,
           });
-        }
+        });
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [menuItems]); // intentionally omit triggerBackgroundSync — see listener effect below
+  }, []); // empty — run once on mount only
 
   // Online/offline listeners — separated so that re-creation of triggerBackgroundSync
   // (which no longer depends on syncingOffline) does not restart the mount effect.

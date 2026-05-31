@@ -1,5 +1,5 @@
 const CACHE_NAME = 'restaflow-static-v1';
-const POS_HTML_CACHE = 'restoflow-pos-html-v1';
+const POS_HTML_CACHE = 'restoflow-pos-html-v2';
 
 // Only cache truly static shell assets — never operational data
 const STATIC_ASSETS = [
