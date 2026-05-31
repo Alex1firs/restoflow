@@ -72,7 +72,10 @@ type CompletedOrder = {
   tableLabel: string;
   createdAt: Date;
   isOffline?: boolean;
+  waiterName?: string | null;
+  pricingMode?: string | null;
 };
+
 
 type TodayOrder = {
   id: string;
@@ -1420,6 +1423,8 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
         note: note.trim(),
         serviceMode,
         tableLabel: finalTableLabel,
+        waiterName: selectedWaiterName,
+        pricingMode,
         createdAt: new Date(),
         isOffline: true,
       };
@@ -3416,6 +3421,9 @@ function ReceiptView({
                 <ReceiptRow label="Customer" value={order.customerName} />
               )}
             <ReceiptRow label="Cashier" value={staffName} />
+            {order.waiterName && (
+              <ReceiptRow label="Waiter/Attendant" value={order.waiterName} accent />
+            )}
             <ReceiptRow
               label="Service"
               value={isDineIn ? "Dine-In" : "Counter Pickup"}
