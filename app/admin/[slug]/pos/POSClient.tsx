@@ -622,6 +622,7 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
   const [rightTab, setRightTab] = useState<"order" | "bills">("order");
   const [settleBillId, setSettleBillId] = useState<string | null>(null);
   const [settlementResult, setSettlementResult] = useState<SettlementResult | null>(null);
+  const [settledOrder, setSettledOrder] = useState<TodayOrder | null>(null);
 
   // Mobile cart toggle
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
@@ -1503,6 +1504,7 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
           staffName={staffName}
           onClose={() => setSettleBillId(null)}
           onSettled={(result) => {
+            setSettledOrder(settleOrder);
             setSettlementResult(result);
             // Remove from open bills immediately (optimistic)
             setOpenBills((prev) => prev.filter((o) => o.id !== result.orderId));
@@ -1511,16 +1513,17 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
       )}
       {settleBillId && settlementResult && (
         <SettlementSuccessModal
-          order={openBills.find((o) => o.id === settleBillId) ?? settleOrder!}
+          order={settledOrder}
           result={settlementResult}
           restaurantName={restaurant.name}
           onClose={() => {
             setSettleBillId(null);
             setSettlementResult(null);
+            setSettledOrder(null);
           }}
           onPrint={() =>
             openSettledBillWindow(
-              openBills.find((o) => o.id === settleBillId) ?? settleOrder!,
+              settledOrder!,
               settlementResult,
               restaurant.name
             )
@@ -1834,6 +1837,7 @@ export default function POSClient({ restaurant, menuItems, staffName, role }: Pr
               onSettle={(id) => {
                 setSettleBillId(id);
                 setSettlementResult(null);
+                setSettledOrder(null);
               }}
               onEdit={handleEditOrder}
             />
