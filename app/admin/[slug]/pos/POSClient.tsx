@@ -764,7 +764,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
     try {
       const queue = await dbGetAll<any>("ordersQueue");
       const bills: TodayOrder[] = queue
-        .filter((o: any) => (o.syncStatus === "pending" || o.syncStatus === "failed") && o.paymentStatus === "unpaid")
+        .filter((o: any) => (o.syncStatus === "pending" || o.syncStatus === "failed") && o.paymentStatus !== "paid")
         .map((o: any) => ({
           id: o.localOrderId,
           localOrderId: o.localOrderId,
