@@ -2068,39 +2068,47 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
               <label className="block text-slate-400 text-[10px] font-black uppercase tracking-wider mb-2">
                 Select Cashier / Staff
               </label>
-              <select
-                value={activeCashierId}
-                onChange={(e) => {
-                  const id = e.target.value;
-                  setActiveCashierId(id);
-                  const s = cachedStaffList.find(x => x.staffId === id);
-                  if (s) {
-                    setActiveCashierName(s.staffName);
-                    setActiveCashierRole(s.role);
-                  } else if (id === staffId) {
-                    setActiveCashierName(staffName);
-                    setActiveCashierRole(role);
-                  }
-                  setPinInput("");
-                  setPinError(null);
-                }}
-                className="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3.5 text-white font-bold text-sm outline-none focus:border-orange-500 transition-all cursor-pointer text-gray-100"
-              >
-                {cachedStaffList.length === 0 ? (
-                  <option value={staffId} className="bg-slate-900">{staffName} (Default Owner)</option>
-                ) : (
-                  <>
-                    {cachedStaffList.map((s: any) => (
-                      <option key={s.staffId} value={s.staffId} className="bg-slate-900">
-                        {s.staffName} ({s.role.toUpperCase()})
-                      </option>
-                    ))}
-                    {!cachedStaffList.some((x: any) => x.staffId === staffId) && (
-                      <option value={staffId} className="bg-slate-900">{staffName} ({role.toUpperCase()})</option>
-                    )}
-                  </>
-                )}
-              </select>
+              <div className="relative">
+                <select
+                  value={activeCashierId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setActiveCashierId(id);
+                    const s = cachedStaffList.find(x => x.staffId === id);
+                    if (s) {
+                      setActiveCashierName(s.staffName);
+                      setActiveCashierRole(s.role);
+                    } else if (id === staffId) {
+                      setActiveCashierName(staffName);
+                      setActiveCashierRole(role);
+                    }
+                    setPinInput("");
+                    setPinError(null);
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3.5 pr-10 text-white font-bold text-sm outline-none focus:border-orange-500 transition-all cursor-pointer appearance-none text-white"
+                  style={{ color: "white", WebkitTextFillColor: "white" }}
+                >
+                  {cachedStaffList.length === 0 ? (
+                    <option value={staffId} className="bg-slate-900 text-white">{staffName} (Default Owner)</option>
+                  ) : (
+                    <>
+                      {cachedStaffList.map((s: any) => (
+                        <option key={s.staffId} value={s.staffId} className="bg-slate-900 text-white">
+                          {s.staffName} ({s.role.toUpperCase()})
+                        </option>
+                      ))}
+                      {!cachedStaffList.some((x: any) => x.staffId === staffId) && (
+                        <option value={staffId} className="bg-slate-900 text-white">{staffName} ({role.toUpperCase()})</option>
+                      )}
+                    </>
+                  )}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4 text-slate-400">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-4 mb-8 justify-center">
