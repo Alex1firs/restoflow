@@ -15,6 +15,7 @@ const app = initializeApp({
 const db = getFirestore(app);
 
 const newItems = [
+  // List 1 Items (1 to 17)
   {
     name: "FRIED YAM + PEPPER GOAT MEAT",
     description: "Nigerian fried yam chunks and tender peppered goat meat, garnished with fresh herbs and red chili peppers.",
@@ -252,6 +253,218 @@ const newItems = [
     kitchenStation: "kitchen",
     allowCustomPrice: false,
     restaurantId: "tricias-kitchen"
+  },
+
+  // List 2 Items (15 unique items)
+  {
+    name: "creamy macaroni salad",
+    description: "Creamy macaroni salad with veggies and a rich signature dressing.",
+    price: 7000,
+    indoorPrice: 6000,
+    image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format",
+    category: "Salad",
+    available: true,
+    itemType: "item",
+    basePrice: 7000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "CROACKER FISH ONLY",
+    description: "Perfectly seasoned and fried or grilled Croaker fish, rich in flavor.",
+    price: 6000,
+    indoorPrice: 6000,
+    image: "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=800&auto=format",
+    category: "Protein",
+    available: true,
+    itemType: "item",
+    basePrice: 6000,
+    kitchenStation: "grill",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "EDIKANIKONG SOUP",
+    description: "Traditional Nigerian Edikang Ikong soup loaded with fresh pumpkin leaves, waterleaves, and premium meats.",
+    price: 7000,
+    indoorPrice: 6000,
+    image: "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&auto=format",
+    category: "Soup",
+    available: true,
+    itemType: "item",
+    basePrice: 7000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "EFORIRO SOUP",
+    description: "Rich and savory Nigerian Efo Riro (stewed spinach soup) cooked with red bell peppers, locust beans, and assorted meats.",
+    price: 7000,
+    indoorPrice: 6000,
+    image: "https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?w=800&auto=format",
+    category: "Soup",
+    available: true,
+    itemType: "item",
+    basePrice: 7000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "FRESH FISH",
+    description: "Freshly cooked fish steak in a light seasoned broth or grilled.",
+    price: 6000,
+    indoorPrice: 6000,
+    image: "https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=800&auto=format",
+    category: "Protein",
+    available: true,
+    itemType: "item",
+    basePrice: 6000,
+    kitchenStation: "grill",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "GOAT MEAT PEPPER SOUP",
+    description: "Highly aromatic and spicy Nigerian goat meat pepper soup, served piping hot.",
+    price: 6000,
+    indoorPrice: 6000,
+    image: "https://images.unsplash.com/photo-1547592180-85f173990554?w=800&auto=format",
+    category: "Soup",
+    available: true,
+    itemType: "item",
+    basePrice: 6000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "GOAT MEAT PEPPER SOUP + AGIDI",
+    description: "Steaming hot goat meat pepper soup accompanied by traditional smooth Agidi (cornstarch paste).",
+    price: 7000,
+    indoorPrice: 6000,
+    image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&auto=format",
+    category: "Soup",
+    available: true,
+    itemType: "item",
+    basePrice: 7000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "ONUGBU SOUP",
+    description: "Authentic Nigerian Bitterleaf soup (Ofe Onugbu) cooked with cocoyam paste, palm oil, and premium assorted meats.",
+    price: 7000,
+    indoorPrice: 6000,
+    image: "https://images.unsplash.com/photo-1543339308-43e59d6b73a6?w=800&auto=format",
+    category: "Soup",
+    available: true,
+    itemType: "item",
+    basePrice: 7000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "POTATO CHIPS + SAUCE",
+    description: "Crispy golden potato chips served with a rich, seasoned tomato and pepper dipping sauce.",
+    price: 6000,
+    indoorPrice: 6000,
+    image: "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=800&auto=format",
+    category: "Fries",
+    available: true,
+    itemType: "item",
+    basePrice: 6000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "Potato salad",
+    description: "Classic creamy potato salad with boiled potatoes, hard-boiled eggs, mayonnaise, and fresh herbs.",
+    price: 7000,
+    indoorPrice: 6000,
+    image: "https://images.unsplash.com/photo-1608039829572-78524f79c4c7?w=800&auto=format",
+    category: "Salad",
+    available: true,
+    itemType: "item",
+    basePrice: 7000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "SHAWARMA + SUSAGE",
+    description: "Rich, tightly wrapped double-sausage chicken shawarma with creamy garlic mayonnaise sauce.",
+    price: 6000,
+    indoorPrice: 6000,
+    image: "https://images.unsplash.com/photo-1561651823-34fed022540e?w=800&auto=format",
+    category: "Fast Food",
+    available: true,
+    itemType: "item",
+    basePrice: 6000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "WHITE RICE + OFEAKWU",
+    description: "Fluffy steamed white rice served with Ofe Akwu (traditional Igbo palm nut stew) rich in local spices.",
+    price: 7000,
+    indoorPrice: 6000,
+    image: "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=800&auto=format",
+    category: "Rice",
+    available: true,
+    itemType: "item",
+    basePrice: 7000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "CHINESE FRIED RICE + SHREDDED B",
+    description: "Chinese wok-fried rice tossed with shredded tender beef strips, carrots, green peas, and scallions.",
+    price: 8000,
+    indoorPrice: 7000,
+    image: "https://images.unsplash.com/photo-1603133872878-685f588c7915?w=800&auto=format",
+    category: "Rice",
+    available: true,
+    itemType: "item",
+    basePrice: 8000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "COWTAIL",
+    description: "Rich, tender cowtail cutlets, cooked in a delicious peppered sauce.",
+    price: 7000,
+    indoorPrice: 7000,
+    image: "https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format",
+    category: "Protein",
+    available: true,
+    itemType: "item",
+    basePrice: 7000,
+    kitchenStation: "grill",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "FRENCH FRIES WITH CHICKEN",
+    description: "Golden French fries served with a crispy seasoned chicken drumstick or wing.",
+    price: 8000,
+    indoorPrice: 7000,
+    image: "https://images.unsplash.com/photo-1569058242253-92a9c755a0ec?w=800&auto=format",
+    category: "Fries",
+    available: true,
+    itemType: "item",
+    basePrice: 8000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
   }
 ];
 
@@ -282,7 +495,7 @@ async function seed() {
       console.log("✓ Cleared old prepared_items for tricias-kitchen");
     }
 
-    // 3. Insert all 17 items
+    // 3. Insert all 32 items
     for (const item of newItems) {
       console.log(`Adding prepared item: ${item.name}...`);
       const docRef = colRef.doc();
