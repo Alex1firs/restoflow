@@ -52,30 +52,30 @@ export default async function PaymentCallbackPage({ params, searchParams }: Prop
         if (orderId) {
           success = true;
 
-          // Only award loyalty once — the caller that actually created the order
-          if (isCreator) {
-            try {
-              const orderSnap = await getAdminDb().collection("orders").doc(orderId).get();
-              if (orderSnap.exists) {
-                const d = orderSnap.data()!;
-                orderPhone = (d.phone as string) ?? "";
-                trackingToken = (d.trackingToken as string) ?? null;
-                const rSnap = await getAdminDb().collection("restaurants").doc(slug).get();
-                restaurantName = (rSnap.data()?.name as string) ?? "";
+          // Always fetch order tracking details and customer phone for tracking links
+          try {
+            const orderSnap = await getAdminDb().collection("orders").doc(orderId).get();
+            if (orderSnap.exists) {
+              const d = orderSnap.data()!;
+              orderPhone = (d.phone as string) ?? "";
+              trackingToken = (d.trackingToken as string) ?? null;
+              
+              const rSnap = await getAdminDb().collection("restaurants").doc(slug).get();
+              restaurantName = (rSnap.data()?.name as string) ?? "";
 
-                if (orderPhone) {
-                  loyaltyResult = await awardLoyaltyTick({
-                    orderId,
-                    restaurantSlug: slug,
-                    phone: orderPhone,
-                    customerName: (d.customerName as string) ?? "",
-                    orderTotal: (d.total as number) ?? 0,
-                  }).catch(() => null);
-                }
+              // Only award loyalty once — the caller that actually created the order
+              if (isCreator && orderPhone) {
+                loyaltyResult = await awardLoyaltyTick({
+                  orderId,
+                  restaurantSlug: slug,
+                  phone: orderPhone,
+                  customerName: (d.customerName as string) ?? "",
+                  orderTotal: (d.total as number) ?? 0,
+                }).catch(() => null);
               }
-            } catch {
-              // Non-fatal — never block the success page
             }
+          } catch (e) {
+            console.error("Non-fatal: Failed to fetch order callback details", e);
           }
         } else {
           message = "Payment received but order could not be created. Please show this page to the restaurant.";
