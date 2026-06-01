@@ -255,7 +255,7 @@ const newItems = [
     restaurantId: "tricias-kitchen"
   },
 
-  // List 2 Items (15 unique items)
+  // List 2 Items
   {
     name: "creamy macaroni salad",
     description: "Creamy macaroni salad with veggies and a rich signature dressing.",
@@ -465,6 +465,232 @@ const newItems = [
     kitchenStation: "kitchen",
     allowCustomPrice: false,
     restaurantId: "tricias-kitchen"
+  },
+
+  // List 3 Items (16 unique items)
+  {
+    name: "OKRO SOUP",
+    description: "Deliciously slimy traditional Okro (Okra) soup cooked with fresh vegetables and fish.",
+    price: 6000,
+    indoorPrice: 5000,
+    image: "https://images.unsplash.com/photo-1541832676-9b763b0239ab?w=800&auto=format",
+    category: "Soup",
+    available: true,
+    itemType: "item",
+    basePrice: 6000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "ONLY SHAWARMA",
+    description: "Single chicken shawarma wrap filled with sliced seasoned chicken and creamy garlic sauce.",
+    price: 5000,
+    indoorPrice: 5000,
+    image: "https://images.unsplash.com/photo-1608219992759-8d74ed8d76eb?w=800&auto=format",
+    category: "Fast Food",
+    available: true,
+    itemType: "item",
+    basePrice: 5000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "ORA SOUP",
+    description: "Authentic Nigerian Oha soup (Ora) thickened with cocoyam paste and flavored with local spices.",
+    price: 6000,
+    indoorPrice: 5000,
+    image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format",
+    category: "Soup",
+    available: true,
+    itemType: "item",
+    basePrice: 6000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "SPAGHETTI",
+    description: "Flavorful Jollof or stir-fried spaghetti, rich in local spices.",
+    price: 6000,
+    indoorPrice: 5000,
+    image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&auto=format",
+    category: "Pasta",
+    available: true,
+    itemType: "item",
+    basePrice: 6000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "UKWA + DRY FISH",
+    description: "Traditional Igbo breadfruit porridge (Ukwa) cooked to perfection with dry fish chunks.",
+    price: 6000,
+    indoorPrice: 5000,
+    image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format",
+    category: "Local Delicacy",
+    available: true,
+    itemType: "item",
+    basePrice: 6000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "UNRIPE PLANTAIN + VEGETABLE STE",
+    description: "Healthy boiled unripe plantain served with a rich and tasty vegetable stew.",
+    price: 6000,
+    indoorPrice: 5000,
+    image: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800&auto=format",
+    category: "Local Delicacy",
+    available: true,
+    itemType: "item",
+    basePrice: 6000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "VEGETABLE SALAD",
+    description: "Fresh garden salad with crisp cucumbers, carrots, lettuce, and cabbage.",
+    price: 6000,
+    indoorPrice: 5000,
+    image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format",
+    category: "Salad",
+    available: true,
+    itemType: "item",
+    basePrice: 6000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "WHITE BEAN + VEGETABLE STEW",
+    description: "Soft boiled white beans served with a rich, savory vegetable stew.",
+    price: 6000,
+    indoorPrice: 5000,
+    image: "https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=800&auto=format",
+    category: "Local Delicacy",
+    available: true,
+    itemType: "item",
+    basePrice: 6000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "YAM + EGG SUACE",
+    description: "Boiled or fried soft white yam served with a rich, seasoned fried egg and tomato sauce.",
+    price: 5000,
+    indoorPrice: 5000,
+    image: "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&auto=format",
+    category: "Fries",
+    available: true,
+    itemType: "item",
+    basePrice: 5000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "AFANG SOUP",
+    description: "Rich, thick Efik soup cooked with wild Afang leaves and fresh waterleaves, loaded with assorted meats.",
+    price: 7000,
+    indoorPrice: 6000,
+    image: "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&auto=format",
+    category: "Soup",
+    available: true,
+    itemType: "item",
+    basePrice: 7000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "BAKED POTATOES",
+    description: "Gently baked potato wedges, seasoned with light herbs.",
+    price: 6000,
+    indoorPrice: 6000,
+    image: "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=800&auto=format",
+    category: "Fries",
+    available: true,
+    itemType: "item",
+    basePrice: 6000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "CATFISH PEPPER SOUP + AGIDI",
+    description: "Spicy catfish pepper soup infused with native scent leaves, served with soft wrapped Agidi.",
+    price: 7000,
+    indoorPrice: 6000,
+    image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&auto=format",
+    category: "Soup",
+    available: true,
+    itemType: "item",
+    basePrice: 7000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "CHICKEN BURGER",
+    description: "Juicy seasoned chicken patty in a toasted sesame bun with lettuce and creamy mayonnaise.",
+    price: 7000,
+    indoorPrice: 6000,
+    image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format",
+    category: "Burger",
+    available: true,
+    itemType: "item",
+    basePrice: 7000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "CHICKEN PEPPER SOUP + AGIDI",
+    description: "Hot, spicy, and soothing chicken pepper soup accompanied by wrapped soft Agidi.",
+    price: 7000,
+    indoorPrice: 6000,
+    image: "https://images.unsplash.com/photo-1547592180-85f173990554?w=800&auto=format",
+    category: "Soup",
+    available: true,
+    itemType: "item",
+    basePrice: 7000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "COW LEG PEPER SOUP + AGIDI",
+    description: "Tender, gelatinous slow-cooked cow leg pepper soup served with a wrapped soft Agidi.",
+    price: 7000,
+    indoorPrice: 6000,
+    image: "https://images.unsplash.com/photo-1543339308-43e59d6b73a6?w=800&auto=format",
+    category: "Soup",
+    available: true,
+    itemType: "item",
+    basePrice: 7000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "COW TAIL PEPER SOUP + AGIDI",
+    description: "Rich, tender peppered cow tail soup in a hot local herb broth, served with wrapped smooth Agidi.",
+    price: 7000,
+    indoorPrice: 6000,
+    image: "https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format",
+    category: "Soup",
+    available: true,
+    itemType: "item",
+    basePrice: 7000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
   }
 ];
 
@@ -495,7 +721,7 @@ async function seed() {
       console.log("✓ Cleared old prepared_items for tricias-kitchen");
     }
 
-    // 3. Insert all 32 items
+    // 3. Insert all 48 items
     for (const item of newItems) {
       console.log(`Adding prepared item: ${item.name}...`);
       const docRef = colRef.doc();
