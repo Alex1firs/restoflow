@@ -1307,6 +1307,216 @@ const newItems = [
     kitchenStation: "kitchen",
     allowCustomPrice: false,
     restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "SMALL BOTTLE WATER",
+    description: "Chilled small plastic bottle of mineral water.",
+    price: 200,
+    indoorPrice: 200,
+    image: "https://images.unsplash.com/photo-1523362628745-0c100150b504?w=800&auto=format",
+    category: "Drinks",
+    available: true,
+    itemType: "item",
+    basePrice: 200,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "AGIDI",
+    description: "Smooth white Agidi (cornstarch paste), wrapped in local leaves.",
+    price: 500,
+    indoorPrice: 500,
+    image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&auto=format",
+    category: "Local Delicacy",
+    available: true,
+    itemType: "item",
+    basePrice: 500,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "TAKEAWAY Pack",
+    description: "Premium takeaway packaging pack.",
+    price: 500,
+    indoorPrice: 500,
+    image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&auto=format",
+    category: "System",
+    available: true,
+    itemType: "item",
+    basePrice: 500,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "WATER",
+    description: "Chilled standard bottle of mineral water.",
+    price: 500,
+    indoorPrice: 500,
+    image: "https://images.unsplash.com/photo-1560030515-6f9d54e8ca6c?w=800&auto=format",
+    category: "Drinks",
+    available: true,
+    itemType: "item",
+    basePrice: 500,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "TRANSPORTATION",
+    description: "Flat-rate restaurant logistics / delivery transport charge.",
+    price: 600,
+    indoorPrice: 600,
+    image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&auto=format",
+    category: "Service",
+    available: true,
+    itemType: "item",
+    basePrice: 600,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "SOFT DRINKS",
+    description: "Chilled canned or bottled soft drinks (Coke, Fanta, Sprite, etc.).",
+    price: 800,
+    indoorPrice: 800,
+    image: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=800&auto=format",
+    category: "Drinks",
+    available: true,
+    itemType: "item",
+    basePrice: 800,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "DODO",
+    description: "Golden-brown fried sweet ripe plantain slices.",
+    price: 1000,
+    indoorPrice: 1000,
+    image: "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&auto=format",
+    category: "Fries",
+    available: true,
+    itemType: "item",
+    basePrice: 1000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "FAYROUZ",
+    description: "Chilled can of Fayrouz malt soft drink.",
+    price: 1000,
+    indoorPrice: 1000,
+    image: "https://images.unsplash.com/photo-1556881286-fc6915169721?w=800&auto=format",
+    category: "Drinks",
+    available: true,
+    itemType: "item",
+    basePrice: 1000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "FRIED PLANTAIN",
+    description: "Portion of perfectly fried sweet plantain.",
+    price: 1000,
+    indoorPrice: 1000,
+    image: "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&auto=format",
+    category: "Fries",
+    available: true,
+    itemType: "item",
+    basePrice: 1000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "FUFU",
+    description: "Traditional smooth cassava swallow fufu, served hot.",
+    price: 1000,
+    indoorPrice: 1000,
+    image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format",
+    category: "Swallow",
+    available: true,
+    itemType: "item",
+    basePrice: 1000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "GARRI",
+    description: "Hot Garri swallow (Eba), yellow or white, rolled into a smooth ball.",
+    price: 1000,
+    indoorPrice: 1000,
+    image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format",
+    category: "Swallow",
+    available: true,
+    itemType: "item",
+    basePrice: 1000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "MALT",
+    description: "Chilled bottle or can of dark malt beverage (Malta Guinness, Amstel, etc.).",
+    price: 1000,
+    indoorPrice: 1000,
+    image: "https://images.unsplash.com/photo-1556881286-fc6915169721?w=800&auto=format",
+    category: "Drinks",
+    available: true,
+    itemType: "item",
+    basePrice: 1000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "MOI MOI",
+    description: "Traditional Nigerian steamed savory bean pudding with eggs and local spices.",
+    price: 1500,
+    indoorPrice: 1000,
+    image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format",
+    category: "Protein",
+    available: true,
+    itemType: "item",
+    basePrice: 1500,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "SEMOVITA",
+    description: "Smooth and soft Semovita swallow, freshly prepared.",
+    price: 1000,
+    indoorPrice: 1000,
+    image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format",
+    category: "Swallow",
+    available: true,
+    itemType: "item",
+    basePrice: 1000,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "BEERS",
+    description: "Chilled bottle of local premium beer.",
+    price: 1500,
+    indoorPrice: 1500,
+    image: "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?w=800&auto=format",
+    category: "Drinks",
+    available: true,
+    itemType: "item",
+    basePrice: 1500,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
   }
 ];
 
@@ -1337,14 +1547,21 @@ async function seed() {
       console.log("✓ Cleared old prepared_items for tricias-kitchen");
     }
 
-    // 3. Insert all items
-    for (const item of newItems) {
-      console.log(`Adding prepared item: ${item.name}...`);
-      const docRef = colRef.doc();
-      await docRef.set({
-        ...item,
-        createdAt: new Date().toISOString()
-      });
+    // 3. Insert all items in parallel chunks to prevent timeouts
+    console.log(`Writing ${newItems.length} items in parallel chunks...`);
+    const chunkSize = 20;
+    for (let i = 0; i < newItems.length; i += chunkSize) {
+      const chunk = newItems.slice(i, i + chunkSize);
+      console.log(`Writing chunk from item ${i + 1} to ${Math.min(i + chunkSize, newItems.length)}...`);
+      await Promise.all(
+        chunk.map((item) => {
+          const docRef = colRef.doc();
+          return docRef.set({
+            ...item,
+            createdAt: new Date().toISOString(),
+          });
+        })
+      );
     }
 
     console.log(`✓ Seeding complete! Successfully added ${newItems.length} menu items to Firestore.`);
