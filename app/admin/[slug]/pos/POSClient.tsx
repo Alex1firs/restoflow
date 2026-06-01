@@ -2605,7 +2605,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                             : "text-gray-500 hover:text-gray-800"
                         }`}
                       >
-                        Outside / Regular Menu
+                        Regular (Inside)
                       </button>
                       <button
                         type="button"
@@ -2616,7 +2616,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                             : "text-gray-500 hover:bg-orange-50/50 hover:text-orange-700"
                         }`}
                       >
-                        Indoor VIP Lounge
+                        Outside Price
                       </button>
                     </div>
                   </div>
