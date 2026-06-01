@@ -27,6 +27,10 @@ type Order = {
   customerName: string;
   phone: string;
   items: string;
+  itemsRaw?: Array<{ name: string; quantity: number; price: number; indoorPrice?: number }>;
+  waiterName?: string;
+  settlementNote?: string;
+  settledByStaffName?: string;
   itemsTotal: number;
   deliveryFee: number;
   total: number;
@@ -64,6 +68,7 @@ export default function ReportsClient({ slug }: { slug: string }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [bestSellers, setBestSellers] = useState<BestSeller[]>([]);
   const [exporting, setExporting] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   const fetchReports = useCallback(async (r: RangeKey, f?: string, t?: string) => {
     setLoading(true);
@@ -277,7 +282,11 @@ export default function ReportsClient({ slug }: { slug: string }) {
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {orders.map((o) => (
-                        <tr key={o.orderId} className="hover:bg-gray-50">
+                        <tr
+                          key={o.orderId}
+                          className="hover:bg-gray-50 cursor-pointer transition-colors"
+                          onClick={() => setSelectedOrder(o)}
+                        >
                           <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{o.date}</td>
                           <td className="px-4 py-3">
                             <p className="font-bold text-gray-900">{o.customerName || "—"}</p>
@@ -322,7 +331,11 @@ export default function ReportsClient({ slug }: { slug: string }) {
                 </div>
                 <div className="md:hidden divide-y divide-gray-50">
                   {orders.map((o) => (
-                    <div key={o.orderId} className="p-4 space-y-2">
+                    <div
+                      key={o.orderId}
+                      className="p-4 space-y-2 cursor-pointer hover:bg-gray-50 transition-colors"
+                      onClick={() => setSelectedOrder(o)}
+                    >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <p className="font-bold text-gray-900">{o.customerName || "—"}</p>
@@ -368,6 +381,221 @@ export default function ReportsClient({ slug }: { slug: string }) {
       ) : (
         <div className="py-24 text-center text-gray-400 text-sm">No data available.</div>
       )}
+      {selectedOrder && (
+        <div className="fixed inset-0 backdrop-blur-sm bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto no-print">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-black text-gray-900 text-sm uppercase tracking-wider">Past Order Receipt</h3>
+              <button
+                onClick={() => setSelectedOrder(null)}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 bg-gray-100 flex justify-center">
+              {/* Virtual Receipt Sheet */}
+              <div
+                id="print-receipt-area"
+                className="bg-white w-full max-w-sm shadow-md rounded-lg p-6 font-mono text-xs text-gray-800 border border-gray-200"
+                style={{ fontFamily: "Courier New, Courier, monospace" }}
+              >
+                <div className="text-center space-y-1 mb-4">
+                  <h4 className="font-extrabold text-sm text-gray-900 tracking-wider">
+                    {slug === "tricias-kitchen" ? "TRICIA'S KITCHEN" : slug.replace("-", " ").toUpperCase()}
+                  </h4>
+                  <p className="text-[10px] text-gray-400">Digital POS Sales Receipt</p>
+                  <p className="text-[10px] text-gray-400">{selectedOrder.date}</p>
+                </div>
+
+                <div className="border-t border-dashed border-gray-300 py-2 space-y-1 text-[11px]">
+                  <div className="flex justify-between">
+                    <span>Order ID:</span>
+                    <span className="font-bold text-gray-900">#{selectedOrder.orderId.slice(-6).toUpperCase()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Source:</span>
+                    <span className="font-bold capitalize text-gray-900">{selectedOrder.orderSource}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Service Mode:</span>
+                    <span className="font-bold capitalize text-gray-900">{selectedOrder.serviceMode?.replace("_", " ") || "Standard"}</span>
+                  </div>
+                  {selectedOrder.tableLabel && (
+                    <div className="flex justify-between">
+                      <span>Table:</span>
+                      <span className="font-bold text-gray-900">{selectedOrder.tableLabel}</span>
+                    </div>
+                  )}
+                  {selectedOrder.customerName && (
+                    <div className="flex justify-between">
+                      <span>Customer:</span>
+                      <span className="font-bold text-gray-900">{selectedOrder.customerName}</span>
+                    </div>
+                  )}
+                  {selectedOrder.phone && (
+                    <div className="flex justify-between">
+                      <span>Phone:</span>
+                      <span className="font-bold text-gray-900">{selectedOrder.phone}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t border-dashed border-gray-300 my-2"></div>
+
+                {/* Items List */}
+                <table className="w-full text-left text-[11px] border-collapse">
+                  <thead>
+                    <tr className="border-b border-dashed border-gray-200">
+                      <th className="py-1 font-bold text-gray-900">ITEM</th>
+                      <th className="py-1 font-bold text-gray-900 text-center">QTY</th>
+                      <th className="py-1 font-bold text-gray-900 text-right">TOTAL</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(selectedOrder.itemsRaw && selectedOrder.itemsRaw.length > 0
+                      ? selectedOrder.itemsRaw
+                      : selectedOrder.items.split(", ").map((str) => {
+                          const match = str.match(/^(\d+)x\s+(.+)$/);
+                          return match
+                            ? { name: match[2], quantity: parseInt(match[1]), price: 0 }
+                            : { name: str, quantity: 1, price: 0 };
+                        })
+                    ).map((item, idx) => {
+                      const itemTotal = item.price ? item.price * item.quantity : 0;
+                      return (
+                        <tr key={idx} className="border-b border-dotted border-gray-100 last:border-0">
+                          <td className="py-1.5 pr-2 align-top">
+                            <span className="font-bold text-gray-900 block">{item.name}</span>
+                            {item.price > 0 && (
+                              <span className="text-[9px] text-gray-400">@ ₦{item.price.toLocaleString("en-NG")}</span>
+                            )}
+                          </td>
+                          <td className="py-1.5 text-center align-top">{item.quantity}</td>
+                          <td className="py-1.5 text-right align-top font-bold text-gray-900">
+                            {itemTotal > 0 ? `₦${itemTotal.toLocaleString("en-NG")}` : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+
+                <div className="border-t border-dashed border-gray-300 my-2"></div>
+
+                {/* Subtotal, delivery, total */}
+                <div className="space-y-1 text-[11px]">
+                  {selectedOrder.itemsTotal > 0 && (
+                    <div className="flex justify-between">
+                      <span>Subtotal:</span>
+                      <span>₦{selectedOrder.itemsTotal.toLocaleString("en-NG")}</span>
+                    </div>
+                  )}
+                  {selectedOrder.deliveryFee > 0 && (
+                    <div className="flex justify-between">
+                      <span>Delivery Fee:</span>
+                      <span>₦{selectedOrder.deliveryFee.toLocaleString("en-NG")}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-xs font-extrabold text-gray-900 pt-1">
+                    <span>GRAND TOTAL:</span>
+                    <span>₦{selectedOrder.total.toLocaleString("en-NG")}</span>
+                  </div>
+                </div>
+
+                <div className="border-t border-dashed border-gray-300 my-2"></div>
+
+                {/* Payment, Cashier, Waiter details */}
+                <div className="space-y-1 text-[10px] text-gray-500">
+                  <div className="flex justify-between">
+                    <span>Payment Status:</span>
+                    <span className="font-bold uppercase text-green-600">{selectedOrder.paymentStatus || "PAID"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Method:</span>
+                    <span className="font-bold uppercase">{selectedOrder.paymentMethod?.replace("_", " ")}</span>
+                  </div>
+                  {selectedOrder.settledByStaffName && (
+                    <div className="flex justify-between">
+                      <span>Cashier:</span>
+                      <span className="font-bold">{selectedOrder.settledByStaffName}</span>
+                    </div>
+                  )}
+                  {selectedOrder.waiterName && (
+                    <div className="flex justify-between">
+                      <span>Waiter:</span>
+                      <span className="font-bold">{selectedOrder.waiterName}</span>
+                    </div>
+                  )}
+                  {selectedOrder.settlementNote && (
+                    <div className="mt-2 p-1.5 bg-gray-50 border border-gray-100 rounded text-[9px] text-gray-400 italic">
+                      Note: {selectedOrder.settlementNote}
+                    </div>
+                  )}
+                </div>
+
+                <div className="text-center mt-6 pt-4 border-t border-dashed border-gray-200">
+                  <p className="text-[10px] uppercase font-bold tracking-wider text-gray-400">Thank You For Your Patronage!</p>
+                  <p className="text-[8px] text-gray-300 mt-1">Powered by RestoFlow POS</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3">
+              <button
+                onClick={() => setSelectedOrder(null)}
+                className="flex-1 py-2.5 border border-gray-200 hover:bg-gray-100 transition-colors text-sm font-bold text-gray-600 rounded-xl"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-500 transition-colors text-sm font-bold text-white rounded-xl shadow-sm flex items-center justify-center gap-2"
+              >
+                🖨️ Print Receipt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Self-contained styling for high precision print media */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            @media print {
+              /* Hide all application dashboard wrappers, navs, sidebars */
+              body * {
+                visibility: hidden;
+                background: none !important;
+              }
+              /* Expose and isolate ONLY the print receipt slip area */
+              #print-receipt-area, #print-receipt-area * {
+                visibility: visible;
+              }
+              #print-receipt-area {
+                position: fixed;
+                left: 0;
+                top: 0;
+                width: 80mm;
+                max-width: 80mm;
+                padding: 10px;
+                margin: 0;
+                border: none !important;
+                box-shadow: none !important;
+                background: white !important;
+                color: black !important;
+              }
+              /* Suppress headers, footers, margins */
+              @page {
+                size: auto;
+                margin: 0;
+              }
+            }
+          `,
+        }}
+      />
     </div>
   );
 }
