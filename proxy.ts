@@ -42,7 +42,7 @@ export function getRestoFlowSubdomain(host: string): string | null {
   return null;
 }
 
-export function proxy(request: NextRequest) {
+export default function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const host = request.headers.get("host") ?? "";
 
