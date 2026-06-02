@@ -66,7 +66,12 @@ export default function proxy(request: NextRequest) {
       return NextResponse.redirect(mainUrl);
     }
 
-    // 2. Otherwise, transparently rewrite to the storefront slug path (preserving full subpath)
+    // 2. Allow tracking pages to resolve directly at the root-level /track route
+    if (pathname.startsWith("/track")) {
+      return NextResponse.next();
+    }
+
+    // 3. Otherwise, transparently rewrite to the storefront slug path (preserving full subpath)
     const url = request.nextUrl.clone();
     url.pathname = `/r/${subdomain}${pathname === "/" ? "" : pathname}`;
     return NextResponse.rewrite(url);
