@@ -39,12 +39,13 @@ export default async function TrackPage({ params, searchParams }: Props) {
       token={token}
       initial={{
         restaurantId: d.restaurantId as string,
-        items: (d.items as { name: string; quantity: number; price: number }[]) ?? [],
+        items: (d.items as { id: string; name: string; quantity: number; price: number }[]) ?? [],
         total: (d.total as number) ?? 0,
         status: d.status as "pending" | "preparing" | "ready" | "completed" | "rejected",
         paymentMethod: (d.paymentMethod as "online" | "cash") ?? "cash",
         paymentStatus: (d.paymentStatus as "paid" | "pending") ?? "pending",
         deliveryType: (d.deliveryType as "delivery" | "pickup") ?? "delivery",
+        note: (d.note as string) ?? "",
       }}
     />
   );

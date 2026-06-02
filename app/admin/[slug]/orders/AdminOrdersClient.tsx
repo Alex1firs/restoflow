@@ -27,6 +27,7 @@ type Order = {
   scheduledFor?: string | Timestamp;
   createdAt: Timestamp;
   orderSource?: string;
+  deliveryType?: "delivery" | "pickup";
 };
 
 type FilterTab = "active" | "completed" | "all";
@@ -70,6 +71,9 @@ export default function AdminOrdersClient({ restaurant }: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
 
+  // Printing state
+  const [printingOrder, setPrintingOrder] = useState<Order | null>(null);
+
   const prevIds = useRef<Set<string>>(new Set());
   const firstLoad = useRef(true);
 
@@ -77,6 +81,14 @@ export default function AdminOrdersClient({ restaurant }: Props) {
     setToast(msg);
     setTimeout(() => setToast(null), 4000);
   }, []);
+
+  const triggerPrint = (order: Order) => {
+    setPrintingOrder(order);
+    setTimeout(() => {
+      window.print();
+      setPrintingOrder(null);
+    }, 150);
+  };
 
   useEffect(() => {
     const q = query(
@@ -133,6 +145,15 @@ export default function AdminOrdersClient({ restaurant }: Props) {
         body: JSON.stringify({ status: next }),
       });
       if (!res.ok) throw new Error("Failed");
+
+      // Auto-print kitchen ticket on Acceptance (status moving to preparing)
+      if (next === "preparing") {
+        // Query the live local array or fetch to get the complete current items
+        const acceptedOrder = orders.find((o) => o.id === orderId);
+        if (acceptedOrder) {
+          triggerPrint(acceptedOrder);
+        }
+      }
     } catch {
       alert("Failed to update status. Please try again.");
     } finally {
@@ -187,7 +208,7 @@ export default function AdminOrdersClient({ restaurant }: Props) {
   const todayCash = todayOrders.filter((o) => o.paymentMethod === "cash" && o.status !== "rejected").length;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6 pb-20 md:pb-6">
+    <div className="max-w-5xl mx-auto px-4 py-6 pb-20 md:pb-6 relative">
       {/* Toast */}
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 border border-orange-500/50 text-white px-6 py-3 rounded-2xl shadow-2xl font-bold text-sm flex items-center gap-3 animate-bounce">
@@ -395,6 +416,14 @@ export default function AdminOrdersClient({ restaurant }: Props) {
                               Rejected
                             </div>
                           )}
+
+                          {/* Secondary manual Reprint Action Button */}
+                          <button
+                            onClick={() => triggerPrint(order)}
+                            className="w-full py-2.5 rounded-2xl bg-white hover:bg-gray-100 text-gray-700 border border-gray-250 font-bold text-xs uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2"
+                          >
+                            🖨️ Print Receipt
+                          </button>
                         </>
                       )}
                     </div>
@@ -405,6 +434,121 @@ export default function AdminOrdersClient({ restaurant }: Props) {
           })}
         </div>
       )}
+
+      {/* Hidden high-fidelity thermal kitchen/driver ticket template */}
+      {printingOrder && (
+        <div id="admin-receipt-print-area" className="hidden print:block bg-white p-4 text-black font-sans leading-tight">
+          <div className="text-center mb-4">
+            <h2 className="text-lg font-black tracking-wide uppercase">{restaurant.name}</h2>
+            <p className="text-[10px] text-gray-500 font-bold">LIVE KITCHEN TICKET</p>
+            <div className="border-b border-dashed border-black my-2" />
+          </div>
+
+          <div className="space-y-1.5 text-xs">
+            <div className="flex justify-between font-mono text-[10px]">
+              <span>TICKET: #{printingOrder.id.slice(0, 8).toUpperCase()}</span>
+              <span>{fmt(printingOrder.createdAt)}</span>
+            </div>
+            <div className="flex justify-between font-black text-sm uppercase mt-1">
+              <span>SERVICE MODE:</span>
+              <span className="underline">{printingOrder.deliveryType || "delivery"}</span>
+            </div>
+          </div>
+
+          <div className="border-b border-dashed border-black my-3" />
+
+          {/* Customer info */}
+          <div className="text-xs space-y-1">
+            <p className="font-black text-sm">{printingOrder.customerName}</p>
+            <p className="font-bold">{printingOrder.phone}</p>
+            <p className="text-[11px] text-gray-600 font-medium leading-tight">{printingOrder.address}</p>
+          </div>
+
+          {/* Special note */}
+          {printingOrder.note && (
+            <div className="mt-2.5 p-2 bg-gray-100 border border-gray-200 rounded text-xs leading-normal">
+              <span className="font-black text-[9px] uppercase tracking-wider block text-gray-500 mb-0.5">Kitchen Note:</span>
+              "{printingOrder.note}"
+            </div>
+          )}
+
+          <div className="border-b border-dashed border-black my-3" />
+
+          {/* Items Table */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-[10px] font-black text-gray-500 uppercase">
+              <span>Qty × Item</span>
+              <span>Price</span>
+            </div>
+            <div className="border-b border-dotted border-gray-400 my-1" />
+            
+            {printingOrder.items.map((item, idx) => (
+              <div key={idx} className="flex justify-between text-xs items-start">
+                <span className="font-bold flex-1 pr-2">
+                  <span className="font-black text-sm text-black">{item.quantity}×</span> {item.name}
+                </span>
+                <span className="font-mono">₦{(item.price * item.quantity).toLocaleString("en-NG")}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="border-b border-dashed border-black my-3" />
+
+          {/* Subtotal & delivery */}
+          <div className="space-y-1.5 text-xs">
+            {printingOrder.deliveryFee !== undefined && printingOrder.deliveryFee > 0 && (
+              <>
+                <div className="flex justify-between font-medium">
+                  <span>Subtotal:</span>
+                  <span>₦{(printingOrder.itemsTotal ?? (printingOrder.total - printingOrder.deliveryFee)).toLocaleString("en-NG")}</span>
+                </div>
+                <div className="flex justify-between font-medium">
+                  <span>Delivery:</span>
+                  <span>₦{printingOrder.deliveryFee.toLocaleString("en-NG")}</span>
+                </div>
+              </>
+            )}
+            <div className="flex justify-between font-black text-sm pt-1 border-t border-dotted border-black">
+              <span>TOTAL DUE:</span>
+              <span>₦{printingOrder.total.toLocaleString("en-NG")}</span>
+            </div>
+          </div>
+
+          <div className="border-b border-dashed border-black my-3" />
+
+          {/* Payment metadata */}
+          <div className="text-center space-y-1">
+            <p className="text-[10px] font-black uppercase tracking-wider bg-gray-100 py-1 rounded">
+              PAYMENT METHOD: {printingOrder.paymentMethod === "online" ? "ONLINE" : "CASH"} ({printingOrder.paymentStatus === "paid" ? "PAID ✓" : "UNPAID"})
+            </p>
+            <p className="text-[9px] text-gray-400 font-bold mt-2">RestoFlow POS · Thank you for your business!</p>
+          </div>
+        </div>
+      )}
+
+      {/* High-fidelity CSS injector to completely isolate printable 80mm ticket */}
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden !important;
+            background: none !important;
+          }
+          #admin-receipt-print-area, #admin-receipt-print-area * {
+            visibility: visible !important;
+          }
+          #admin-receipt-print-area {
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 80mm !important;
+            max-width: 80mm !important;
+            padding: 8px !important;
+            margin: 0 !important;
+            background: white !important;
+            color: black !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
