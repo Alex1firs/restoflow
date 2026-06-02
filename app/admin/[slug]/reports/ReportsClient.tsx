@@ -567,30 +567,39 @@ export default function ReportsClient({ slug }: { slug: string }) {
             @media print {
               /* Hide all application dashboard wrappers, navs, sidebars */
               body * {
-                visibility: hidden;
+                visibility: hidden !important;
                 background: none !important;
               }
               /* Expose and isolate ONLY the print receipt slip area */
               #print-receipt-area, #print-receipt-area * {
-                visibility: visible;
+                visibility: visible !important;
               }
               #print-receipt-area {
-                position: fixed;
-                left: 0;
-                top: 0;
-                width: 80mm;
-                max-width: 80mm;
-                padding: 10px;
-                margin: 0;
+                position: fixed !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                max-width: 58mm !important; /* Perfect standard roll sizing */
+                padding: 4px 6px !important;
+                margin: 0 !important;
                 border: none !important;
                 box-shadow: none !important;
                 background: white !important;
                 color: black !important;
+                box-sizing: border-box !important;
+                line-height: 1.1 !important;
+              }
+              #print-receipt-area * {
+                font-size: 9px !important;
+              }
+              #print-receipt-area h4 {
+                font-size: 11px !important;
+                margin-bottom: 2px !important;
               }
               /* Suppress headers, footers, margins */
               @page {
                 size: auto;
-                margin: 0;
+                margin: 0 !important;
               }
             }
           `,

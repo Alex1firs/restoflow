@@ -437,65 +437,65 @@ export default function AdminOrdersClient({ restaurant }: Props) {
 
       {/* Hidden high-fidelity thermal kitchen/driver ticket template */}
       {printingOrder && (
-        <div id="admin-receipt-print-area" className="hidden print:block bg-white p-4 text-black font-sans leading-tight">
-          <div className="text-center mb-4">
-            <h2 className="text-lg font-black tracking-wide uppercase">{restaurant.name}</h2>
-            <p className="text-[10px] text-gray-500 font-bold">LIVE KITCHEN TICKET</p>
-            <div className="border-b border-dashed border-black my-2" />
+        <div id="admin-receipt-print-area" className="hidden print:block bg-white text-black font-sans leading-none">
+          <div className="text-center mb-1.5">
+            <h2 className="text-xs font-black tracking-tight uppercase" style={{ fontSize: "11px", margin: "0 0 1px 0" }}>{restaurant.name}</h2>
+            <p className="text-[8px] text-gray-500 font-extrabold uppercase" style={{ fontSize: "8px", margin: "0" }}>LIVE KITCHEN TICKET</p>
+            <div className="border-b border-dashed border-black my-1" />
           </div>
 
-          <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between font-mono text-[10px]">
+          <div className="space-y-0.5" style={{ fontSize: "9px" }}>
+            <div className="flex justify-between font-mono text-[8px]" style={{ fontSize: "8px" }}>
               <span>TICKET: #{printingOrder.id.slice(0, 8).toUpperCase()}</span>
               <span>{fmt(printingOrder.createdAt)}</span>
             </div>
-            <div className="flex justify-between font-black text-sm uppercase mt-1">
+            <div className="flex justify-between font-black uppercase" style={{ fontSize: "9px", marginTop: "1px" }}>
               <span>SERVICE MODE:</span>
               <span className="underline">{printingOrder.deliveryType || "delivery"}</span>
             </div>
           </div>
 
-          <div className="border-b border-dashed border-black my-3" />
+          <div className="border-b border-dashed border-black my-1" />
 
           {/* Customer info */}
-          <div className="text-xs space-y-1">
-            <p className="font-black text-sm">{printingOrder.customerName}</p>
-            <p className="font-bold">{printingOrder.phone}</p>
-            <p className="text-[11px] text-gray-600 font-medium leading-tight">{printingOrder.address}</p>
+          <div className="space-y-0.5" style={{ fontSize: "9px" }}>
+            <p className="font-black" style={{ fontSize: "10px", margin: "0" }}>{printingOrder.customerName}</p>
+            <p className="font-bold" style={{ margin: "0" }}>{printingOrder.phone}</p>
+            <p className="text-gray-600 leading-none" style={{ fontSize: "8px", margin: "0" }}>{printingOrder.address}</p>
           </div>
 
           {/* Special note */}
           {printingOrder.note && (
-            <div className="mt-2.5 p-2 bg-gray-100 border border-gray-200 rounded text-xs leading-normal">
-              <span className="font-black text-[9px] uppercase tracking-wider block text-gray-500 mb-0.5">Kitchen Note:</span>
+            <div className="mt-1 p-1 bg-gray-50 border border-gray-200 rounded leading-tight" style={{ fontSize: "8px" }}>
+              <span className="font-black uppercase tracking-wider block text-gray-500" style={{ fontSize: "7px", marginBottom: "1px" }}>Kitchen Note:</span>
               "{printingOrder.note}"
             </div>
           )}
 
-          <div className="border-b border-dashed border-black my-3" />
+          <div className="border-b border-dashed border-black my-1" />
 
           {/* Items Table */}
-          <div className="space-y-2">
-            <div className="flex justify-between text-[10px] font-black text-gray-500 uppercase">
+          <div className="space-y-0.5">
+            <div className="flex justify-between font-black text-gray-500 uppercase" style={{ fontSize: "8px" }}>
               <span>Qty × Item</span>
               <span>Price</span>
             </div>
-            <div className="border-b border-dotted border-gray-400 my-1" />
+            <div className="border-b border-dotted border-gray-400 my-0.5" />
             
             {printingOrder.items.map((item, idx) => (
-              <div key={idx} className="flex justify-between text-xs items-start">
-                <span className="font-bold flex-1 pr-2">
-                  <span className="font-black text-sm text-black">{item.quantity}×</span> {item.name}
+              <div key={idx} className="flex justify-between items-start" style={{ fontSize: "9px" }}>
+                <span className="font-bold flex-1 pr-1 leading-tight">
+                  <span className="font-black text-black" style={{ fontSize: "11px" }}>{item.quantity}×</span> {item.name}
                 </span>
-                <span className="font-mono">₦{(item.price * item.quantity).toLocaleString("en-NG")}</span>
+                <span className="font-mono pl-1 shrink-0">₦{(item.price * item.quantity).toLocaleString("en-NG")}</span>
               </div>
             ))}
           </div>
 
-          <div className="border-b border-dashed border-black my-3" />
+          <div className="border-b border-dashed border-black my-1" />
 
           {/* Subtotal & delivery */}
-          <div className="space-y-1.5 text-xs">
+          <div className="space-y-0.5" style={{ fontSize: "9px" }}>
             {printingOrder.deliveryFee !== undefined && printingOrder.deliveryFee > 0 && (
               <>
                 <div className="flex justify-between font-medium">
@@ -508,25 +508,25 @@ export default function AdminOrdersClient({ restaurant }: Props) {
                 </div>
               </>
             )}
-            <div className="flex justify-between font-black text-sm pt-1 border-t border-dotted border-black">
+            <div className="flex justify-between font-black pt-0.5 border-t border-dotted border-black" style={{ fontSize: "10px" }}>
               <span>TOTAL DUE:</span>
               <span>₦{printingOrder.total.toLocaleString("en-NG")}</span>
             </div>
           </div>
 
-          <div className="border-b border-dashed border-black my-3" />
+          <div className="border-b border-dashed border-black my-1" />
 
           {/* Payment metadata */}
-          <div className="text-center space-y-1">
-            <p className="text-[10px] font-black uppercase tracking-wider bg-gray-100 py-1 rounded">
-              PAYMENT METHOD: {printingOrder.paymentMethod === "online" ? "ONLINE" : "CASH"} ({printingOrder.paymentStatus === "paid" ? "PAID ✓" : "UNPAID"})
+          <div className="text-center space-y-0.5" style={{ fontSize: "8px" }}>
+            <p className="font-black uppercase bg-gray-100 py-0.5 rounded" style={{ fontSize: "8px", margin: "0" }}>
+              PAY: {printingOrder.paymentMethod === "online" ? "ONLINE" : "CASH"} ({printingOrder.paymentStatus === "paid" ? "PAID ✓" : "UNPAID"})
             </p>
-            <p className="text-[9px] text-gray-400 font-bold mt-2">RestoFlow POS · Thank you for your business!</p>
+            <p className="text-gray-400 font-bold mt-1" style={{ fontSize: "7px", margin: "2px 0 0 0" }}>RestoFlow POS · Thanks for your order!</p>
           </div>
         </div>
       )}
 
-      {/* High-fidelity CSS injector to completely isolate printable 80mm ticket */}
+      {/* High-fidelity CSS injector to completely isolate printable receipt */}
       <style>{`
         @media print {
           body * {
@@ -540,12 +540,17 @@ export default function AdminOrdersClient({ restaurant }: Props) {
             position: fixed !important;
             left: 0 !important;
             top: 0 !important;
-            width: 80mm !important;
-            max-width: 80mm !important;
-            padding: 8px !important;
+            width: 100% !important;
+            max-width: 58mm !important; /* Perfect standard roll sizing */
+            padding: 4px 6px !important;
             margin: 0 !important;
             background: white !important;
             color: black !important;
+            box-sizing: border-box !important;
+          }
+          @page {
+            size: auto;
+            margin: 0 !important; /* Removes all default browser headers, footers and margins */
           }
         }
       `}</style>
