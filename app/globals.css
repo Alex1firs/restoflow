@@ -24,6 +24,21 @@ select {
   color: #111827; /* Tailwind gray-900 */
 }
 
+/* Support dark mode (both class and media preferences) */
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark textarea,
+.dark select {
+  color: #f9fafb; /* Tailwind gray-50 */
+}
+
+@media (prefers-color-scheme: dark) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    color: #f9fafb; /* Tailwind gray-50 */
+  }
+}
+
 /* Custom premium styling */
 .glass {
   background: rgba(255, 255, 255, 0.03);
