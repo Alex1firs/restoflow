@@ -367,7 +367,7 @@ function openPOSReceiptWindow(
     .items-header{display:flex;justify-content:space-between;font-size:8px;font-weight:900;color:#333;letter-spacing:0.5px}
     .footer{text-align:center;color:#333;font-size:7.5px;margin-top:4px;border-top:1px dashed black;padding-top:2px;font-weight:bold}
     @media print{
-      body{margin:0;padding:0;background:white;color:black}
+      body{margin:0 !important;padding:4mm 2mm 4mm 6mm !important;background:white;color:black}
       .print-page{page-break-after:always;min-height:auto !important;height:auto !important}
       .print-page:last-child{page-break-after:avoid}
       @page {
@@ -447,7 +447,7 @@ function openAddOnReprintWindow(receipt: AddOnReceipt, restaurantName: string, s
     .running{display:flex;justify-content:space-between;font-size:9.5px;margin-top:3px;color:#444}
     .footer{text-align:center;color:#666;font-size:7.5px;margin-top:6px;border-top:1px dashed #bbb;padding-top:2px}
     @media print{
-      body{margin:0;padding:4px}
+      body{margin:0 !important;padding:4mm 2mm 4mm 6mm !important}
       @page {
         size: auto;
         margin: 0 !important; /* Removes all default browser headers, footers and margins */
@@ -528,7 +528,7 @@ function openKitchenSlip(order: any, restaurantName: string, cashierName: string
   .pending{display:block;margin:6px auto 0;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:#e65100;border:1.5px solid #e65100;border-radius:10px;padding:2px 8px;width:fit-content}
   .footer{font-size:7.5px;color:#aaa;margin-top:6px}
   @media print{
-    body{margin:0;padding:4px}
+    body{margin:0 !important;padding:4mm 2mm 4mm 6mm !important}
     @page {
       size: auto;
       margin: 0 !important; /* Removes all default browser headers, footers and margins */
@@ -621,7 +621,7 @@ function openSettledBillWindow(order: TodayOrder, result: SettlementResult, rest
     .total{display:flex;justify-content:space-between;font-size:11px;font-weight:900;margin-top:3px}
     .footer{text-align:center;color:#bbb;font-size:7.5px;margin-top:6px;border-top:1px dashed #ddd;padding-top:2px}
     @media print{
-      body{margin:0;padding:4px}
+      body{margin:0 !important;padding:4mm 2mm 4mm 6mm !important}
       @page {
         size: auto;
         margin: 0 !important; /* Removes all default browser headers, footers and margins */

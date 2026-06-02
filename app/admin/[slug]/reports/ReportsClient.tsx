@@ -576,11 +576,11 @@ export default function ReportsClient({ slug }: { slug: string }) {
               }
               #print-receipt-area {
                 position: fixed !important;
-                left: 0 !important;
-                top: 0 !important;
-                width: 100% !important;
-                max-width: 58mm !important; /* Perfect standard roll sizing */
-                padding: 4px 6px !important;
+                left: 6mm !important;
+                top: 4mm !important;
+                width: calc(100% - 8mm) !important;
+                max-width: 50mm !important; /* Safe printable width on 58mm rolls */
+                padding: 0 !important;
                 margin: 0 !important;
                 border: none !important;
                 box-shadow: none !important;
