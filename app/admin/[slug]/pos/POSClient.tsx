@@ -702,6 +702,10 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   const [syncingOffline, setSyncingOffline] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
+  // Online orders background monitoring alert state
+  const [onlineAlertCount, setOnlineAlertCount] = useState<number>(0);
+  const [showOnlineOrderAlert, setShowOnlineOrderAlert] = useState<boolean>(false);
+
   // Strengthened PWA Offline POS States
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [lastSyncText, setLastSyncText] = useState<string>("Never");
@@ -1125,6 +1129,56 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
       wList.sort((a, b) => a.name.localeCompare(b.name));
       setWaiters(wList);
     });
+    return () => unsubscribe();
+  }, [restaurant.slug]);
+
+  // Listen for new online orders in the background to alert POS cashier
+  useEffect(() => {
+    let firstLoadDone = false;
+    const q = query(
+      collection(db, "orders"),
+      where("restaurantId", "==", restaurant.slug),
+      where("status", "==", "pending")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      // Exclude walk-in counter orders
+      const newOnlineOrders = snapshot.docs.filter(
+        (doc) => (doc.data().orderSource as string | undefined) !== "counter"
+      );
+
+      if (newOnlineOrders.length > 0) {
+        if (firstLoadDone) {
+          try {
+            const AC = window.AudioContext || (window as any).webkitAudioContext;
+            if (AC) {
+              const ctx = new AC();
+              [0, 0.18, 0.36].forEach((t) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = "sine";
+                osc.frequency.value = 880;
+                gain.gain.setValueAtTime(0.35, ctx.currentTime + t);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.15);
+                osc.start(ctx.currentTime + t);
+                osc.stop(ctx.currentTime + t + 0.15);
+              });
+            }
+          } catch { /* skip autoplay blocks */ }
+
+          setOnlineAlertCount(newOnlineOrders.length);
+          setShowOnlineOrderAlert(true);
+        } else {
+          firstLoadDone = true;
+        }
+      } else {
+        setShowOnlineOrderAlert(false);
+        firstLoadDone = true;
+      }
+    });
+
     return () => unsubscribe();
   }, [restaurant.slug]);
 
@@ -1986,6 +2040,35 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
       className="flex flex-col overflow-hidden relative"
       style={{ height: "calc(100vh - 56px)" }}
     >
+      {/* Real-time floating Online Order alerts overlay for cashiers taking walk-ins */}
+      {showOnlineOrderAlert && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[999999] w-full max-w-sm px-4 select-none pointer-events-auto">
+          <div className="bg-gradient-to-r from-orange-600 to-amber-600 border border-orange-400 text-white p-4 rounded-3xl shadow-2xl flex items-center gap-3 animate-bounce">
+            <span className="w-2.5 h-2.5 bg-white rounded-full animate-ping flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-black uppercase tracking-wider">🔔 New Online Order!</p>
+              <p className="text-[10px] text-white/80 font-medium">
+                {onlineAlertCount} pending order{onlineAlertCount > 1 ? "s" : ""} requiring acceptance.
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <a
+                href={`/admin/${restaurant.slug}/orders`}
+                className="bg-white/20 hover:bg-white/30 text-white font-black text-[9px] uppercase tracking-widest px-3 py-1.5 rounded-xl transition-all active:scale-95"
+              >
+                View
+              </a>
+              <button
+                onClick={() => setShowOnlineOrderAlert(false)}
+                className="text-white/60 hover:text-white font-bold p-1 text-xs"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Offline PWA Lock Screen keypads and settings configuration overlays ── */}
       {showTerminalSetup && (
         <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[99999] flex items-center justify-center p-4 select-none">
