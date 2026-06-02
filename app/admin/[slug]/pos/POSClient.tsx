@@ -238,19 +238,12 @@ function openPOSReceiptWindow(
   const isDineIn = order.serviceMode === "dine_in";
 
   const pmLabels: Record<string, string> = {
-    cash: "Cash",
-    bank_transfer: "Bank Transfer",
-    card: "Card / POS Machine",
-    unpaid: "Unpaid / Pay Later",
-  };
-  const psLabels: Record<string, string> = {
-    paid: "Paid",
-    unpaid: "Unpaid",
-    part_paid: "Part Paid",
-    cancelled: "Cancelled",
+    cash: "CASH",
+    bank_transfer: "BANK TRANSFER",
+    card: "CARD / POS",
+    unpaid: "UNPAID / DEFER",
   };
 
-  // Helper to generate a single page block
   const generatePageHtml = (label: string, isKitchen: boolean) => {
     const itemsHtml = order.items
       .map((i: any) => {
@@ -280,55 +273,54 @@ function openPOSReceiptWindow(
     const totalsSection = isKitchen 
       ? "" 
       : `<div class="div"></div>
-         <div class="kv"><span class="kl">Subtotal</span><span class="kv-v">₦${(order.itemsTotal ?? order.total).toLocaleString("en-NG")}</span></div>
-         <div class="total"><span>Total</span><span>₦${order.total.toLocaleString("en-NG")}</span></div>
+         <div class="kv"><span class="kl">Subtotal:</span><span class="kv-v">₦${(order.itemsTotal ?? order.total).toLocaleString("en-NG")}</span></div>
+         <div class="total"><span>TOTAL DUE:</span><span>₦${order.total.toLocaleString("en-NG")}</span></div>
          <div class="div"></div>
-         <div class="kv"><span class="kl">Payment</span><span class="kv-v">${pmLabels[order.paymentMethod] ?? order.paymentMethod}</span></div>
-         <div class="kv"><span class="kl">Status</span><span class="badge ${order.paymentStatus === "paid" ? "badge-paid" : "badge-unpaid"}">${psLabels[order.paymentStatus] ?? order.paymentStatus}</span></div>`;
+         <div class="payment-method-row">
+           PAYMENT METHOD: ${pmLabels[order.paymentMethod] ?? (order.paymentMethod ?? "CASH").toUpperCase()} (${order.paymentStatus === "paid" ? "PAID ✓" : "UNPAID"})
+         </div>`;
 
     const sourceHtml = isDineIn
-      ? `<div class="kv"><span class="kl">Service</span><span class="kv-v">Dine-In</span></div>
-         <div class="kv"><span class="kl">Table</span><span class="kv-v kv-table">${order.tableLabel ?? ""}</span></div>`
-      : `<div class="kv"><span class="kl">Source</span><span class="kv-v">Counter / POS</span></div>`;
+      ? `<div class="kv"><span class="kl">Service:</span><span class="kv-v" style="text-decoration:underline">DINE-IN</span></div>
+         <div class="kv"><span class="kl">Table:</span><span class="kv-v kv-table">${order.tableLabel ?? ""}</span></div>`
+      : `<div class="kv"><span class="kl">Service:</span><span class="kv-v" style="text-decoration:underline">COUNTER PICKUP</span></div>`;
 
     const waiterHtml = order.waiterName 
-      ? `<div class="kv"><span class="kl">Waiter</span><span class="kv-v text-teal font-black">${order.waiterName}</span></div>` 
+      ? `<div class="kv"><span class="kl">Waiter:</span><span class="kv-v text-teal">${order.waiterName}</span></div>` 
       : "";
 
     const customerHtml = order.customerName && order.customerName !== order.tableLabel 
-      ? `<div class="kv"><span class="kl">Customer</span><span class="kv-v">${order.customerName}</span></div>` 
+      ? `<div class="kv"><span class="kl">Customer:</span><span class="kv-v">${order.customerName}</span></div>` 
       : "";
 
     return `
     <div class="print-page">
       <div class="center">
-        <div class="lbl">${label}</div>
         <h1>${restaurantName}</h1>
-        <div class="service-badge ${isDineIn ? "badge-teal" : "badge-orange"}">${isDineIn ? "Dine-In" : "Counter Pickup"}</div>
-        ${isDineIn && order.tableLabel ? `<div class="table-lbl">${order.tableLabel}</div>` : ""}
-        <div class="meta">${dateStr} · ${timeStr}</div>
+        <div class="lbl">${label}</div>
+        <div class="div"></div>
       </div>
-      <div class="div"></div>
-      <div class="kv"><span class="kl">Order #</span><span class="kv-v" style="font-family:monospace">${(order.orderId || order.id).slice(-8).toUpperCase()}</span></div>
+      
+      <div class="kv"><span class="kl">Ticket:</span><span class="kv-v font-mono">#${(order.orderId || order.id).slice(-8).toUpperCase()}</span></div>
+      <div class="kv"><span class="kl">Date:</span><span class="kv-v font-mono">${dateStr} · ${timeStr}</span></div>
       ${customerHtml}
-      <div class="kv"><span class="kl">Cashier</span><span class="kv-v">${staffName}</span></div>
+      <div class="kv"><span class="kl">Cashier:</span><span class="kv-v">${staffName}</span></div>
       ${waiterHtml}
       ${sourceHtml}
-      <div class="div"></div>
       
+      <div class="div"></div>
       <div class="items-header">
-        <span>QTY & ITEM</span>
+        <span>QTY × ITEM</span>
         ${isKitchen ? "" : "<span>PRICE</span>"}
       </div>
-      <div class="div" style="margin:4px 0"></div>
+      <div class="div" style="margin:2px 0; border-top:1px dotted #888;"></div>
       
       ${itemsHtml}
       ${totalsSection}
-      ${order.note ? `<div class="kv" style="margin-top:6px"><span class="kl">Note</span><span class="kv-v">${order.note}</span></div>` : ""}
+      ${order.note ? `<div class="kv" style="margin-top:4px"><span class="kl">Note:</span><span class="kv-v">"${order.note}"</span></div>` : ""}
       
       <div class="footer">
-        <div>${isKitchen ? "--- KITCHEN COPY ---" : isDineIn ? "Enjoy your meal!" : "Thank you for your patronage!"}</div>
-        <div style="font-size:8px;margin-top:2px">Powered by Restaflow</div>
+        <div>${isKitchen ? "--- KITCHEN COPY ---" : "RestoFlow POS · Thank you for your business!"}</div>
       </div>
     </div>`;
   };
@@ -338,7 +330,7 @@ function openPOSReceiptWindow(
     pages.push(generatePageHtml("CUSTOMER RECEIPT", false));
   }
   if (copies >= 2) {
-    pages.push(generatePageHtml("KITCHEN TICKET (UNPAID)", true));
+    pages.push(generatePageHtml("KITCHEN TICKET", true));
   }
   if (copies >= 3) {
     pages.push(generatePageHtml("CASHIER AUDIT COPY", false));
@@ -351,39 +343,32 @@ function openPOSReceiptWindow(
   <title>POS Print Job</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:-apple-system,system-ui,sans-serif;font-size:12px;max-width:300px;margin:0 auto;color:#111;background:white}
-    .print-page{padding:12px 6px;width:100%}
+    body{font-family:-apple-system,system-ui,sans-serif;font-size:11px;max-width:300px;margin:0 auto;color:black;background:white;line-height:1.15}
+    .print-page{padding:4px 2px;width:100%;height:auto}
     .center{text-align:center}
-    .lbl{font-size:8px;font-weight:900;letter-spacing:2px;text-transform:uppercase;color:#666;margin-bottom:3px}
-    h1{font-size:16px;font-weight:900;margin-bottom:2px}
-    .service-badge{display:inline-block;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;padding:2px 8px;border-radius:20px;margin-bottom:4px}
-    .badge-teal{background:#e0f2f1;color:#00796b}
-    .badge-orange{background:#fff3e0;color:#e65100}
-    .table-lbl{font-size:15px;font-weight:900;color:#00796b;margin-bottom:2px}
-    .meta{font-size:10px;color:#666}
-    .div{border-top:1px dashed #ccc;margin:8px 0}
-    .item-block{margin:5px 0}
-    .row{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin:3px 0}
-    .qty{font-weight:900;color:#333;flex-shrink:0;font-mono;margin-right:4px}
-    .name{font-weight:700;flex:1;text-transform:uppercase}
+    .lbl{font-size:9px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:#444;margin-top:2px}
+    h1{font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:0.5px}
+    .meta{font-size:9px;color:#333}
+    .div{border-top:1px dashed black;margin:4px 0}
+    .item-block{margin:3px 0}
+    .row{display:flex;justify-content:space-between;align-items:baseline;gap:4px;margin:1px 0}
+    .qty{font-weight:900;color:black;flex-shrink:0;margin-right:2px}
+    .name{font-weight:700;flex:1;text-transform:uppercase;font-size:10px}
     .price{font-weight:700;flex-shrink:0;font-family:monospace}
-    .mod-row{font-size:10px;color:#444;padding-left:16px;font-weight:600;margin-top:1px}
-    .note-row{font-size:10px;color:#d97706;padding-left:16px;font-style:italic;margin-top:1px;font-weight:600}
-    .kv{display:flex;justify-content:space-between;font-size:11px;margin:2px 0}
-    .kl{color:#666;font-weight:600}
+    .mod-row{font-size:9px;color:#333;padding-left:12px;font-weight:600}
+    .note-row{font-size:9px;color:#b45309;padding-left:12px;font-style:italic;font-weight:600}
+    .kv{display:flex;justify-content:space-between;font-size:10px;margin:1px 0}
+    .kl{color:#444;font-weight:600}
     .kv-v{font-weight:700}
-    .text-teal{color:#00796b}
-    .font-black{font-weight:900}
-    .kv-table{font-size:13px;color:#00796b}
-    .total{display:flex;justify-content:space-between;font-size:14px;font-weight:900;margin-top:4px}
-    .badge{font-size:8px;font-weight:800;text-transform:uppercase;padding:2px 6px;border-radius:20px}
-    .badge-paid{background:#d1fae5;color:#065f46}
-    .badge-unpaid{background:#fee2e2;color:#991b1b}
-    .items-header{display:flex;justify-content:space-between;font-size:9px;font-weight:800;color:#777;letter-spacing:1px}
-    .footer{text-align:center;color:#888;font-size:9px;margin-top:14px;border-top:1px dashed #eee;padding-top:8px}
+    .text-teal{color:black}
+    .kv-table{font-size:11px;color:black;text-decoration:underline}
+    .total{display:flex;justify-content:space-between;font-size:12px;font-weight:900;margin-top:2px}
+    .payment-method-row{text-align:center;font-size:9px;font-weight:900;background:#eee;padding:3px;border-radius:4px;margin-top:3px;text-transform:uppercase}
+    .items-header{display:flex;justify-content:space-between;font-size:8px;font-weight:900;color:#333;letter-spacing:0.5px}
+    .footer{text-align:center;color:#333;font-size:8px;margin-top:8px;border-top:1px dashed black;padding-top:4px;font-weight:bold}
     @media print{
-      body{margin:0;padding:0}
-      .print-page{page-break-after:always;min-height:100vh}
+      body{margin:0;padding:0;background:white;color:black}
+      .print-page{page-break-after:always;min-height:auto !important;height:auto !important}
       .print-page:last-child{page-break-after:avoid}
     }
   </style>
