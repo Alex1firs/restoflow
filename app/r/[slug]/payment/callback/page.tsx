@@ -46,19 +46,23 @@ export default async function PaymentCallbackPage({ params, searchParams }: Prop
         // createOrderFromPaymentReference runs a Firestore transaction that deletes
         // pending_payments/{reference} atomically — only the first concurrent caller
         // gets a non-null return. Use that as the idempotency signal.
-        const createdOrderId = await createOrderFromPaymentReference(reference);
-        const isCreator = createdOrderId !== null;
-        orderId = createdOrderId ?? await getOrderByReference(reference);
-        if (orderId) {
+        const result = await createOrderFromPaymentReference(reference);
+        const isCreator = result !== null;
+        const resolved = result ?? await getOrderByReference(reference);
+        if (resolved) {
+          orderId = resolved.orderId;
+          trackingToken = resolved.trackingToken;
           success = true;
 
-          // Always fetch order tracking details and customer phone for tracking links
+          // Always fetch order details for loyalty and storefront metadata
           try {
             const orderSnap = await getAdminDb().collection("orders").doc(orderId).get();
             if (orderSnap.exists) {
               const d = orderSnap.data()!;
               orderPhone = (d.phone as string) ?? "";
-              trackingToken = (d.trackingToken as string) ?? null;
+              if (!trackingToken) {
+                trackingToken = (d.trackingToken as string) ?? null;
+              }
               
               const rSnap = await getAdminDb().collection("restaurants").doc(slug).get();
               restaurantName = (rSnap.data()?.name as string) ?? "";

@@ -2,7 +2,9 @@ import { randomBytes } from "crypto";
 import { getAdminDb } from "./firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 
-export async function createOrderFromPaymentReference(reference: string): Promise<string | null> {
+export async function createOrderFromPaymentReference(
+  reference: string
+): Promise<{ orderId: string; trackingToken: string } | null> {
   const db = getAdminDb();
   const pendingRef = db.collection("pending_payments").doc(reference);
   const orderRef = db.collection("orders").doc();
@@ -33,16 +35,23 @@ export async function createOrderFromPaymentReference(reference: string): Promis
     });
     tx.delete(pendingRef);
 
-    return orderRef.id;
+    return { orderId: orderRef.id, trackingToken };
   });
 }
 
-export async function getOrderByReference(reference: string): Promise<string | null> {
+export async function getOrderByReference(
+  reference: string
+): Promise<{ orderId: string; trackingToken: string } | null> {
   const db = getAdminDb();
   const snap = await db
     .collection("orders")
     .where("paymentReference", "==", reference)
     .limit(1)
     .get();
-  return snap.empty ? null : snap.docs[0].id;
+  if (snap.empty) return null;
+  const doc = snap.docs[0];
+  return {
+    orderId: doc.id,
+    trackingToken: (doc.data().trackingToken as string) || "",
+  };
 }

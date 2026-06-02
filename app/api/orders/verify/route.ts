@@ -32,11 +32,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Payment was not completed (status: ${txData.status})` }, { status: 400 });
     }
 
-    let orderId = await createOrderFromPaymentReference(reference.trim());
-    const isNew = !!orderId;
-
-    if (!orderId) {
-      orderId = await getOrderByReference(reference.trim());
+    const result = await createOrderFromPaymentReference(reference.trim());
+    const isNew = !!result;
+    
+    let orderId: string | null = null;
+    if (result) {
+      orderId = result.orderId;
+    } else {
+      const existing = await getOrderByReference(reference.trim());
+      orderId = existing ? existing.orderId : null;
     }
 
     if (isNew && orderId) {

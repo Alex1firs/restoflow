@@ -39,8 +39,9 @@ export async function POST(req: NextRequest) {
       if (metadata?.paymentType === "onboarding" && metadata?.onboardingId) {
         await processOnboarding(metadata.onboardingId, reference);
       } else if (metadata?.paymentType === "order") {
-        const newOrderId = await createOrderFromPaymentReference(reference);
-        if (newOrderId) {
+        const result = await createOrderFromPaymentReference(reference);
+        if (result) {
+          const { orderId: newOrderId } = result;
           // Fetch order + restaurant for notifications
           const db = getAdminDb();
           const orderSnap = await db.collection("orders").doc(newOrderId).get();
