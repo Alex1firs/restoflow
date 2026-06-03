@@ -17,24 +17,24 @@ body {
   color: var(--foreground);
 }
 
-/* Ensure inputs, textareas, and selects default to dark text for readability on light/white containers */
-input:not([type="checkbox"]):not([type="radio"]),
-textarea,
-select {
+/* Ensure inputs, textareas, and selects default to dark text for readability on light/white containers, using :where() for zero specificity so utility classes can override them */
+:where(input:not([type="checkbox"]):not([type="radio"])),
+:where(textarea),
+:where(select) {
   color: #111827; /* Tailwind gray-900 */
 }
 
 /* Support dark mode (both class and media preferences) */
-.dark input:not([type="checkbox"]):not([type="radio"]),
-.dark textarea,
-.dark select {
+:where(.dark input:not([type="checkbox"]):not([type="radio"])),
+:where(.dark textarea),
+:where(.dark select) {
   color: #f9fafb; /* Tailwind gray-50 */
 }
 
 @media (prefers-color-scheme: dark) {
-  input:not([type="checkbox"]):not([type="radio"]),
-  textarea,
-  select {
+  :where(input:not([type="checkbox"]):not([type="radio"])),
+  :where(textarea),
+  :where(select) {
     color: #f9fafb; /* Tailwind gray-50 */
   }
 }
