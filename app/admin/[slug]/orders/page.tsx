@@ -46,7 +46,7 @@ export default async function AdminOrdersPage({ params }: Props) {
       <div className="flex-1 min-w-0 pt-14 pb-16 lg:pt-0 lg:pb-0">
         <SubscriptionBanner subscription={subscription} />
         <div className="relative">
-          <AdminOrdersClient restaurant={restaurant} />
+          <AdminOrdersClient restaurant={restaurant} role={user.role} />
           {/* Billing card pinned to top-right of content area */}
           <div className="hidden xl:block absolute top-8 right-4 w-72">
             <BillingSection

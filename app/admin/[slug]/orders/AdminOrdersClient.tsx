@@ -36,7 +36,10 @@ type Order = {
 
 type FilterTab = "active" | "completed" | "all";
 
-type Props = { restaurant: { id: string; name: string; slug: string } };
+type Props = {
+  restaurant: { id: string; name: string; slug: string };
+  role?: string;
+};
 
 function playBeep() {
   try {
@@ -66,7 +69,7 @@ const STATUS_CONFIG: Record<OrderStatus, { label: string; badge: string; dot: st
   rejected:  { label: "Rejected",  badge: "bg-red-100 text-red-800 border-red-200",      dot: "bg-red-400" },
 };
 
-export default function AdminOrdersClient({ restaurant }: Props) {
+export default function AdminOrdersClient({ restaurant, role }: Props) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<FilterTab>("active");
@@ -304,7 +307,7 @@ export default function AdminOrdersClient({ restaurant }: Props) {
       </div>
 
       {/* ── PENDING CANCELLATION REQUESTS QUEUE ────────────────── */}
-      {tab === "active" && cancellationRequests.length > 0 && (
+      {(role === "owner" || role === "manager") && tab === "active" && cancellationRequests.length > 0 && (
         <div className="mb-8 space-y-4">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 bg-red-550 rounded-full animate-ping" />

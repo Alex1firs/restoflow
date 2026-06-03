@@ -50,6 +50,7 @@ export default async function DashboardPage({ params }: Props) {
           rejectionReason={data.rejectionReason as string | undefined}
           setupChecklist={setupChecklist}
           assistanceStatus={(data.assistanceStatus as string) || undefined}
+          role={user.role}
         />
       </div>
     </div>

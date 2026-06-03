@@ -31,6 +31,7 @@ interface Props {
   rejectionReason?: string;
   setupChecklist?: SetupChecklist;
   assistanceStatus?: string;
+  role?: string;
 }
 
 function getLagosStartOfDay(): Date {
@@ -112,7 +113,7 @@ const ITEM_ACTION: Record<string, { actionUrl: (slug: string) => string; actionL
   },
 };
 
-export default function DashboardClient({ slug, status = "draft", rejectionReason, setupChecklist, assistanceStatus }: Props) {
+export default function DashboardClient({ slug, status = "draft", rejectionReason, setupChecklist, assistanceStatus, role }: Props) {
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
@@ -280,7 +281,7 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
         </div>
 
         {/* ── PENDING CANCELLATION ALERTS BANNER ──────────────────── */}
-        {allOrders.filter((o) => o.cancellationRequested === true).length > 0 && (
+        {(role === "owner" || role === "manager") && allOrders.filter((o) => o.cancellationRequested === true).length > 0 && (
           <div className="bg-red-50 border border-red-200 rounded-3xl p-5 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in duration-200">
             <div className="flex items-start gap-4">
               <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-600 text-xl shrink-0">

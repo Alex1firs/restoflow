@@ -78,6 +78,9 @@ export async function PATCH(
     }
 
     if (declineCancellation) {
+      if (user.role !== "owner" && user.role !== "manager") {
+        return NextResponse.json({ error: "Forbidden: Only owners and managers can decline cancellation requests." }, { status: 403 });
+      }
       await orderRef.update({
         cancellationRequested: false,
         cancellationReason: null,
@@ -94,6 +97,14 @@ export async function PATCH(
     // Idempotency — skip if already at this status
     if (order.status === status) {
       return NextResponse.json({ success: true });
+    }
+
+    // Ensure role restrictions for approving cancellation requests
+    if (status === "rejected" && order.cancellationRequested) {
+      const isManagerOverride = voidReason?.toLowerCase().includes("override") || voidReason?.toLowerCase().includes("pin");
+      if (!isManagerOverride && user.role !== "owner" && user.role !== "manager") {
+        return NextResponse.json({ error: "Forbidden: Only owners and managers can approve cancellation requests." }, { status: 403 });
+      }
     }
 
     // Timestamp each stage for future kitchen performance metrics
