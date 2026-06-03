@@ -2726,6 +2726,8 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
             <div className="flex-1 max-w-md">
               <input
                 type="text"
+                name="pos-search-query"
+                autoComplete="off"
                 placeholder="Search menu items..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -3671,7 +3673,18 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
       {/* ── 2. Manager Authorization PIN Override dialog ─────────────────────────── */}
       {verifyingAction && (
         <div className="absolute inset-0 bg-black/75 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-6 text-center animate-scale-in border border-gray-100">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              verifyPin();
+            }}
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-6 text-center animate-scale-in border border-gray-100"
+            autoComplete="off"
+          >
+            {/* Dummy credentials inputs to catch browser autofill */}
+            <input type="text" name="username" style={{ display: 'none' }} autoComplete="username" />
+            <input type="password" name="password" style={{ display: 'none' }} autoComplete="new-password" />
+
             <div className="w-12 h-12 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-4 text-xl border border-amber-200">
               🔑
             </div>
@@ -3687,6 +3700,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
             <div className="mt-5">
               <input
                 type="password"
+                autoComplete="new-password"
                 maxLength={4}
                 placeholder="••••"
                 value={pinInput}
@@ -3698,6 +3712,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
 
             <div className="flex gap-2.5 mt-6">
               <button
+                type="button"
                 onClick={() => {
                   setVerifyingAction(null);
                   setPinInput("");
@@ -3709,7 +3724,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                 Cancel
               </button>
               <button
-                onClick={verifyPin}
+                type="submit"
                 className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-black py-3 rounded-xl transition-colors text-xs"
               >
                 Authorize Action
@@ -3724,14 +3739,25 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                 Enter your 4-digit manager authorization PIN
               </p>
             )}
-          </div>
+          </form>
         </div>
       )}
 
       {/* ── Cashier PIN Settings Modal ── */}
       {showCashierPinModal && selectedCashierForPin && (
         <div className="fixed inset-0 bg-black/60 z-[10000] flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-sm border border-gray-100 shadow-2xl space-y-4 text-left">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSaveCashierPin();
+            }}
+            className="bg-white rounded-3xl p-6 w-full max-w-sm border border-gray-100 shadow-2xl space-y-4 text-left"
+            autoComplete="off"
+          >
+            {/* Dummy credentials inputs to catch browser autofill */}
+            <input type="text" name="username" style={{ display: 'none' }} autoComplete="username" />
+            <input type="password" name="password" style={{ display: 'none' }} autoComplete="new-password" />
+
             <div>
               <h3 className="text-lg font-black text-gray-900">Configure POS PIN Code</h3>
               <p className="text-xs text-gray-400 mt-1">
@@ -3758,6 +3784,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                 </label>
                 <input
                   type="password"
+                  autoComplete="new-password"
                   pattern="\d*"
                   maxLength={4}
                   value={cashierPinOld}
@@ -3777,6 +3804,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
               </label>
               <input
                 type="password"
+                autoComplete="new-password"
                 pattern="\d*"
                 maxLength={4}
                 value={cashierPinNew}
@@ -3795,6 +3823,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
               </label>
               <input
                 type="password"
+                autoComplete="new-password"
                 pattern="\d*"
                 maxLength={4}
                 value={cashierPinConfirm}
@@ -3809,13 +3838,14 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
 
             <div className="flex gap-2.5 pt-2">
               <button
+                type="submit"
                 disabled={cashierPinSubmitting || !isOnline}
-                onClick={handleSaveCashierPin}
                 className="flex-1 bg-orange-600 hover:bg-orange-500 text-white font-bold text-sm py-3 rounded-xl disabled:opacity-50 transition-colors"
               >
                 {cashierPinSubmitting ? "Saving..." : "Save PIN"}
               </button>
               <button
+                type="button"
                 disabled={cashierPinSubmitting}
                 onClick={() => {
                   setShowCashierPinModal(false);
@@ -3826,7 +3856,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                 Cancel
               </button>
             </div>
-          </div>
+          </form>
         </div>
       )}
 
