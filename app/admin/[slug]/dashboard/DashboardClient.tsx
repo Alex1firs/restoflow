@@ -22,6 +22,7 @@ interface Order {
   paymentReference?: string;
   createdAt: Timestamp | null;
   restaurantId: string;
+  cancellationRequested?: boolean;
 }
 
 interface Props {
@@ -277,6 +278,29 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
             })}
           </p>
         </div>
+
+        {/* ── PENDING CANCELLATION ALERTS BANNER ──────────────────── */}
+        {allOrders.filter((o) => o.cancellationRequested === true).length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-3xl p-5 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in duration-200">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-600 text-xl shrink-0">
+                🚨
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-black text-red-950 text-sm md:text-base">Order Cancellation Approval Required</h3>
+                <p className="text-xs text-gray-500 font-bold leading-relaxed">
+                  There are pending cancellation requests from your staff. You must approve or decline them to update POS unfinalized bills.
+                </p>
+              </div>
+            </div>
+            <a
+              href={`/admin/${slug}/orders`}
+              className="w-full md:w-auto px-5 py-3 bg-red-600 hover:bg-red-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-sm text-center active:scale-95 shrink-0"
+            >
+              Review Requests
+            </a>
+          </div>
+        )}
 
         {/* ── Mobile quick actions (hidden md+) ──────────────────────────── */}
         <div className="grid grid-cols-3 gap-3 md:hidden">

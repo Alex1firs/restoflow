@@ -28,6 +28,10 @@ type Order = {
   createdAt: Timestamp;
   orderSource?: string;
   deliveryType?: "delivery" | "pickup";
+  cancellationRequested?: boolean;
+  cancellationReason?: string;
+  cancellationRequestedBy?: string;
+  cancellationRequestedAt?: Timestamp;
 };
 
 type FilterTab = "active" | "completed" | "all";
@@ -88,6 +92,52 @@ export default function AdminOrdersClient({ restaurant }: Props) {
       window.print();
       setPrintingOrder(null);
     }, 150);
+  };
+
+  const handleAcceptCancellation = async (orderId: string) => {
+    setUpdating(orderId);
+    try {
+      const res = await fetch(`/api/orders/${orderId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "rejected",
+          voidReason: "Owner approved remote cancellation request.",
+          voidedByStaffName: "Owner (Remote Approval)",
+        }),
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to accept cancellation");
+      }
+      showToast("Order cancellation approved and voided.");
+    } catch (e: any) {
+      showToast(e.message || "Error accepting cancellation");
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const handleDeclineCancellation = async (orderId: string) => {
+    setUpdating(orderId);
+    try {
+      const res = await fetch(`/api/orders/${orderId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          declineCancellation: true,
+        }),
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to decline cancellation");
+      }
+      showToast("Order cancellation declined and restored.");
+    } catch (e: any) {
+      showToast(e.message || "Error declining cancellation");
+    } finally {
+      setUpdating(null);
+    }
   };
 
   useEffect(() => {
@@ -194,8 +244,9 @@ export default function AdminOrdersClient({ restaurant }: Props) {
   const activeStatuses: OrderStatus[] = ["scheduled", "pending", "preparing", "ready"];
   const todayOrders = orders.filter((o) => isToday(o.createdAt));
   const activeOrders = orders.filter(
-    (o) => activeStatuses.includes(o.status) && o.orderSource !== "counter"
+    (o) => activeStatuses.includes(o.status) && o.orderSource !== "counter" && o.cancellationRequested !== true
   );
+  const cancellationRequests = orders.filter((o) => o.cancellationRequested === true);
 
   const filtered =
     tab === "active" ? activeOrders :
@@ -251,6 +302,73 @@ export default function AdminOrdersClient({ restaurant }: Props) {
           </button>
         ))}
       </div>
+
+      {/* ── PENDING CANCELLATION REQUESTS QUEUE ────────────────── */}
+      {tab === "active" && cancellationRequests.length > 0 && (
+        <div className="mb-8 space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 bg-red-550 rounded-full animate-ping" />
+            <h2 className="text-xs font-black text-red-750 uppercase tracking-widest flex items-center gap-1">
+              🚨 Pending Cancellation Requests ({cancellationRequests.length})
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-4">
+            {cancellationRequests.map((order) => (
+              <div key={order.id} className="bg-red-50/40 border border-red-200/80 rounded-3xl p-5 shadow-sm flex flex-col md:flex-row gap-5 items-start justify-between">
+                <div className="space-y-2 flex-1">
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-xs text-red-700 bg-red-100/60 px-2 py-0.5 rounded font-black">
+                      #{order.id.slice(-6).toUpperCase()}
+                    </span>
+                    <span className="text-xs text-gray-500 font-semibold">
+                      {order.createdAt?.toDate ? order.createdAt.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ""}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-gray-950">
+                      Customer: {order.customerName || "Walk-in Guest"}
+                    </p>
+                    <p className="text-xs text-gray-500 font-bold mt-0.5">
+                      Total: <span className="text-gray-900 font-black">₦{order.total.toLocaleString("en-NG")}</span>
+                    </p>
+                  </div>
+                  <div className="bg-white border border-red-100 rounded-2xl p-3.5 text-xs space-y-1">
+                    <p className="text-red-700 font-extrabold flex items-center gap-1.5">
+                      ⚠️ Reason for Cancellation Request:
+                    </p>
+                    <p className="text-gray-700 font-medium italic">
+                      "{order.cancellationReason || "No reason provided"}"
+                    </p>
+                    {order.cancellationRequestedBy && (
+                      <p className="text-[10px] text-gray-400 font-bold mt-1">
+                        Requested by: {order.cancellationRequestedBy}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-row md:flex-col gap-2.5 w-full md:w-auto self-stretch md:self-auto justify-end">
+                  <button
+                    type="button"
+                    disabled={updating === order.id}
+                    onClick={() => handleDeclineCancellation(order.id)}
+                    className="flex-1 md:flex-initial px-4 py-2.5 bg-gray-150 hover:bg-gray-200 text-gray-700 font-black rounded-xl text-xs uppercase tracking-wider transition-colors disabled:opacity-50"
+                  >
+                    Decline
+                  </button>
+                  <button
+                    type="button"
+                    disabled={updating === order.id}
+                    onClick={() => handleAcceptCancellation(order.id)}
+                    className="flex-1 md:flex-initial px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white font-black rounded-xl text-xs uppercase tracking-wider transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <span>Approve & Void</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex flex-col items-center py-20 bg-white rounded-3xl border shadow-sm">

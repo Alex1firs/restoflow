@@ -41,6 +41,8 @@ export async function PUT(req: NextRequest) {
     hidePrices,
     dineInEnabled,
     heroSettings,
+    cancellationManagerPinEnabled,
+    cancellationOwnerApprovalEnabled,
   } = body as {
     name?: string;
     description?: string;
@@ -66,6 +68,8 @@ export async function PUT(req: NextRequest) {
     hidePrices?: boolean;
     dineInEnabled?: boolean;
     heroSettings?: HeroSettings;
+    cancellationManagerPinEnabled?: boolean;
+    cancellationOwnerApprovalEnabled?: boolean;
   };
 
   if (!name?.trim()) {
@@ -101,6 +105,8 @@ export async function PUT(req: NextRequest) {
       deliveryTime: (deliveryTime ?? "").trim(),
       hidePrices: hidePrices === true,
       dineInEnabled: dineInEnabled === true,
+      cancellationManagerPinEnabled: cancellationManagerPinEnabled !== false,
+      cancellationOwnerApprovalEnabled: cancellationOwnerApprovalEnabled !== false,
       ...(heroSettings && typeof heroSettings === "object" ? { heroSettings } : {}),
     });
 

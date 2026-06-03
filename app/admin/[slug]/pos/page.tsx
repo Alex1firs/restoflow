@@ -56,6 +56,8 @@ export default async function POSPage({ params }: Props) {
   const restaurant = {
     slug: data.slug as string,
     name: data.name as string,
+    cancellationManagerPinEnabled: data.cancellationManagerPinEnabled !== false,
+    cancellationOwnerApprovalEnabled: data.cancellationOwnerApprovalEnabled !== false,
   };
 
   const userDoc = await db.collection("users").doc(user.uid).get();

@@ -116,6 +116,10 @@ type TodayOrder = {
   pricingMode?: string | null;
   isOffline?: boolean;
   auditLog?: any[];
+  cancellationRequested?: boolean;
+  cancellationReason?: string;
+  cancellationRequestedBy?: string;
+  cancellationRequestedAt?: any;
 };
 
 type AddOnReceipt = {
@@ -138,7 +142,12 @@ type SettlementResult = {
 };
 
 type Props = {
-  restaurant: { slug: string; name: string };
+  restaurant: {
+    slug: string;
+    name: string;
+    cancellationManagerPinEnabled?: boolean;
+    cancellationOwnerApprovalEnabled?: boolean;
+  };
   menuItems: MenuItem[];
   staffName: string;
   staffId: string;
@@ -832,6 +841,8 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   const [rightTab, setRightTab] = useState<"order" | "bills">("order");
   const [settleBillId, setSettleBillId] = useState<string | null>(null);
   const [voidingOrder, setVoidingOrder] = useState<TodayOrder | null>(null);
+  const [pendingVoidParams, setPendingVoidParams] = useState<{ orderId: string; reason: string } | null>(null);
+  const [voidAuthChoiceOpen, setVoidAuthChoiceOpen] = useState(false);
   const [settlementResult, setSettlementResult] = useState<SettlementResult | null>(null);
   const [settledOrder, setSettledOrder] = useState<TodayOrder | null>(null);
 
@@ -2477,18 +2488,21 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
           cashierName={activeCashierName}
           onClose={() => setVoidingOrder(null)}
           onVoidComplete={async (orderId, reason) => {
-            if (voidingOrder.isOffline) {
-              openCancellationSlip(voidingOrder, restaurant.name, activeCashierName, reason);
-              await dbDelete("ordersQueue", orderId);
+            const executeOfflineVoidLocal = async (id: string, rsn: string) => {
+              openCancellationSlip(voidingOrder, restaurant.name, activeCashierName, rsn);
+              await dbDelete("ordersQueue", id);
               loadOfflineQueueBills();
               showSystemToast("Offline order deleted successfully.");
-            } else {
-              const res = await fetch(`/api/orders/${orderId}/status`, {
+              setVoidingOrder(null);
+            };
+
+            const executeVoidOrderLocal = async (id: string, rsn: string) => {
+              const res = await fetch(`/api/orders/${id}/status`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   status: "rejected",
-                  voidReason: reason,
+                  voidReason: rsn,
                   voidedByStaffName: activeCashierName,
                 }),
               });
@@ -2496,12 +2510,169 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                 const errData = await res.json();
                 throw new Error(errData.error || "Failed to void order");
               }
-              openCancellationSlip(voidingOrder, restaurant.name, activeCashierName, reason);
+              openCancellationSlip(voidingOrder, restaurant.name, activeCashierName, rsn);
               showSystemToast("Bill voided successfully.");
+              setVoidingOrder(null);
+            };
+
+            const executeRequestCancellationLocal = async (id: string, rsn: string) => {
+              const res = await fetch(`/api/orders/${id}/status`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  requestCancellation: true,
+                  voidReason: rsn,
+                  voidedByStaffName: activeCashierName,
+                }),
+              });
+              if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.error || "Failed to send cancellation request");
+              }
+              showSystemToast("Cancellation request sent to owner.");
+              setVoidingOrder(null);
+            };
+
+            // Check authorization rules
+            const isStaff = role === "staff" || activeCashierRole === "staff";
+            const managerPin = restaurant.cancellationManagerPinEnabled !== false;
+            const ownerApproval = restaurant.cancellationOwnerApprovalEnabled !== false;
+            const isOffline = voidingOrder.isOffline;
+
+            if (isStaff && !isOffline) {
+              if (managerPin && ownerApproval) {
+                setPendingVoidParams({ orderId, reason });
+                setVoidAuthChoiceOpen(true);
+                return;
+              } else if (managerPin) {
+                setPendingVoidParams({ orderId, reason });
+                setVerifyingAction("void_order");
+                setPendingActionCallback(() => () => {
+                  setVerifyingAction(null);
+                  setPinInput("");
+                  setPinError(null);
+                  executeVoidOrderLocal(orderId, reason);
+                });
+                return;
+              } else if (ownerApproval) {
+                await executeRequestCancellationLocal(orderId, reason);
+                return;
+              }
+            } else if (isStaff && isOffline) {
+              if (managerPin) {
+                setPendingVoidParams({ orderId, reason });
+                setVerifyingAction("void_order");
+                setPendingActionCallback(() => () => {
+                  setVerifyingAction(null);
+                  setPinInput("");
+                  setPinError(null);
+                  executeOfflineVoidLocal(orderId, reason);
+                });
+                return;
+              }
             }
-            setVoidingOrder(null);
+
+            // Normal void logic for managers, owners, offline/online fallback
+            if (isOffline) {
+              await executeOfflineVoidLocal(orderId, reason);
+            } else {
+              await executeVoidOrderLocal(orderId, reason);
+            }
           }}
         />
+      )}
+      {/* ── Void Auth Choice Modal overlay ────────────────────────── */}
+      {voidAuthChoiceOpen && pendingVoidParams && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-gray-100 animate-in fade-in duration-200">
+            <div className="px-6 py-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="font-black text-gray-900 text-sm uppercase tracking-wider">🔒 Approval Required</h3>
+                <p className="text-[10px] text-gray-400 font-semibold mt-0.5">Select how to authorize this cancellation</p>
+              </div>
+              <button onClick={() => { setVoidAuthChoiceOpen(false); setPendingVoidParams(null); setVoidingOrder(null); }} className="text-gray-400 hover:text-gray-600 p-1">✕</button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-gray-500 font-medium leading-relaxed font-semibold">
+                Both security methods are enabled for order voiding. You can request remote approval from the owner or get a local manager to enter their PIN.
+              </p>
+              <div className="grid grid-cols-1 gap-2.5">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const { orderId, reason } = pendingVoidParams;
+                    setVoidAuthChoiceOpen(false);
+                    // Trigger remote approval
+                    const res = await fetch(`/api/orders/${orderId}/status`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        requestCancellation: true,
+                        voidReason: reason,
+                        voidedByStaffName: activeCashierName,
+                      }),
+                    });
+                    if (!res.ok) {
+                      const errData = await res.json();
+                      alert(errData.error || "Failed to request cancellation");
+                    } else {
+                      showSystemToast("Cancellation request sent to owner.");
+                    }
+                    setVoidingOrder(null);
+                    setPendingVoidParams(null);
+                  }}
+                  className="w-full p-4 bg-orange-600 hover:bg-orange-500 text-white rounded-2xl flex items-center gap-3 transition-all hover:scale-[1.02] active:scale-95"
+                >
+                  <span className="text-2xl">⏳</span>
+                  <div className="text-left">
+                    <p className="text-xs font-black uppercase tracking-wider">Request Owner Approval</p>
+                    <p className="text-[10px] text-orange-200 font-bold mt-0.5">Sends a real-time notification to the owner dashboard</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const { orderId, reason } = pendingVoidParams;
+                    setVoidAuthChoiceOpen(false);
+                    setVerifyingAction("void_order");
+                    setPendingActionCallback(() => () => {
+                      setVerifyingAction(null);
+                      setPinInput("");
+                      setPinError(null);
+                      
+                      // Now execute actual void
+                      fetch(`/api/orders/${orderId}/status`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          status: "rejected",
+                          voidReason: reason,
+                          voidedByStaffName: activeCashierName,
+                        }),
+                      }).then((res) => {
+                        if (res.ok) {
+                          openCancellationSlip(voidingOrder!, restaurant.name, activeCashierName, reason);
+                          showSystemToast("Bill voided successfully via manager override.");
+                        } else {
+                          res.json().then(e => alert(e.error || "Failed to void order"));
+                        }
+                        setVoidingOrder(null);
+                        setPendingVoidParams(null);
+                      });
+                    });
+                  }}
+                  className="w-full p-4 bg-teal-700 hover:bg-teal-650 text-white rounded-2xl flex items-center gap-3 transition-all hover:scale-[1.02] active:scale-95"
+                >
+                  <span className="text-2xl">🔑</span>
+                  <div className="text-left">
+                    <p className="text-xs font-black uppercase tracking-wider">Manager PIN Override</p>
+                    <p className="text-[10px] text-teal-200 font-bold mt-0.5">A manager or owner enters their passcode locally</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
       {settleBillId && settlementResult && (
         <SettlementSuccessModal
@@ -2796,18 +2967,38 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
               }
               onEdit={handleEditOrder}
               onVoid={(bill) => {
-                if (role === "staff" || activeCashierRole === "staff") {
+                if (bill.cancellationRequested) {
+                  setPendingVoidParams({ orderId: bill.id, reason: bill.cancellationReason || "Manager PIN Override" });
                   setVerifyingAction("void_order");
                   setPendingActionCallback(() => () => {
                     setVerifyingAction(null);
                     setPinInput("");
                     setPinError(null);
-                    setVoidingOrder(bill);
+                    
+                    fetch(`/api/orders/${bill.id}/status`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        status: "rejected",
+                        voidReason: bill.cancellationReason || "Manager PIN Override",
+                        voidedByStaffName: activeCashierName,
+                      }),
+                    }).then((res) => {
+                      if (res.ok) {
+                        openCancellationSlip(bill, restaurant.name, activeCashierName, bill.cancellationReason || "Manager PIN Override");
+                        showSystemToast("Bill voided successfully via manager override.");
+                      } else {
+                        res.json().then(e => alert(e.error || "Failed to void order"));
+                      }
+                      setVoidingOrder(null);
+                      setPendingVoidParams(null);
+                    });
                   });
                 } else {
                   setVoidingOrder(bill);
                 }
               }}
+              cancellationManagerPinEnabled={restaurant.cancellationManagerPinEnabled !== false}
             />
           )}
 
@@ -3896,12 +4087,14 @@ function OpenBillsPanel({
   onSettleOffline,
   onEdit,
   onVoid,
+  cancellationManagerPinEnabled,
 }: {
   bills: TodayOrder[];
   onSettle: (orderId: string) => void;
   onSettleOffline: (localOrderId: string, method: string, note: string) => void;
   onEdit: (bill: TodayOrder) => void;
   onVoid: (bill: TodayOrder) => void;
+  cancellationManagerPinEnabled?: boolean;
 }) {
   const [offlineSettleId, setOfflineSettleId] = useState<string | null>(null);
   const [offlineMethod, setOfflineMethod] = useState<"cash" | "bank_transfer" | "card">("cash");
@@ -4072,36 +4265,63 @@ function OpenBillsPanel({
               </div>
             )}
 
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => onEdit(bill)}
-                className="flex-1 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 font-black text-sm py-3.5 rounded-xl transition-colors border border-gray-200"
-              >
-                Edit Order
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (bill.isOffline) {
-                    setOfflineMethod("cash");
-                    setOfflineSettleId(offlineSettleId === bill.id ? null : bill.id);
-                  } else {
-                    onSettle(bill.id);
-                  }
-                }}
-                className="flex-1 bg-teal-600 hover:bg-teal-500 active:bg-teal-700 text-white font-black text-sm py-3.5 rounded-xl transition-colors"
-              >
-                Settle Bill
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => onVoid(bill)}
-              className="w-full mt-2 bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-600 font-black text-xs py-2.5 rounded-xl transition-colors border border-red-100 text-center"
-            >
-              ⚠️ Void / Cancel Bill
-            </button>
+            {bill.cancellationRequested && (
+              <div className="bg-orange-50 border border-orange-200 rounded-2xl p-3 mb-2 flex flex-col gap-2">
+                <div className="flex items-center gap-1.5 text-orange-700 font-bold text-[11px] uppercase tracking-wide">
+                  <span className="animate-pulse text-base">⏳</span>
+                  <span>Cancellation Pending Owner Approval</span>
+                </div>
+                {bill.cancellationReason && (
+                  <p className="text-[10px] text-gray-500 font-bold leading-relaxed">
+                    Reason: "{bill.cancellationReason}"
+                  </p>
+                )}
+                {cancellationManagerPinEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => onVoid(bill)}
+                    className="w-full bg-teal-700 hover:bg-teal-650 text-white font-black text-xs py-2.5 rounded-xl transition-colors text-center flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                  >
+                    🔑 Enter Manager PIN Override
+                  </button>
+                )}
+              </div>
+            )}
+
+            {!bill.cancellationRequested && (
+              <>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onEdit(bill)}
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 font-black text-sm py-3.5 rounded-xl transition-colors border border-gray-200"
+                  >
+                    Edit Order
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (bill.isOffline) {
+                        setOfflineMethod("cash");
+                        setOfflineSettleId(offlineSettleId === bill.id ? null : bill.id);
+                      } else {
+                        onSettle(bill.id);
+                      }
+                    }}
+                    className="flex-1 bg-teal-600 hover:bg-teal-500 active:bg-teal-700 text-white font-black text-sm py-3.5 rounded-xl transition-colors"
+                  >
+                    Settle Bill
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onVoid(bill)}
+                  className="w-full mt-2 bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-600 font-black text-xs py-2.5 rounded-xl transition-colors border border-red-100 text-center"
+                >
+                  ⚠️ Void / Cancel Bill
+                </button>
+              </>
+            )}
           </div>
         );
       })}

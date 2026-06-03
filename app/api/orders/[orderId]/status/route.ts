@@ -40,14 +40,13 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { status, voidReason, voidedByStaffName } = body as {
+  const { status, voidReason, voidedByStaffName, requestCancellation, declineCancellation } = body as {
     status?: string;
     voidReason?: string;
     voidedByStaffName?: string;
+    requestCancellation?: boolean;
+    declineCancellation?: boolean;
   };
-  if (!status || !VALID.includes(status as ValidStatus)) {
-    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
-  }
 
   const db = getAdminDb();
   const orderRef = db.collection("orders").doc(orderId);
@@ -63,6 +62,33 @@ export async function PATCH(
     // Ensure this order belongs to the authenticated restaurant
     if (order.restaurantId !== user.restaurantSlug) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (requestCancellation) {
+      if (!voidReason?.trim()) {
+        return NextResponse.json({ error: "Cancellation reason is required" }, { status: 400 });
+      }
+      await orderRef.update({
+        cancellationRequested: true,
+        cancellationReason: voidReason.trim(),
+        cancellationRequestedBy: (voidedByStaffName || "Staff").trim(),
+        cancellationRequestedAt: FieldValue.serverTimestamp(),
+      });
+      return NextResponse.json({ success: true });
+    }
+
+    if (declineCancellation) {
+      await orderRef.update({
+        cancellationRequested: false,
+        cancellationReason: null,
+        cancellationRequestedBy: null,
+        cancellationRequestedAt: null,
+      });
+      return NextResponse.json({ success: true });
+    }
+
+    if (!status || !VALID.includes(status as ValidStatus)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
     // Idempotency — skip if already at this status
@@ -85,11 +111,19 @@ export async function PATCH(
     if (status === "rejected") {
       if (voidReason) {
         extraFields.voidReason = voidReason.trim();
+      } else if (order.cancellationReason) {
+        extraFields.voidReason = order.cancellationReason;
       }
       if (voidedByStaffName) {
         extraFields.voidedByStaffName = voidedByStaffName.trim();
+      } else if (order.cancellationRequestedBy) {
+        extraFields.voidedByStaffName = order.cancellationRequestedBy;
       }
       extraFields.voidedByStaffId = user.uid;
+      extraFields.cancellationRequested = false;
+      extraFields.cancellationReason = null;
+      extraFields.cancellationRequestedBy = null;
+      extraFields.cancellationRequestedAt = null;
     }
 
     await orderRef.update(extraFields);
