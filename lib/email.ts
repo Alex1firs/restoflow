@@ -74,3 +74,31 @@ export async function sendStaffSetupEmail(
     `,
   });
 }
+
+export async function sendVerificationEmail(
+  to: string,
+  verificationLink: string
+): Promise<void> {
+  const resend = getResend();
+  if (!resend) return;
+
+  await resend.emails.send({
+    from: from(),
+    to,
+    subject: "Verify your email address for RestoFlow",
+    html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#111">
+        <h2 style="margin-bottom:8px">Verify your email</h2>
+        <p>Please click the button below to verify your email address and activate your RestoFlow account.</p>
+        <p style="margin:32px 0">
+          <a href="${verificationLink}"
+             style="background:#f97316;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block">
+            Verify Email
+          </a>
+        </p>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:32px 0">
+        <p style="color:#888;font-size:12px">RestoFlow · <a href="https://restoflow.org" style="color:#888">restoflow.org</a></p>
+      </div>
+    `,
+  });
+}

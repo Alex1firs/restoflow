@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { onAuthStateChanged, sendEmailVerification, User } from "firebase/auth";
+import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { MailWarning, Send, CheckCircle2, Loader2 } from "lucide-react";
 
@@ -26,16 +26,23 @@ export default function EmailVerificationBanner() {
     setLoading(true);
     setError(null);
     try {
-      await sendEmailVerification(user);
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/auth/send-verification", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ idToken }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to send verification link");
+      }
       setSent(true);
       // Auto dismiss success state after 15 seconds
       setTimeout(() => setDismissed(true), 15000);
     } catch (err: any) {
-      if (err.code === "auth/too-many-requests") {
-        setError("Too many requests. Please check your inbox or try again later.");
-      } else {
-        setError("Failed to send verification email. Please try again.");
-      }
+      setError(err.message || "Failed to send verification email. Please try again.");
     } finally {
       setLoading(false);
     }
