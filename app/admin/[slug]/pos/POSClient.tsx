@@ -761,8 +761,6 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   const [selectedWaiterName, setSelectedWaiterName] = useState<string | null>(null);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [waiters, setWaiters] = useState<{ id: string; name: string }[]>([]);
-  const [showWaiterManager, setShowWaiterManager] = useState(false);
-  const [newWaiterName, setNewWaiterName] = useState("");
   const [printCopies, setPrintCopies] = useState<1 | 2 | 3>(2);
 
   // Customizer Drawer / Modal State
@@ -2525,109 +2523,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
         />
       )}
 
-      {/* ── Waiter Manager Modal overlay ─────────────────────────── */}
-      {showWaiterManager && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-4 flex items-center justify-between">
-              <h3 className="text-white font-black text-lg">Manage Waiters</h3>
-              <button
-                type="button"
-                onClick={() => setShowWaiterManager(false)}
-                className="text-white/85 hover:text-white font-black text-xl leading-none"
-              >
-                ×
-              </button>
-            </div>
-            {/* Body */}
-            <div className="p-6 space-y-4">
-              {/* Add form */}
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Enter waiter's full name"
-                  value={newWaiterName}
-                  onChange={(e) => setNewWaiterName(e.target.value)}
-                  className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-orange-500 bg-gray-50 font-semibold"
-                />
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const nameTrim = newWaiterName.trim();
-                    if (!nameTrim) return;
-                    try {
-                      const res = await fetch("/api/admin/waiters", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ name: nameTrim }),
-                      });
-                      if (!res.ok) {
-                        const data = await res.json();
-                        throw new Error(data.error || "Failed to add waiter");
-                      }
-                      setNewWaiterName("");
-                      showSystemToast(`Added waiter "${nameTrim}" successfully`);
-                    } catch (e: any) {
-                      showSystemToast(e.message || "Failed to add waiter");
-                    }
-                  }}
-                  className="bg-orange-600 hover:bg-orange-500 text-white font-black px-4 py-2.5 rounded-xl text-sm transition-colors"
-                >
-                  Add
-                </button>
-              </div>
 
-              {/* Waiters List */}
-              <div className="border border-gray-100 rounded-2xl overflow-hidden max-h-60 overflow-y-auto divide-y divide-gray-100">
-                {waiters.length === 0 ? (
-                  <div className="p-6 text-center text-gray-400 text-xs font-bold bg-gray-50/30">
-                    No waiters registered yet.
-                  </div>
-                ) : (
-                  waiters.map((w) => (
-                    <div key={w.id} className="px-4 py-3 flex items-center justify-between gap-3 bg-white hover:bg-gray-50/50">
-                      <span className="font-bold text-gray-800 text-sm">{w.name}</span>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (confirm(`Are you sure you want to remove ${w.name}?`)) {
-                            try {
-                              const res = await fetch(`/api/admin/waiters?id=${w.id}`, {
-                                method: "DELETE",
-                              });
-                              if (!res.ok) {
-                                const data = await res.json();
-                                throw new Error(data.error || "Failed to remove waiter");
-                              }
-                              showSystemToast(`Removed waiter "${w.name}"`);
-                            } catch (e: any) {
-                              showSystemToast(e.message || "Failed to remove waiter");
-                            }
-                          }
-                        }}
-                        className="text-red-500 hover:text-red-700 font-bold text-xs px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-            {/* Footer */}
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowWaiterManager(false)}
-                className="bg-gray-900 hover:bg-gray-850 text-white font-black px-5 py-2.5 rounded-xl text-xs transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {/* ── Ready-order alert banner ──────────────────────────────── */}
       {readyOrders.length > 0 && (
         <ReadyOrdersPanel
@@ -3277,13 +3173,6 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
                         Attendant / Waiter
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => setShowWaiterManager(true)}
-                        className="text-[9px] font-black text-orange-600 hover:text-orange-700 flex items-center gap-1 hover:underline"
-                      >
-                        ⚙ Manage List
-                      </button>
                     </div>
                     <select
                       value={selectedWaiterName || ""}

@@ -2,6 +2,41 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { getAdminDb } from "@/lib/firebase-admin";
 
+export async function GET(request: NextRequest) {
+  let user;
+  try {
+    user = await getAuthenticatedUser();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const db = getAdminDb();
+  try {
+    const snap = await db
+      .collection("waiters")
+      .where("restaurantId", "==", user.restaurantSlug)
+      .get();
+
+    const waiters = snap.docs.map((doc) => ({
+      id: doc.id,
+      name: doc.data().name,
+      createdAt: doc.data().createdAt,
+    }));
+
+    // Sort in-memory to prevent indexing errors
+    waiters.sort((a: any, b: any) => {
+      const timeA = a.createdAt?.toDate?.()?.getTime() || 0;
+      const timeB = b.createdAt?.toDate?.()?.getTime() || 0;
+      return timeB - timeA;
+    });
+
+    return NextResponse.json({ waiters });
+  } catch (e: any) {
+    console.error("Failed to fetch waiters:", e);
+    return NextResponse.json({ error: "Failed to fetch waiters" }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   let user;
   try {
