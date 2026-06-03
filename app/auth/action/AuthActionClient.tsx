@@ -103,6 +103,7 @@ export default function AuthActionClient() {
                   minLength={8}
                   placeholder="At least 8 characters"
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-orange-500 transition"
+                  style={{ color: "white" }}
                 />
               </div>
 
@@ -117,6 +118,7 @@ export default function AuthActionClient() {
                   required
                   placeholder="Repeat your password"
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-orange-500 transition"
+                  style={{ color: "white" }}
                 />
               </div>
 
