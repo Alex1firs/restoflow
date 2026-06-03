@@ -40,7 +40,11 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { status } = body as { status?: string };
+  const { status, voidReason, voidedByStaffName } = body as {
+    status?: string;
+    voidReason?: string;
+    voidedByStaffName?: string;
+  };
   if (!status || !VALID.includes(status as ValidStatus)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
@@ -76,6 +80,16 @@ export async function PATCH(
     const extraFields: Record<string, unknown> = { status };
     if (timestampField[status as ValidStatus]) {
       extraFields[timestampField[status as ValidStatus]] = FieldValue.serverTimestamp();
+    }
+
+    if (status === "rejected") {
+      if (voidReason) {
+        extraFields.voidReason = voidReason.trim();
+      }
+      if (voidedByStaffName) {
+        extraFields.voidedByStaffName = voidedByStaffName.trim();
+      }
+      extraFields.voidedByStaffId = user.uid;
     }
 
     await orderRef.update(extraFields);

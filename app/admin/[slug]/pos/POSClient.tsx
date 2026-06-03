@@ -748,6 +748,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   const [offlineQueueBills, setOfflineQueueBills] = useState<TodayOrder[]>([]);
   const [rightTab, setRightTab] = useState<"order" | "bills">("order");
   const [settleBillId, setSettleBillId] = useState<string | null>(null);
+  const [voidingOrder, setVoidingOrder] = useState<TodayOrder | null>(null);
   const [settlementResult, setSettlementResult] = useState<SettlementResult | null>(null);
   const [settledOrder, setSettledOrder] = useState<TodayOrder | null>(null);
 
@@ -2266,6 +2267,37 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
           }}
         />
       )}
+      {/* ── Void Bill Modal overlay ─────────────────────────────── */}
+      {voidingOrder && (
+        <VoidBillModal
+          order={voidingOrder}
+          cashierName={activeCashierName}
+          onClose={() => setVoidingOrder(null)}
+          onVoidComplete={async (orderId, reason) => {
+            if (voidingOrder.isOffline) {
+              await dbDelete("ordersQueue", orderId);
+              loadOfflineQueueBills();
+              showSystemToast("Offline order deleted successfully.");
+            } else {
+              const res = await fetch(`/api/orders/${orderId}/status`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  status: "rejected",
+                  voidReason: reason,
+                  voidedByStaffName: activeCashierName,
+                }),
+              });
+              if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.error || "Failed to void order");
+              }
+              showSystemToast("Bill voided successfully.");
+            }
+            setVoidingOrder(null);
+          }}
+        />
+      )}
       {settleBillId && settlementResult && (
         <SettlementSuccessModal
           order={settledOrder}
@@ -2642,6 +2674,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                 settleOfflineOrder(localOrderId, method, note, restaurant.name, activeCashierName)
               }
               onEdit={handleEditOrder}
+              onVoid={setVoidingOrder}
             />
           )}
 
@@ -3598,11 +3631,13 @@ function OpenBillsPanel({
   onSettle,
   onSettleOffline,
   onEdit,
+  onVoid,
 }: {
   bills: TodayOrder[];
   onSettle: (orderId: string) => void;
   onSettleOffline: (localOrderId: string, method: string, note: string) => void;
   onEdit: (bill: TodayOrder) => void;
+  onVoid: (bill: TodayOrder) => void;
 }) {
   const [offlineSettleId, setOfflineSettleId] = useState<string | null>(null);
   const [offlineMethod, setOfflineMethod] = useState<"cash" | "bank_transfer" | "card">("cash");
@@ -3796,6 +3831,13 @@ function OpenBillsPanel({
                 Settle Bill
               </button>
             </div>
+            <button
+              type="button"
+              onClick={() => onVoid(bill)}
+              className="w-full mt-2 bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-600 font-black text-xs py-2.5 rounded-xl transition-colors border border-red-100 text-center"
+            >
+              ⚠️ Void / Cancel Bill
+            </button>
           </div>
         );
       })}
@@ -4455,6 +4497,116 @@ function ReceiptRow({
       >
         {value}
       </span>
+    </div>
+  );
+}
+
+// ── Void Bill Modal ───────────────────────────────────────────────────────────
+
+function VoidBillModal({
+  order,
+  cashierName,
+  onClose,
+  onVoidComplete,
+}: {
+  order: TodayOrder;
+  cashierName: string;
+  onClose: () => void;
+  onVoidComplete: (orderId: string, reason: string) => Promise<void>;
+}) {
+  const [selectedReason, setSelectedReason] = useState("");
+  const [customReason, setCustomReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleVoid = async () => {
+    const finalReason = selectedReason === "other" ? customReason.trim() : selectedReason;
+    if (!finalReason) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onVoidComplete(order.id, finalReason);
+    } catch (e: any) {
+      setError(e.message || "Failed to void order. Please try again.");
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-gray-100 animate-in fade-in duration-200">
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h3 className="font-black text-gray-900 text-sm uppercase tracking-wider">⚠️ Void / Cancel Bill</h3>
+            <p className="text-[10px] text-gray-400 font-semibold mt-0.5">Order #{order.id.slice(-6).toUpperCase()}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">✕</button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div className="bg-red-50/60 border border-red-100 rounded-2xl p-4 text-xs text-red-700 space-y-1">
+            <p className="font-extrabold">Warning: voiding this bill will cancel it in the system.</p>
+            <p className="font-semibold text-[11px] leading-relaxed">
+              This action will keep a permanent record of the cancellation under cashier <span className="underline">{cashierName}</span> for auditing purposes.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Select Void Reason</label>
+            <select
+              value={selectedReason}
+              onChange={(e) => {
+                setSelectedReason(e.target.value);
+                if (e.target.value !== "other") {
+                  setCustomReason("");
+                }
+              }}
+              className="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 text-sm font-bold text-gray-700 bg-white"
+            >
+              <option value="">-- Choose a reason --</option>
+              <option value="Customer walked out / left">Customer walked out / left</option>
+              <option value="Order entered in error">Order entered in error</option>
+              <option value="Kitchen delayed / changed mind">Kitchen delayed / changed mind</option>
+              <option value="other">Other (specify reason)</option>
+            </select>
+          </div>
+
+          {selectedReason === "other" && (
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Specify Custom Reason</label>
+              <textarea
+                value={customReason}
+                onChange={(e) => setCustomReason(e.target.value)}
+                placeholder="Type the cancellation details here..."
+                className="w-full px-4 py-3 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 text-sm font-semibold text-gray-700"
+                rows={2}
+              />
+            </div>
+          )}
+
+          {error && (
+            <p className="text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl p-3">{error}</p>
+          )}
+        </div>
+
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-3 border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-2xl text-sm font-black transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleVoid}
+            disabled={submitting || !selectedReason || (selectedReason === "other" && !customReason.trim())}
+            className="flex-1 py-3 bg-red-600 hover:bg-red-500 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-2xl text-sm font-black transition-colors flex items-center justify-center gap-2"
+          >
+            {submitting ? "Voiding..." : "Confirm Void"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
