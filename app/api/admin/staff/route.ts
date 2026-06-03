@@ -27,6 +27,7 @@ export async function GET() {
         displayName: (d.displayName as string) ?? "",
         role: (d.role as string) ?? "owner",
         disabled: (d.disabled as boolean) ?? false,
+        pinSet: !!d.pinHash,
         createdAt: d.createdAt ? (d.createdAt.toDate ? d.createdAt.toDate().toISOString() : new Date((d.createdAt.seconds ?? 0) * 1000).toISOString()) : null,
       };
     })

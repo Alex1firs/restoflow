@@ -808,6 +808,16 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   const [showTerminalSetup, setShowTerminalSetup] = useState<boolean>(false);
   const [terminalNameInput, setTerminalNameInput] = useState<string>("");
 
+  // Cashier PIN setup/change modal states
+  const [showCashierPinModal, setShowCashierPinModal] = useState<boolean>(false);
+  const [selectedCashierForPin, setSelectedCashierForPin] = useState<any | null>(null);
+  const [cashierPinOld, setCashierPinOld] = useState<string>("");
+  const [cashierPinNew, setCashierPinNew] = useState<string>("");
+  const [cashierPinConfirm, setCashierPinConfirm] = useState<string>("");
+  const [cashierPinError, setCashierPinError] = useState<string | null>(null);
+  const [cashierPinSubmitting, setCashierPinSubmitting] = useState<boolean>(false);
+  const [managersWithPinCount, setManagersWithPinCount] = useState<number>(0);
+
   // Ready-order alert state
   const [readyOrders, setReadyOrders] = useState<TodayOrder[]>([]);
   const [alertMuted, setAlertMuted] = useState<boolean>(false);
@@ -1115,6 +1125,10 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
     try {
       const list = await dbGetAll<any>("staff");
       setCachedStaffList(list);
+
+      const managers = list.filter((s: any) => (s.role === "manager" || s.role === "owner") && s.isActive !== false && !!s.pinHash);
+      setManagersWithPinCount(managers.length);
+
       if (list.length > 0 && !activeCashierId) {
         setActiveCashierId(list[0].staffId);
         setActiveCashierName(list[0].staffName);
@@ -1128,6 +1142,73 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   useEffect(() => {
     loadCachedStaff();
   }, [isTerminalLocked, loadCachedStaff]);
+
+  const handleSaveCashierPin = async () => {
+    if (!selectedCashierForPin) return;
+    setCashierPinError(null);
+
+    // Validate input
+    if (selectedCashierForPin.pinHash) {
+      if (!cashierPinOld || cashierPinOld.length !== 4) {
+        setCashierPinError("Please enter your current 4-digit PIN");
+        return;
+      }
+      // Verify old PIN locally
+      const isOldMatch = await verifyOfflinePin(cashierPinOld, selectedCashierForPin.pinSalt, selectedCashierForPin.pinHash);
+      if (!isOldMatch) {
+        setCashierPinError("Incorrect current PIN passcode");
+        return;
+      }
+    }
+
+    if (!/^\d{4}$/.test(cashierPinNew)) {
+      setCashierPinError("New PIN must be exactly 4 digits");
+      return;
+    }
+
+    if (cashierPinNew !== cashierPinConfirm) {
+      setCashierPinError("New PIN confirmation does not match");
+      return;
+    }
+
+    setCashierPinSubmitting(true);
+    try {
+      const res = await fetch(`/api/admin/staff/${selectedCashierForPin.staffId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: cashierPinNew }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCashierPinError(data.error ?? "Failed to save PIN");
+        return;
+      }
+
+      showSystemToast("PIN code updated successfully!");
+      setShowCashierPinModal(false);
+      setSelectedCashierForPin(null);
+      setPinInput("");
+
+      // Trigger background sync immediately to download new pinHash and pinSalt
+      const syncRes = await fetch(`/api/admin/pos/staff-sync`);
+      const syncData = await syncRes.json();
+      if (syncData.staff && Array.isArray(syncData.staff)) {
+        for (const member of syncData.staff) {
+          if (!member.isActive) {
+            await dbDelete("staff", member.staffId);
+          } else {
+            await dbPut("staff", member);
+          }
+        }
+        await loadCachedStaff();
+      }
+
+    } catch (err) {
+      setCashierPinError("Failed to update PIN due to a network error.");
+    } finally {
+      setCashierPinSubmitting(false);
+    }
+  };
 
   const handleKeypadPress = (val: string) => {
     if (lockoutTime > 0) return;
@@ -1170,9 +1251,8 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
     }
 
     if (!staffMember.pinHash) {
-      setIsTerminalLocked(false);
+      setPinError("No PIN configured. Click 'Setup PIN' below to configure your passcode.");
       setPinInput("");
-      showSystemToast(`Terminal unlocked. Set a 4-digit PIN in settings!`);
       return;
     }
 
@@ -1757,14 +1837,37 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   }, [role]);
 
   // ── Manager PIN authorization check ──
-  const verifyPin = () => {
-    if (pinInput === "1234" || pinInput === "5555") {
-      showSystemToast("Manager override approved!");
+  const verifyPin = async () => {
+    if (!pinInput || pinInput.length !== 4) {
+      setPinError("Enter exactly 4 digits");
+      return;
+    }
+
+    const list = cachedStaffList.length > 0 ? cachedStaffList : await dbGetAll<any>("staff").catch(() => []);
+    const managers = list.filter((s: any) => (s.role === "manager" || s.role === "owner") && s.isActive !== false);
+
+    let approvedMember: any = null;
+    for (const member of managers) {
+      if (member.pinHash && member.pinSalt) {
+        const isMatch = await verifyOfflinePin(pinInput, member.pinSalt, member.pinHash);
+        if (isMatch) {
+          approvedMember = member;
+          break;
+        }
+      }
+    }
+
+    if (approvedMember) {
+      showSystemToast(`Manager override approved by ${approvedMember.staffName}!`);
+      setVerifyingAction(null);
+      setPinInput("");
+      setPinError(null);
       if (pendingActionCallback) {
         pendingActionCallback();
+        setPendingActionCallback(null);
       }
     } else {
-      setPinError("Invalid manager PIN code. Try '1234' or '5555'.");
+      setPinError("Invalid manager PIN code.");
     }
   };
 
@@ -2235,7 +2338,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
               <label className="block text-slate-400 text-[10px] font-black uppercase tracking-wider mb-2">
                 Select Cashier / Staff
               </label>
-              <div className="relative">
+              <div className="relative mb-2">
                 <select
                   value={activeCashierId}
                   onChange={(e) => {
@@ -2276,6 +2379,33 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                   </svg>
                 </div>
               </div>
+
+              {/* Show Setup PIN option if the selected staff has no PIN configured */}
+              {(() => {
+                const sMember = cachedStaffList.find(x => x.staffId === activeCashierId) ||
+                                (activeCashierId === staffId ? { staffId, staffName, role: "owner", pinSalt: "", pinHash: "", isActive: true } : null);
+                if (sMember && !sMember.pinHash) {
+                  return (
+                    <div className="flex items-center justify-between bg-yellow-500/10 border border-yellow-500/20 px-3.5 py-2.5 rounded-2xl mt-2 animate-fade-in">
+                      <span className="text-[10px] text-yellow-400 font-bold">⚠️ PIN Passcode not configured</span>
+                      <button
+                        onClick={() => {
+                          setSelectedCashierForPin(sMember);
+                          setCashierPinOld("");
+                          setCashierPinNew("");
+                          setCashierPinConfirm("");
+                          setCashierPinError(null);
+                          setShowCashierPinModal(true);
+                        }}
+                        className="text-[9px] font-black uppercase tracking-wider bg-yellow-500 hover:bg-yellow-600 text-slate-900 px-2 py-1 rounded-lg transition-colors border-none cursor-pointer"
+                      >
+                        Setup PIN
+                      </button>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
 
             <div className="flex gap-4 mb-8 justify-center">
@@ -2541,8 +2671,24 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
               <div className="flex items-center gap-2 px-3 py-1 bg-gray-50 border border-gray-200 text-gray-700 rounded-full font-bold text-[10px] uppercase tracking-wider">
                 👤 {activeCashierName}
                 <button
+                  onClick={() => {
+                    const currentStaff = cachedStaffList.find(x => x.staffId === activeCashierId) ||
+                                         (activeCashierId === staffId ? { staffId, staffName, role: "owner", pinSalt: "", pinHash: "", isActive: true } : null);
+                    setSelectedCashierForPin(currentStaff);
+                    setCashierPinOld("");
+                    setCashierPinNew("");
+                    setCashierPinConfirm("");
+                    setCashierPinError(null);
+                    setShowCashierPinModal(true);
+                  }}
+                  className="ml-1 bg-orange-100 hover:bg-orange-200 text-orange-700 px-1.5 py-0.5 rounded-md text-[8px] transition-all font-black"
+                  title="Set/Change PIN"
+                >
+                  🔑 PIN
+                </button>
+                <button
                   onClick={() => setIsTerminalLocked(true)}
-                  className="ml-1 bg-gray-200 hover:bg-gray-300 text-gray-700 w-4 h-4 rounded-full flex items-center justify-center text-[8px] transition-all"
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-700 w-4 h-4 rounded-full flex items-center justify-center text-[8px] transition-all"
                   title="Lock terminal or switch cashier"
                 >
                   🔒
@@ -3569,9 +3715,117 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                 Authorize Action
               </button>
             </div>
-            <p className="text-[9px] text-gray-300 mt-4 uppercase tracking-wider font-bold">
-              Demo Manager PIN Code is 1234 or 5555
-            </p>
+            {managersWithPinCount === 0 ? (
+              <p className="text-[10px] text-red-500 bg-red-50 border border-red-150 p-2.5 rounded-xl mt-4 font-bold leading-normal">
+                ⚠️ No manager PIN configured. Please set a PIN in Staff Settings or POS settings.
+              </p>
+            ) : (
+              <p className="text-[9px] text-gray-400 mt-4 uppercase tracking-wider font-bold">
+                Enter your 4-digit manager authorization PIN
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Cashier PIN Settings Modal ── */}
+      {showCashierPinModal && selectedCashierForPin && (
+        <div className="fixed inset-0 bg-black/60 z-[10000] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm border border-gray-100 shadow-2xl space-y-4 text-left">
+            <div>
+              <h3 className="text-lg font-black text-gray-900">Configure POS PIN Code</h3>
+              <p className="text-xs text-gray-400 mt-1">
+                For cashier <strong>{selectedCashierForPin.staffName}</strong>.
+              </p>
+            </div>
+
+            {cashierPinError && (
+              <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-3.5 py-2.5 rounded-xl font-bold leading-normal">
+                {cashierPinError}
+              </div>
+            )}
+
+            {!isOnline && (
+              <div className="bg-amber-50 border border-amber-250 text-amber-800 text-[10px] px-3.5 py-2 rounded-xl font-bold leading-relaxed">
+                ⚠️ Internet connection is required to update credentials on the server.
+              </div>
+            )}
+
+            {selectedCashierForPin.pinHash && (
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide">
+                  Current PIN Passcode
+                </label>
+                <input
+                  type="password"
+                  pattern="\d*"
+                  maxLength={4}
+                  value={cashierPinOld}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, "");
+                    if (val.length <= 4) setCashierPinOld(val);
+                  }}
+                  placeholder="••••"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-md text-center tracking-widest outline-none focus:border-orange-500 font-bold font-mono text-slate-800 bg-white"
+                />
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide">
+                New 4-Digit PIN
+              </label>
+              <input
+                type="password"
+                pattern="\d*"
+                maxLength={4}
+                value={cashierPinNew}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, "");
+                  if (val.length <= 4) setCashierPinNew(val);
+                }}
+                placeholder="••••"
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-md text-center tracking-widest outline-none focus:border-orange-500 font-bold font-mono text-slate-800 bg-white"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide">
+                Confirm New PIN
+              </label>
+              <input
+                type="password"
+                pattern="\d*"
+                maxLength={4}
+                value={cashierPinConfirm}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, "");
+                  if (val.length <= 4) setCashierPinConfirm(val);
+                }}
+                placeholder="••••"
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-md text-center tracking-widest outline-none focus:border-orange-500 font-bold font-mono text-slate-800 bg-white"
+              />
+            </div>
+
+            <div className="flex gap-2.5 pt-2">
+              <button
+                disabled={cashierPinSubmitting || !isOnline}
+                onClick={handleSaveCashierPin}
+                className="flex-1 bg-orange-600 hover:bg-orange-500 text-white font-bold text-sm py-3 rounded-xl disabled:opacity-50 transition-colors"
+              >
+                {cashierPinSubmitting ? "Saving..." : "Save PIN"}
+              </button>
+              <button
+                disabled={cashierPinSubmitting}
+                onClick={() => {
+                  setShowCashierPinModal(false);
+                  setSelectedCashierForPin(null);
+                }}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-sm py-3 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

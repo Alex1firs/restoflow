@@ -8,6 +8,7 @@ type StaffMember = {
   displayName: string;
   role: string;
   disabled: boolean;
+  pinSet?: boolean;
   createdAt: string | null;
 };
 
@@ -31,6 +32,41 @@ export default function StaffClient({ slug }: { slug: string }) {
   const [showCreate, setShowCreate] = useState(false);
   const [newStaff, setNewStaff] = useState({ email: "", displayName: "", role: "staff" });
   const [inviteResult, setInviteResult] = useState<{ email: string } | null>(null);
+
+  // PIN settings state
+  const [selectedStaffForPin, setSelectedStaffForPin] = useState<StaffMember | null>(null);
+  const [pinInputValue, setPinInputValue] = useState("");
+  const [pinInputError, setPinInputError] = useState<string | null>(null);
+  const [pinSubmitting, setPinSubmitting] = useState(false);
+
+  async function handleSetPin() {
+    if (!selectedStaffForPin) return;
+    if (!/^\d{4}$/.test(pinInputValue)) {
+      setPinInputError("PIN must be exactly 4 digits");
+      return;
+    }
+    setPinSubmitting(true);
+    setPinInputError(null);
+    try {
+      const res = await fetch(`/api/admin/staff/${selectedStaffForPin.uid}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: pinInputValue }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPinInputError(data.error ?? "Failed to update PIN");
+        return;
+      }
+      setSelectedStaffForPin(null);
+      setPinInputValue("");
+      fetchStaff();
+    } catch {
+      setPinInputError("Network error. Please try again.");
+    } finally {
+      setPinSubmitting(false);
+    }
+  }
 
   const fetchStaff = useCallback(async () => {
     setLoading(true);
@@ -187,7 +223,7 @@ export default function StaffClient({ slug }: { slug: string }) {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    {["Member", "Role", "Status", "Added", "Actions"].map((h) => (
+                    {["Member", "Role", "Status", "POS PIN", "Added", "Actions"].map((h) => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">{h}</th>
                     ))}
                   </tr>
@@ -209,13 +245,22 @@ export default function StaffClient({ slug }: { slug: string }) {
                           {s.disabled ? "Disabled" : "Active"}
                         </span>
                       </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${s.pinSet ? "bg-green-100 text-green-700 animate-fade-in" : "bg-yellow-100 text-yellow-800 animate-fade-in"}`}>
+                          {s.pinSet ? "Configured" : "Not Set"}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(s.createdAt)}</td>
                       <td className="px-4 py-3">
-                        {s.role === "owner" ? (
-                          <span className="text-xs text-gray-400">—</span>
-                        ) : (
-                          <div className="flex gap-1.5 flex-wrap">
-                            {s.role !== "owner" && (
+                        <div className="flex gap-1.5 flex-wrap items-center">
+                          <button
+                            onClick={() => { setSelectedStaffForPin(s); setPinInputValue(""); setPinInputError(null); }}
+                            className="text-xs font-bold px-2.5 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors"
+                          >
+                            Set PIN
+                          </button>
+                          {s.role !== "owner" && (
+                            <>
                               <select
                                 value={s.role}
                                 disabled={!!actionLoading}
@@ -225,23 +270,23 @@ export default function StaffClient({ slug }: { slug: string }) {
                                 <option value="staff">Staff</option>
                                 <option value="manager">Manager</option>
                               </select>
-                            )}
-                            <button
-                              disabled={!!actionLoading}
-                              onClick={() => updateStaff(s.uid, { disabled: !s.disabled })}
-                              className={`text-xs font-bold px-2 py-1 rounded-lg transition-colors disabled:opacity-50 ${s.disabled ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-amber-100 text-amber-700 hover:bg-amber-200"}`}
-                            >
-                              {s.disabled ? "Enable" : "Disable"}
-                            </button>
-                            <button
-                              disabled={!!actionLoading}
-                              onClick={() => deleteStaff(s.uid)}
-                              className="text-xs font-bold px-2 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        )}
+                              <button
+                                disabled={!!actionLoading}
+                                onClick={() => updateStaff(s.uid, { disabled: !s.disabled })}
+                                className={`text-xs font-bold px-2 py-1 rounded-lg transition-colors disabled:opacity-50 ${s.disabled ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-amber-100 text-amber-700 hover:bg-amber-200"}`}
+                              >
+                                {s.disabled ? "Enable" : "Disable"}
+                              </button>
+                              <button
+                                disabled={!!actionLoading}
+                                onClick={() => deleteStaff(s.uid)}
+                                className="text-xs font-bold px-2 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50"
+                              >
+                                Delete
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -256,43 +301,54 @@ export default function StaffClient({ slug }: { slug: string }) {
                       <p className="font-bold text-gray-900">{s.displayName || s.email}</p>
                       {s.displayName && <p className="text-xs text-gray-400 truncate">{s.email}</p>}
                     </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
                       <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full ${ROLE_COLORS[s.role] ?? "bg-gray-100 text-gray-600"}`}>
                         {ROLE_LABELS[s.role] ?? s.role}
                       </span>
                       <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full ${s.disabled ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
                         {s.disabled ? "Disabled" : "Active"}
                       </span>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${s.pinSet ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-800"}`}>
+                        PIN: {s.pinSet ? "✓" : "✗"}
+                      </span>
                     </div>
                   </div>
                   <p className="text-xs text-gray-400">Added: {fmtDate(s.createdAt)}</p>
-                  {s.role !== "owner" && (
-                    <div className="flex flex-wrap gap-2">
-                      <select
-                        value={s.role}
-                        disabled={!!actionLoading}
-                        onChange={(e) => updateStaff(s.uid, { role: e.target.value })}
-                        className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white outline-none"
-                      >
-                        <option value="staff">Staff</option>
-                        <option value="manager">Manager</option>
-                      </select>
-                      <button
-                        disabled={!!actionLoading}
-                        onClick={() => updateStaff(s.uid, { disabled: !s.disabled })}
-                        className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${s.disabled ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-amber-100 text-amber-700 hover:bg-amber-200"}`}
-                      >
-                        {s.disabled ? "Enable" : "Disable"}
-                      </button>
-                      <button
-                        disabled={!!actionLoading}
-                        onClick={() => deleteStaff(s.uid)}
-                        className="text-xs font-bold px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <button
+                      onClick={() => { setSelectedStaffForPin(s); setPinInputValue(""); setPinInputError(null); }}
+                      className="text-xs font-bold px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors"
+                    >
+                      Set PIN
+                    </button>
+                    {s.role !== "owner" && (
+                      <>
+                        <select
+                          value={s.role}
+                          disabled={!!actionLoading}
+                          onChange={(e) => updateStaff(s.uid, { role: e.target.value })}
+                          className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white outline-none"
+                        >
+                          <option value="staff">Staff</option>
+                          <option value="manager">Manager</option>
+                        </select>
+                        <button
+                          disabled={!!actionLoading}
+                          onClick={() => updateStaff(s.uid, { disabled: !s.disabled })}
+                          className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${s.disabled ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-amber-100 text-amber-700 hover:bg-amber-200"}`}
+                        >
+                          {s.disabled ? "Enable" : "Disable"}
+                        </button>
+                        <button
+                          disabled={!!actionLoading}
+                          onClick={() => deleteStaff(s.uid)}
+                          className="text-xs font-bold px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -338,6 +394,61 @@ export default function StaffClient({ slug }: { slug: string }) {
           </div>
         </div>
       </div>
+
+      {/* Set/Change PIN Modal overlay */}
+      {selectedStaffForPin && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm border border-gray-100 shadow-2xl space-y-4">
+            <div>
+              <h3 className="text-lg font-black text-gray-900">Set POS PIN Code</h3>
+              <p className="text-xs text-gray-400 mt-1">
+                Configure a secure 4-digit PIN for <strong>{selectedStaffForPin.displayName || selectedStaffForPin.email}</strong>.
+              </p>
+            </div>
+
+            {pinInputError && (
+              <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-3.5 py-2.5 rounded-xl font-bold">
+                {pinInputError}
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide">
+                4-Digit Passcode
+              </label>
+              <input
+                type="password"
+                pattern="\d*"
+                maxLength={4}
+                value={pinInputValue}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, "");
+                  if (val.length <= 4) setPinInputValue(val);
+                }}
+                placeholder="••••"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-lg text-center tracking-widest outline-none focus:border-orange-500 font-bold font-mono"
+              />
+            </div>
+
+            <div className="flex gap-2.5 pt-2">
+              <button
+                disabled={pinSubmitting}
+                onClick={handleSetPin}
+                className="flex-1 bg-orange-600 hover:bg-orange-500 text-white font-bold text-sm py-3 rounded-xl disabled:opacity-50 transition-colors"
+              >
+                {pinSubmitting ? "Saving..." : "Save PIN"}
+              </button>
+              <button
+                disabled={pinSubmitting}
+                onClick={() => setSelectedStaffForPin(null)}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-sm py-3 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

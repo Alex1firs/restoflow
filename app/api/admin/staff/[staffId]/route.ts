@@ -6,9 +6,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ st
   let user: Awaited<ReturnType<typeof getAuthenticatedUser>>;
   try { user = await getAuthenticatedUser(); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
 
-  if (user.role !== "owner") return NextResponse.json({ error: "Only the owner can manage staff" }, { status: 403 });
-
   const { staffId } = await params;
+
+  if (user.role !== "owner" && user.uid !== staffId) {
+    return NextResponse.json({ error: "Only the owner or the user themselves can manage this account" }, { status: 403 });
+  }
+
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
 
@@ -17,11 +20,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ st
 
   const staffData = staffDoc.data()!;
   if (staffData.restaurantSlug !== user.restaurantSlug) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  if (staffData.role === "owner") return NextResponse.json({ error: "Cannot modify the owner account" }, { status: 403 });
+
+  // Prevent modifying owner account unless it's the owner themselves modifying their own PIN
+  if (staffData.role === "owner" && user.uid !== staffId) {
+    return NextResponse.json({ error: "Cannot modify the owner account" }, { status: 403 });
+  }
+
+  // Prevent modifying own role or disabled status
+  if (user.uid === staffId) {
+    if (body.role !== undefined || body.disabled !== undefined) {
+      return NextResponse.json({ error: "Cannot modify your own role or disabled status" }, { status: 400 });
+    }
+  }
 
   const update: Record<string, unknown> = {};
-  if (typeof body.disabled === "boolean") update.disabled = body.disabled;
-  if (["manager", "staff"].includes(body.role)) update.role = body.role;
+  if (user.role === "owner") {
+    if (typeof body.disabled === "boolean") update.disabled = body.disabled;
+    if (["manager", "staff"].includes(body.role)) update.role = body.role;
+  }
 
   if (body.pin) {
     if (typeof body.pin !== "string" || !/^\d{4}$/.test(body.pin)) {

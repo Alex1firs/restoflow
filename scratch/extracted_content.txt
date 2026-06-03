@@ -1,0 +1,17 @@
+I have successfully extracted the data from the QuickBooks Desktop POS screenshot you provided. 
+
+Below is the clean **Markdown Table** representation of the extracted items, followed by a proposed **JSON/TypeScript seed structure** showing exactly how this data is formatted to align with your platform's schema. 
+
+*As requested, I have **not** seeded this data, modified any code, or added it to the database. I am awaiting your final approval on this mapping.*
+
+---
+
+### Extracted POS Item List Data
+
+| # | Item Name | Category (Department) | Item Description | Regular Price | On-Hand Qty | Outside Price |
+|---|---|---|---|---|---|---|
+| **1** | FRIED YAM + PEPPER GOAT MEAT | Fries | FRIED YAM + PEPPER GOAT MEAT | ₦8,000.00 | 0 | ₦7,000.00 |
+| **2** | GRILL TURKEY | Protein | GRILL TURKEY | ₦8,000.00 | 0 | ₦7,000.00 |
+| **3** | pasta salad | Salad | pasta salad | ₦8,000.00 | 0 | ₦7,000.00 |
+| **4** | PEPPERED TURKEY | Protein | PEPPERED TURKEY | ₦8,000.00 | 0 | ₦7,000.00 |
+<truncated 6432 bytes>
