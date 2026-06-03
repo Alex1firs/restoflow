@@ -107,20 +107,20 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
+  const totalRevenue = orders.filter((o) => o.paymentStatus === "paid").reduce((s, o) => s + o.total, 0);
   const totalOrders = orders.length;
   const completed = orders.filter((o) => o.status === "completed").length;
   const cancelled = orders.filter((o) => o.status === "rejected").length;
   const onlineTotal = orders.filter((o) => o.paymentMethod === "online" && o.paymentStatus === "paid").reduce((s, o) => s + o.total, 0);
-  const cashTotal = orders.filter((o) => o.paymentMethod === "cash").reduce((s, o) => s + o.total, 0);
-  const counterTotal = orders.filter((o) => o.orderSource === "counter").reduce((s, o) => s + o.total, 0);
-  const bankTransferTotal = orders.filter((o) => o.paymentMethod === "bank_transfer").reduce((s, o) => s + o.total, 0);
-  const cardTotal = orders.filter((o) => o.paymentMethod === "card").reduce((s, o) => s + o.total, 0);
+  const cashTotal = orders.filter((o) => o.paymentMethod === "cash" && o.paymentStatus === "paid").reduce((s, o) => s + o.total, 0);
+  const counterTotal = orders.filter((o) => o.orderSource === "counter" && o.paymentStatus === "paid").reduce((s, o) => s + o.total, 0);
+  const bankTransferTotal = orders.filter((o) => o.paymentMethod === "bank_transfer" && o.paymentStatus === "paid").reduce((s, o) => s + o.total, 0);
+  const cardTotal = orders.filter((o) => o.paymentMethod === "card" && o.paymentStatus === "paid").reduce((s, o) => s + o.total, 0);
   const unpaidTotal = orders.filter((o) => o.paymentStatus === "unpaid" || o.paymentStatus === "part_paid").reduce((s, o) => s + o.total, 0);
   const onlineOrdersCount = orders.filter((o) => o.orderSource !== "counter").length;
   const counterOrdersCount = orders.filter((o) => o.orderSource === "counter").length;
   const dineInOrdersCount = orders.filter((o) => o.serviceMode === "dine_in").length;
-  const dineInTotal = orders.filter((o) => o.serviceMode === "dine_in").reduce((s, o) => s + o.total, 0);
+  const dineInTotal = orders.filter((o) => o.serviceMode === "dine_in" && o.paymentStatus === "paid").reduce((s, o) => s + o.total, 0);
 
   const itemCounts: Record<string, { name: string; count: number; revenue: number }> = {};
 
