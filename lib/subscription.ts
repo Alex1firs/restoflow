@@ -34,7 +34,7 @@ export type SubscriptionInfo = {
 export async function getSubscriptionInfo(
   data: Record<string, unknown>
 ): Promise<SubscriptionInfo> {
-  const planId = (data.planId as string) ?? "starter";
+  const planId = "pro"; // Force "pro" as requested: only one plan/price exists now
   const stored = (data.subscriptionStatus as string) ?? "active";
 
   let endDate: Date | null = null;
@@ -70,17 +70,8 @@ export async function getSubscriptionInfo(
   const isOperational = status !== "expired";
 
   // Fetch plan name and price
-  let planName = "Restaflow Pro";
-  let monthlyPrice = 19999;
-  try {
-    const planDoc = await getAdminDb().collection("plans").doc(planId).get();
-    if (planDoc.exists) {
-      planName = planDoc.data()!.name as string;
-      monthlyPrice = planDoc.data()!.monthlyPrice as number;
-    }
-  } catch {
-    // Non-fatal — display falls back to defaults
-  }
+  const planName = "Restaflow Pro";
+  const monthlyPrice = 19999;
 
   return {
     planId,
