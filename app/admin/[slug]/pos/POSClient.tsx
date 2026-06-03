@@ -355,26 +355,26 @@ function openPOSReceiptWindow(
     body{font-family:-apple-system,system-ui,sans-serif;font-size:9.5px;max-width:260px;width:100%;margin:0 auto;color:black;background:white;line-height:1.1}
     .print-page{padding:2px 4px;width:100%;height:auto}
     .center{text-align:center}
-    .lbl{font-size:8px;font-weight:900;letter-spacing:0.5px;text-transform:uppercase;color:#444;margin-top:1px}
+    .lbl{font-size:8px;font-weight:900;letter-spacing:0.5px;text-transform:uppercase;color:black;margin-top:1px}
     h1{font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:0.5px}
-    .meta{font-size:8px;color:#333}
+    .meta{font-size:8px;color:black;font-weight:750}
     .div{border-top:1px dashed black;margin:2px 0}
     .item-block{margin:1.5px 0}
     .row{display:flex;justify-content:space-between;align-items:baseline;gap:2px;margin:0}
     .qty{font-weight:900;color:black;flex-shrink:0;margin-right:2px}
     .name{font-weight:700;flex:1;text-transform:uppercase;font-size:9.5px;line-height:1.15}
     .price{font-weight:700;flex-shrink:0;font-family:monospace;font-size:9.5px}
-    .mod-row{font-size:8px;color:#333;padding-left:8px;font-weight:600}
-    .note-row{font-size:8px;color:#b45309;padding-left:8px;font-style:italic;font-weight:600}
+    .mod-row{font-size:8px;color:black;padding-left:8px;font-weight:700}
+    .note-row{font-size:8px;color:black;padding-left:8px;font-style:italic;font-weight:700}
     .kv{display:flex;justify-content:space-between;font-size:9px;margin:0.5px 0}
-    .kl{color:#444;font-weight:600}
+    .kl{color:black;font-weight:700}
     .kv-v{font-weight:700}
     .text-teal{color:black}
     .kv-table{font-size:10px;color:black;text-decoration:underline}
     .total{display:flex;justify-content:space-between;font-size:10.5px;font-weight:900;margin-top:1px}
-    .payment-method-row{text-align:center;font-size:8px;font-weight:900;background:#eee;padding:2px;border-radius:3px;margin-top:2px;text-transform:uppercase}
-    .items-header{display:flex;justify-content:space-between;font-size:8px;font-weight:900;color:#333;letter-spacing:0.5px}
-    .footer{text-align:center;color:#333;font-size:7.5px;margin-top:4px;border-top:1px dashed black;padding-top:2px;font-weight:bold}
+    .payment-method-row{text-align:center;font-size:8px;font-weight:900;background:white;border:1.5px solid black;padding:2px;border-radius:3px;margin-top:2px;text-transform:uppercase;color:black}
+    .items-header{display:flex;justify-content:space-between;font-size:8px;font-weight:900;color:black;letter-spacing:0.5px}
+    .footer{text-align:center;color:black;font-size:7.5px;margin-top:4px;border-top:1px dashed black;padding-top:2px;font-weight:black}
     @media print{
       body{margin:0 !important;padding:4mm 2mm 4mm 6mm !important;background:white;color:black}
       .print-page{page-break-after:always;min-height:auto !important;height:auto !important}
@@ -434,27 +434,26 @@ function openAddOnReprintWindow(receipt: AddOnReceipt, restaurantName: string, s
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:-apple-system,system-ui,sans-serif;font-size:9.5px;max-width:260px;width:100%;margin:0 auto;padding:4px 6px;color:black;background:white;line-height:1.1}
-    .center{text-align:center}
-    .lbl{font-size:8px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;color:#777;margin-bottom:2px}
+    .lbl{font-size:8px;font-weight:900;letter-spacing:0.5px;text-transform:uppercase;color:black;margin-bottom:2px}
     h1{font-size:12px;font-weight:900;margin-bottom:2px;text-transform:uppercase}
-    .badge{display:inline-block;font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;padding:2px 6px;border-radius:10px;margin-bottom:2px;background:#e0f2f1;color:#00796b}
-    .addon-badge{display:inline-block;font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;padding:2px 6px;border-radius:10px;background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
-    .table-lbl{font-size:13px;font-weight:900;color:#00796b;margin:2px 0}
-    .meta{font-size:8px;color:#555}
-    .div{border-top:1px dashed #bbb;margin:4px 0}
+    .badge{display:inline-block;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:0.5px;padding:2px 6px;border-radius:10px;margin-bottom:2px;border:1.5px solid black;color:black}
+    .addon-badge{display:inline-block;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:0.5px;padding:2px 6px;border-radius:10px;background:white;color:black;border:2px solid black}
+    .table-lbl{font-size:13px;font-weight:900;color:black;margin:2px 0}
+    .meta{font-size:8px;color:black;font-weight:bold}
+    .div{border-top:1px dashed black;margin:4px 0}
     .item-block{margin:3px 0}
     .row{display:flex;justify-content:space-between;align-items:baseline;gap:4px;margin:2px 0}
-    .qty{font-weight:900;color:#333;flex-shrink:0}
-    .name{font-weight:600;flex:1;text-transform:uppercase}
+    .qty{font-weight:900;color:black;flex-shrink:0}
+    .name{font-weight:700;flex:1;text-transform:uppercase}
     .price{font-weight:700;flex-shrink:0;font-family:monospace}
-    .mod-row{font-size:8px;color:#555;padding-left:10px;font-weight:500;margin-top:1px}
-    .note-row{font-size:8px;color:#d97706;padding-left:10px;font-style:italic;margin-top:1px}
+    .mod-row{font-size:8px;color:black;padding-left:10px;font-weight:700;margin-top:1px}
+    .note-row{font-size:8px;color:black;padding-left:10px;font-style:italic;margin-top:1px;font-weight:700}
     .kv{display:flex;justify-content:space-between;font-size:9px;margin:1px 0}
-    .kl{color:#777;font-weight:600}
+    .kl{color:black;font-weight:750}
     .kv-v{font-weight:700}
     .total{display:flex;justify-content:space-between;font-size:11px;font-weight:900;margin-top:2px}
-    .running{display:flex;justify-content:space-between;font-size:9.5px;margin-top:3px;color:#444}
-    .footer{text-align:center;color:#666;font-size:7.5px;margin-top:6px;border-top:1px dashed #bbb;padding-top:2px}
+    .running{display:flex;justify-content:space-between;font-size:9.5px;margin-top:3px;color:black;font-weight:750}
+    .footer{text-align:center;color:black;font-size:7.5px;margin-top:6px;border-top:1px dashed black;padding-top:2px;font-weight:bold}
     @media print{
       body{margin:0 !important;padding:4mm 2mm 4mm 6mm !important}
       @page {
@@ -521,21 +520,21 @@ function openKitchenSlip(order: any, restaurantName: string, cashierName: string
   body{font-family:-apple-system,system-ui,sans-serif;font-size:9.5px;max-width:260px;width:100%;margin:0 auto;padding:4px 6px;color:black;background:white;line-height:1.1}
   .center{text-align:center}
   h1{font-size:12px;font-weight:900;margin-bottom:1px;text-transform:uppercase}
-  .lbl{font-size:8px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#888;margin-bottom:1px}
-  .order-id{font-size:14px;font-weight:900;letter-spacing:0.5px;color:#111;margin:2px 0}
-  .meta{font-size:8px;color:#666;margin-bottom:1px}
-  .div{border-top:1px dashed #bbb;margin:4px 0}
+  .lbl{font-size:8px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:black;margin-bottom:1px}
+  .order-id{font-size:14px;font-weight:900;letter-spacing:0.5px;color:black;margin:2px 0}
+  .meta{font-size:8px;color:black;margin-bottom:1px;font-weight:bold}
+  .div{border-top:1px dashed black;margin:4px 0}
   .item{margin-bottom:4px}
   .row{display:flex;gap:4px;align-items:baseline}
-  .qty{font-weight:900;min-width:16px;color:#333}
+  .qty{font-weight:900;min-width:16px;color:black}
   .name{font-weight:700;flex:1;text-transform:uppercase}
-  .mod,.note{font-size:8px;color:#666;padding-left:20px;margin-top:1px}
+  .mod,.note{font-size:8px;color:black;padding-left:20px;margin-top:1px;font-weight:700}
   .summary{margin-top:4px}
-  .kv{display:flex;justify-content:space-between;font-size:9px;padding:2px 0;color:#444}
-  .kv.strong{font-weight:900;font-size:10.5px;color:#111;border-top:1px solid #111;margin-top:2px;padding-top:3px}
-  .kv.balance{font-weight:900;font-size:11px;color:#c00;border-top:1px dashed #bbb;margin-top:3px;padding-top:3px}
-  .pending{display:block;margin:6px auto 0;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:#e65100;border:1.5px solid #e65100;border-radius:10px;padding:2px 8px;width:fit-content}
-  .footer{font-size:7.5px;color:#aaa;margin-top:6px}
+  .kv{display:flex;justify-content:space-between;font-size:9px;padding:2px 0;color:black;font-weight:700}
+  .kv.strong{font-weight:900;font-size:10.5px;color:black;border-top:1px solid black;margin-top:2px;padding-top:3px}
+  .kv.balance{font-weight:900;font-size:11px;color:black;border-top:1.5px solid black;margin-top:3px;padding-top:3px}
+  .pending{display:block;margin:6px auto 0;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:black;border:2px solid black;border-radius:10px;padding:2px 8px;width:fit-content}
+  .footer{font-size:7.5px;color:black;margin-top:6px;font-weight:bold}
   @media print{
     body{margin:0 !important;padding:4mm 2mm 4mm 6mm !important}
     @page {
@@ -588,7 +587,7 @@ function openCancellationSlip(order: any, restaurantName: string, cashierName: s
       : "";
     const noteHtml = i.itemNote ? `<div class="note">* ${i.itemNote}</div>` : "";
     return `<div class="item">
-      <div class="row" style="text-decoration: line-through; opacity: 0.6;"><span class="qty">${i.quantity}×</span><span class="name">${i.name}${sizeStr}</span></div>
+      <div class="row" style="text-decoration: line-through; opacity: 1; font-weight: 750;"><span class="qty">${i.quantity}×</span><span class="name">${i.name}${sizeStr}</span></div>
       ${modsHtml}${noteHtml}
     </div>`;
   }).join("");
@@ -600,20 +599,20 @@ function openCancellationSlip(order: any, restaurantName: string, cashierName: s
   body{font-family:-apple-system,system-ui,sans-serif;font-size:9.5px;max-width:260px;width:100%;margin:0 auto;padding:4px 6px;color:black;background:white;line-height:1.1}
   .center{text-align:center}
   h1{font-size:12px;font-weight:900;margin-bottom:1px;text-transform:uppercase}
-  .lbl{font-size:8px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#d32f2f;margin-bottom:1px}
-  .order-id{font-size:14px;font-weight:900;letter-spacing:0.5px;color:#d32f2f;margin:2px 0}
-  .meta{font-size:8px;color:#666;margin-bottom:1px}
-  .div{border-top:1px dashed #bbb;margin:4px 0}
+  .lbl{font-size:8px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:black;margin-bottom:1px}
+  .order-id{font-size:14px;font-weight:900;letter-spacing:0.5px;color:black;margin:2px 0}
+  .meta{font-size:8px;color:black;margin-bottom:1px;font-weight:bold}
+  .div{border-top:1px dashed black;margin:4px 0}
   .item{margin-bottom:4px}
   .row{display:flex;gap:4px;align-items:baseline}
-  .qty{font-weight:900;min-width:16px;color:#333}
+  .qty{font-weight:900;min-width:16px;color:black}
   .name{font-weight:700;flex:1;text-transform:uppercase}
-  .mod,.note{font-size:8px;color:#666;padding-left:20px;margin-top:1px}
+  .mod,.note{font-size:8px;color:black;padding-left:20px;margin-top:1px;font-weight:700}
   .summary{margin-top:4px}
-  .kv{display:flex;justify-content:space-between;font-size:9px;padding:2px 0;color:#444}
-  .kv.strong{font-weight:900;font-size:10.5px;color:#111;border-top:1px solid #111;margin-top:2px;padding-top:3px}
-  .void-badge{display:block;margin:6px auto 0;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:#d32f2f;border:2px solid #d32f2f;border-radius:10px;padding:4px 10px;width:fit-content;text-align:center}
-  .footer{font-size:7.5px;color:#aaa;margin-top:6px}
+  .kv{display:flex;justify-content:space-between;font-size:9px;padding:2px 0;color:black;font-weight:700}
+  .kv.strong{font-weight:900;font-size:10.5px;color:black;border-top:1.5px solid black;margin-top:2px;padding-top:3px}
+  .void-badge{display:block;margin:6px auto 0;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:black;border:2.5px solid black;border-radius:10px;padding:4px 10px;width:fit-content;text-align:center}
+  .footer{font-size:7.5px;color:black;margin-top:6px;font-weight:bold}
   @media print{
     body{margin:0 !important;padding:4mm 2mm 4mm 6mm !important}
     @page {
@@ -629,7 +628,7 @@ function openCancellationSlip(order: any, restaurantName: string, cashierName: s
   <div class="order-id" style="text-decoration: line-through;">#${shortId}</div>
   <div class="meta">${dateStr} · ${timeStr}</div>
   ${order.customerName && order.customerName !== "Walk-in Guest" && order.customerName !== "Walk-in Customer" ? `<div class="meta" style="font-weight:700">👤 ${order.customerName}</div>` : ""}
-  <div class="meta" style="font-weight:bold; color:#d32f2f; margin-top: 4px;">Reason: ${reason}</div>
+  <div class="meta" style="font-weight:black; color:black; margin-top: 4px; border: 1.5px solid black; padding: 2px;">Reason: ${reason}</div>
   <div class="meta">Voided By Cashier: ${cashierName}</div>
 </div>
 <div class="div"></div>
@@ -638,7 +637,7 @@ ${itemsHtml}
 <div class="summary">
   <div class="kv strong"><span>TOTAL VOIDED VALUE</span><span>₦${(order.total ?? order.itemsTotal ?? 0).toLocaleString("en-NG")}</span></div>
 </div>
-<div class="center footer" style="margin-top:12px; font-weight: bold; color: #d32f2f; text-transform: uppercase;">
+<div class="center footer" style="margin-top:12px; font-weight: 900; color: black; text-transform: uppercase; border: 2px solid black; padding: 4px;">
   *** STOP PREPARATION / DO NOT SERVE ***
 </div>
 <script>window.onload=function(){window.print();}<\/script>
@@ -688,22 +687,22 @@ function openSettledBillWindow(order: TodayOrder, result: SettlementResult, rest
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:-apple-system,system-ui,sans-serif;font-size:9.5px;max-width:260px;width:100%;margin:0 auto;padding:4px 6px;color:black;background:white;line-height:1.1}
     .center{text-align:center}
-    .lbl{font-size:8px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;color:#999;margin-bottom:2px}
+    .lbl{font-size:8px;font-weight:900;letter-spacing:0.5px;text-transform:uppercase;color:black;margin-bottom:2px}
     h1{font-size:12px;font-weight:900;margin-bottom:2px;text-transform:uppercase}
-    .badge{display:inline-block;font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;padding:2px 6px;border-radius:10px;margin-bottom:2px;background:#e0f2f1;color:#00796b}
-    .paid-badge{display:inline-block;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:0.5px;padding:2px 8px;border-radius:10px;background:#dcfce7;color:#15803d;margin-top:2px}
-    .table-lbl{font-size:13px;font-weight:900;color:#00796b;margin:2px 0}
-    .meta{font-size:8px;color:#777}
-    .div{border-top:1px dashed #ddd;margin:4px 0}
+    .badge{display:inline-block;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:0.5px;padding:2px 6px;border-radius:10px;margin-bottom:2px;border:1px solid black;color:black}
+    .paid-badge{display:inline-block;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:0.5px;padding:2px 8px;border-radius:10px;background:white;color:black;border:2px solid black;margin-top:2px}
+    .table-lbl{font-size:13px;font-weight:900;color:black;margin:2px 0}
+    .meta{font-size:8px;color:black;font-weight:bold}
+    .div{border-top:1px dashed black;margin:4px 0}
     .row{display:flex;justify-content:space-between;align-items:baseline;gap:4px;margin:2px 0}
-    .qty{font-weight:900;color:#777;flex-shrink:0}
-    .name{font-weight:600;flex:1;text-transform:uppercase}
+    .qty{font-weight:900;color:black;flex-shrink:0}
+    .name{font-weight:700;flex:1;text-transform:uppercase}
     .price{font-weight:700;flex-shrink:0;font-family:monospace}
     .kv{display:flex;justify-content:space-between;font-size:9px;margin:1px 0}
-    .kl{color:#777;font-weight:600}
+    .kl{color:black;font-weight:750}
     .kv-v{font-weight:700}
     .total{display:flex;justify-content:space-between;font-size:11px;font-weight:900;margin-top:3px}
-    .footer{text-align:center;color:#bbb;font-size:7.5px;margin-top:6px;border-top:1px dashed #ddd;padding-top:2px}
+    .footer{text-align:center;color:black;font-size:7.5px;margin-top:6px;border-top:1px dashed black;padding-top:2px;font-weight:bold}
     @media print{
       body{margin:0 !important;padding:4mm 2mm 4mm 6mm !important}
       @page {
@@ -733,7 +732,7 @@ function openSettledBillWindow(order: TodayOrder, result: SettlementResult, rest
   <div class="total"><span>Total</span><span>₦${order.total.toLocaleString("en-NG")}</span></div>
   <div class="div"></div>
   <div class="kv"><span class="kl">Payment</span><span class="kv-v">${pmLabels[result.paymentMethod] ?? result.paymentMethod}</span></div>
-  <div class="kv"><span class="kl">Status</span><span class="kv-v" style="color:#15803d;font-weight:900">PAID</span></div>
+  <div class="kv"><span class="kl">Status</span><span class="kv-v" style="color:black;font-weight:900">PAID</span></div>
   <div class="footer"><div>Thank you for dining with us!</div><div>Powered by Restaflow</div></div>
   <script>window.onload=function(){setTimeout(function(){window.print();},80)};</script>
 </body>
