@@ -27,6 +27,8 @@ import {
   LogOut,
   ExternalLink,
   Sliders,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 type Role = "owner" | "manager" | "staff";
@@ -207,12 +209,14 @@ function NavList({
   slug,
   pathname,
   onNavigate,
+  isCollapsed = false,
 }: {
   groups: NavGroup[];
   role: Role;
   slug: string;
   pathname: string;
   onNavigate?: () => void;
+  isCollapsed?: boolean;
 }) {
   return (
     <div className="flex-1 overflow-y-auto py-2">
@@ -221,9 +225,13 @@ function NavList({
         if (visible.length === 0) return null;
         return (
           <div key={group.label} className="mb-4">
-            <p className="px-4 mb-1 text-xs font-black text-gray-400 uppercase tracking-widest">
-              {group.label}
-            </p>
+            {!isCollapsed ? (
+              <p className="px-4 mb-1 text-xs font-black text-gray-400 uppercase tracking-widest transition-opacity duration-300">
+                {group.label}
+              </p>
+            ) : (
+              <div className="mx-4 mb-2 border-t border-gray-100" />
+            )}
             <div className="space-y-0.5 px-2">
               {visible.map(({ name, href, Icon }) => {
                 const isActive = pathname === href;
@@ -233,7 +241,10 @@ function NavList({
                     key={href}
                     href={href}
                     onClick={onNavigate}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                    title={isCollapsed ? name : undefined}
+                    className={`flex items-center rounded-xl text-sm font-semibold transition-all ${
+                      isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5"
+                    } ${
                       isActive
                         ? "bg-orange-50 text-orange-600 border border-orange-100"
                         : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
@@ -244,8 +255,8 @@ function NavList({
                       strokeWidth={isActive ? 2.5 : 2}
                       className="shrink-0"
                     />
-                    <span className="flex-1 truncate">{name}</span>
-                    {isDomain && <DomainDot slug={slug} />}
+                    {!isCollapsed && <span className="flex-1 truncate">{name}</span>}
+                    {!isCollapsed && isDomain && <DomainDot slug={slug} />}
                   </Link>
                 );
               })}
@@ -260,9 +271,11 @@ function NavList({
 function BottomActions({
   slug,
   onLogout,
+  isCollapsed = false,
 }: {
   slug: string;
   onLogout: () => void;
+  isCollapsed?: boolean;
 }) {
   return (
     <div className="border-t border-gray-100 p-2 space-y-0.5">
@@ -270,17 +283,23 @@ function BottomActions({
         href={`/r/${slug}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+        title={isCollapsed ? "View Store" : undefined}
+        className={`flex items-center rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors ${
+          isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5"
+        }`}
       >
         <ExternalLink size={16} className="shrink-0" />
-        <span>View Store</span>
+        {!isCollapsed && <span>View Store</span>}
       </a>
       <button
         onClick={onLogout}
-        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors text-left"
+        title={isCollapsed ? "Sign Out" : undefined}
+        className={`w-full flex items-center rounded-xl text-sm font-semibold text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors text-left ${
+          isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5"
+        }`}
       >
         <LogOut size={16} className="shrink-0" />
-        <span>Sign Out</span>
+        {!isCollapsed && <span>Sign Out</span>}
       </button>
     </div>
   );
@@ -290,6 +309,22 @@ export default function AdminNav({ slug, role = "owner" }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("admin-sidebar-collapsed");
+    if (saved === "true") {
+      setIsCollapsed(true);
+    }
+    setMounted(true);
+  }, []);
+
+  const toggleCollapse = () => {
+    const nextVal = !isCollapsed;
+    setIsCollapsed(nextVal);
+    localStorage.setItem("admin-sidebar-collapsed", String(nextVal));
+  };
 
   const isFullScreen =
     pathname === `/admin/${slug}/kitchen` ||
@@ -311,15 +346,35 @@ export default function AdminNav({ slug, role = "owner" }: Props) {
   return (
     <>
       {/* ── Desktop sidebar ─────────────────────────────────────────────── */}
-      <aside className="hidden lg:flex flex-col w-64 shrink-0 bg-white border-r border-gray-200 sticky top-0 h-screen overflow-hidden">
+      <aside className={`hidden lg:flex flex-col shrink-0 bg-white border-r border-gray-200 sticky top-0 h-screen overflow-hidden ${
+        mounted ? "transition-[width] duration-300 ease-in-out" : ""
+      } ${isCollapsed ? "w-16" : "w-64"}`}>
         {/* Brand */}
-        <div className="px-4 py-5 border-b border-gray-100 shrink-0">
-          <p className="text-xs font-black text-orange-500 uppercase tracking-widest">
-            RestoFlow
-          </p>
-          <p className="text-sm font-black text-gray-900 truncate capitalize mt-0.5">
-            {displayName}
-          </p>
+        <div className={`border-b border-gray-100 shrink-0 flex items-center ${
+          isCollapsed ? "justify-center p-4" : "justify-between px-4 py-5"
+        }`}>
+          {!isCollapsed && (
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-black text-orange-500 uppercase tracking-widest">
+                RestoFlow
+              </p>
+              <p className="text-sm font-black text-gray-900 truncate capitalize mt-0.5">
+                {displayName}
+              </p>
+            </div>
+          )}
+          {isCollapsed && (
+            <span className="text-orange-500 font-black text-lg select-none">R</span>
+          )}
+          <button
+            onClick={toggleCollapse}
+            className={`p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors ${
+              isCollapsed ? "mt-1" : "ml-2"
+            }`}
+            title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          >
+            {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
         </div>
 
         <NavList
@@ -327,9 +382,10 @@ export default function AdminNav({ slug, role = "owner" }: Props) {
           role={role}
           slug={slug}
           pathname={pathname}
+          isCollapsed={isCollapsed}
         />
 
-        <BottomActions slug={slug} onLogout={handleLogout} />
+        <BottomActions slug={slug} onLogout={handleLogout} isCollapsed={isCollapsed} />
       </aside>
 
       {/* ── Mobile: fixed top bar ───────────────────────────────────────── */}
