@@ -83,7 +83,7 @@ export default function PaymentSettingsClient({ current }: { current: CurrentSet
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
+    <div className="space-y-6">
       <div className="mb-8">
         <h1 className="text-2xl font-black text-gray-900">Payment Settings</h1>
         <p className="text-gray-500 font-medium mt-1">

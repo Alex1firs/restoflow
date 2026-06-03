@@ -15,6 +15,7 @@ export type PaystackPaymentData = {
     onboardingId?: string;
     restaurantSlug?: string;
     email?: string;
+    months?: number;
   };
   customer?: { email?: string };
 };
@@ -51,16 +52,31 @@ export async function processSuccessfulPayment(
   if (!existing.empty) return false;
 
   const now = new Date();
-  const subscriptionEndsAt = new Date(now);
-  subscriptionEndsAt.setDate(subscriptionEndsAt.getDate() + 30);
-
-  const paymentRef = db.collection("payments").doc();
   const restaurantRef = db.collection("restaurants").doc(restaurantId);
 
   // Preserve subscriptionStartedAt if this is a renewal (not the first payment)
   const restaurantSnap = await restaurantRef.get();
   const existingData = restaurantSnap.exists ? restaurantSnap.data()! : {};
   const subscriptionStartedAt = existingData.subscriptionStartedAt ?? now;
+
+  // Determine base date for subscription extension
+  let baseDate = now;
+  if (existingData.subscriptionEndDate) {
+    const raw = existingData.subscriptionEndDate as { toDate?: () => Date; seconds?: number };
+    const existingEndDate = raw.toDate ? raw.toDate() : new Date((raw.seconds ?? 0) * 1000);
+    if (existingEndDate > now) {
+      baseDate = existingEndDate;
+    }
+  }
+
+  const rawMonths = metadata?.months;
+  const parsedMonths = rawMonths ? Number(rawMonths) : 1;
+  const months = isNaN(parsedMonths) || parsedMonths < 1 ? 1 : parsedMonths;
+
+  const subscriptionEndsAt = new Date(baseDate);
+  subscriptionEndsAt.setDate(subscriptionEndsAt.getDate() + (30 * months));
+
+  const paymentRef = db.collection("payments").doc();
 
   const batch = db.batch();
 

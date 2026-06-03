@@ -20,10 +20,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { restaurantId, planId, paymentType } = body as {
+  const { restaurantId, planId, paymentType, months: rawMonths } = body as {
     restaurantId?: string;
     planId?: string;
     paymentType?: string;
+    months?: unknown;
   };
 
   if (!restaurantId || !planId || !paymentType) {
@@ -36,6 +37,15 @@ export async function POST(req: NextRequest) {
 
   if (!["setup", "subscription"].includes(paymentType)) {
     return NextResponse.json({ error: "Invalid paymentType" }, { status: 400 });
+  }
+
+  let months = 1;
+  if (paymentType === "subscription" && rawMonths !== undefined) {
+    const parsed = Number(rawMonths);
+    if (isNaN(parsed) || parsed < 1 || parsed > 36 || !Number.isInteger(parsed)) {
+      return NextResponse.json({ error: "Invalid months count. Must be an integer between 1 and 36." }, { status: 400 });
+    }
+    months = parsed;
   }
 
   const db = getAdminDb();
@@ -56,7 +66,7 @@ export async function POST(req: NextRequest) {
   const restaurant = restaurantDoc.data()!;
 
   const amountNgn =
-    paymentType === "setup" ? (plan.setupFee as number) : (plan.monthlyPrice as number);
+    paymentType === "setup" ? (plan.setupFee as number) : (plan.monthlyPrice as number) * months;
   const amountKobo = amountNgn * 100;
 
   const callbackUrl = `${process.env.NEXT_PUBLIC_APP_URL}/admin/${restaurantId}/billing/callback`;
@@ -79,6 +89,7 @@ export async function POST(req: NextRequest) {
         paymentType,
         ownerUid: user.uid,
         planName: plan.name as string,
+        months,
       },
     }),
   });
