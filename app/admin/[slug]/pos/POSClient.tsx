@@ -564,6 +564,81 @@ ${itemsHtml}
   if (w) { w.document.write(html); w.document.close(); }
 }
 
+function openCancellationSlip(order: any, restaurantName: string, cashierName: string, reason: string) {
+  const createdAt = order.createdAt?.toDate ? order.createdAt.toDate() : new Date();
+  const dateStr = createdAt.toLocaleDateString("en-NG", { weekday: "short", year: "numeric", month: "short", day: "numeric" });
+  const timeStr = createdAt.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" });
+  const shortId = order.id?.slice(-8).toUpperCase() ?? "NEW";
+
+  const totalQty = (order.items as any[]).reduce((s: number, i: any) => s + i.quantity, 0);
+
+  const itemsHtml = (order.items as any[]).map((i: any) => {
+    const sizeStr = i.selectedSize ? ` (${i.selectedSize.name})` : "";
+    const modsHtml = i.selectedModifiers?.length
+      ? i.selectedModifiers.map((m: any) => `<div class="mod">+ ${m.name}</div>`).join("")
+      : "";
+    const noteHtml = i.itemNote ? `<div class="note">* ${i.itemNote}</div>` : "";
+    return `<div class="item">
+      <div class="row" style="text-decoration: line-through; opacity: 0.6;"><span class="qty">${i.quantity}×</span><span class="name">${i.name}${sizeStr}</span></div>
+      ${modsHtml}${noteHtml}
+    </div>`;
+  }).join("");
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<title>Cancellation Slip · #${shortId}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,system-ui,sans-serif;font-size:9.5px;max-width:260px;width:100%;margin:0 auto;padding:4px 6px;color:black;background:white;line-height:1.1}
+  .center{text-align:center}
+  h1{font-size:12px;font-weight:900;margin-bottom:1px;text-transform:uppercase}
+  .lbl{font-size:8px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#d32f2f;margin-bottom:1px}
+  .order-id{font-size:14px;font-weight:900;letter-spacing:0.5px;color:#d32f2f;margin:2px 0}
+  .meta{font-size:8px;color:#666;margin-bottom:1px}
+  .div{border-top:1px dashed #bbb;margin:4px 0}
+  .item{margin-bottom:4px}
+  .row{display:flex;gap:4px;align-items:baseline}
+  .qty{font-weight:900;min-width:16px;color:#333}
+  .name{font-weight:700;flex:1;text-transform:uppercase}
+  .mod,.note{font-size:8px;color:#666;padding-left:20px;margin-top:1px}
+  .summary{margin-top:4px}
+  .kv{display:flex;justify-content:space-between;font-size:9px;padding:2px 0;color:#444}
+  .kv.strong{font-weight:900;font-size:10.5px;color:#111;border-top:1px solid #111;margin-top:2px;padding-top:3px}
+  .void-badge{display:block;margin:6px auto 0;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:#d32f2f;border:2px solid #d32f2f;border-radius:10px;padding:4px 10px;width:fit-content;text-align:center}
+  .footer{font-size:7.5px;color:#aaa;margin-top:6px}
+  @media print{
+    body{margin:0 !important;padding:4mm 2mm 4mm 6mm !important}
+    @page {
+      size: auto;
+      margin: 0 !important;
+    }
+  }
+</style></head>
+<body>
+<div class="center">
+  <div class="lbl">${restaurantName}</div>
+  <div class="void-badge">⚠️ ORDER VOIDED / CANCELLED ⚠️</div>
+  <div class="order-id" style="text-decoration: line-through;">#${shortId}</div>
+  <div class="meta">${dateStr} · ${timeStr}</div>
+  ${order.customerName && order.customerName !== "Walk-in Guest" && order.customerName !== "Walk-in Customer" ? `<div class="meta" style="font-weight:700">👤 ${order.customerName}</div>` : ""}
+  <div class="meta" style="font-weight:bold; color:#d32f2f; margin-top: 4px;">Reason: ${reason}</div>
+  <div class="meta">Voided By Cashier: ${cashierName}</div>
+</div>
+<div class="div"></div>
+${itemsHtml}
+<div class="div"></div>
+<div class="summary">
+  <div class="kv strong"><span>TOTAL VOIDED VALUE</span><span>₦${(order.total ?? order.itemsTotal ?? 0).toLocaleString("en-NG")}</span></div>
+</div>
+<div class="center footer" style="margin-top:12px; font-weight: bold; color: #d32f2f; text-transform: uppercase;">
+  *** STOP PREPARATION / DO NOT SERVE ***
+</div>
+<script>window.onload=function(){window.print();}<\/script>
+</body></html>`;
+
+  const w = window.open("", "_blank", "width=380,height=620,toolbar=0,menubar=0");
+  if (w) { w.document.write(html); w.document.close(); }
+}
+
 // ── Settled-bill receipt popup ────────────────────────────────────────────────
 
 function openSettledBillWindow(order: TodayOrder, result: SettlementResult, restaurantName: string) {
@@ -2275,6 +2350,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
           onClose={() => setVoidingOrder(null)}
           onVoidComplete={async (orderId, reason) => {
             if (voidingOrder.isOffline) {
+              openCancellationSlip(voidingOrder, restaurant.name, activeCashierName, reason);
               await dbDelete("ordersQueue", orderId);
               loadOfflineQueueBills();
               showSystemToast("Offline order deleted successfully.");
@@ -2292,6 +2368,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                 const errData = await res.json();
                 throw new Error(errData.error || "Failed to void order");
               }
+              openCancellationSlip(voidingOrder, restaurant.name, activeCashierName, reason);
               showSystemToast("Bill voided successfully.");
             }
             setVoidingOrder(null);
@@ -2674,7 +2751,19 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                 settleOfflineOrder(localOrderId, method, note, restaurant.name, activeCashierName)
               }
               onEdit={handleEditOrder}
-              onVoid={setVoidingOrder}
+              onVoid={(bill) => {
+                if (role === "staff" || activeCashierRole === "staff") {
+                  setVerifyingAction("void_order");
+                  setPendingActionCallback(() => () => {
+                    setVerifyingAction(null);
+                    setPinInput("");
+                    setPinError(null);
+                    setVoidingOrder(bill);
+                  });
+                } else {
+                  setVoidingOrder(bill);
+                }
+              }}
             />
           )}
 
@@ -3444,6 +3533,8 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
             <p className="text-xs text-gray-400 mt-1 font-bold">
               {verifyingAction === "void_item"
                 ? "Manager approval is needed to VOID an item from active tray."
+                : verifyingAction === "void_order"
+                ? "Manager approval is needed to VOID / CANCEL an active bill."
                 : "Manager approval is needed to APPLY custom manual pricing overrides."}
             </p>
 
