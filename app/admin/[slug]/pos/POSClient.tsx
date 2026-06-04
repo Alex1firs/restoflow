@@ -1492,12 +1492,9 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
 
   // ── Ready-order Firestore listener ────────────────────────────────────────
   useEffect(() => {
-    const startOfDay = getLagosStartOfDay();
-
     const q = query(
       collection(db, "orders"),
       where("restaurantId", "==", restaurant.slug),
-      where("createdAt", ">=", Timestamp.fromDate(startOfDay)),
       orderBy("createdAt", "desc")
     );
 
