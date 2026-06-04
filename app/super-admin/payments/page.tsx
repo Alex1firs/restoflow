@@ -17,7 +17,7 @@ export default async function SuperAdminPaymentsPage() {
       id: doc.id,
       restaurant: (d.restaurantId as string) ?? "—",
       ref: (d.paystackReference as string) ?? doc.id.slice(0, 10),
-      amount: (d.amount as number) ?? 0,
+      amount: ((d.amount as number) ?? 0) / 100,
       status: (d.status as string) ?? "pending",
       type: (d.type as string) ?? "—",
       date: fmtDate(d.createdAt as Parameters<typeof fmtDate>[0]),

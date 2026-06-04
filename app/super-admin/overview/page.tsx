@@ -54,7 +54,7 @@ export default async function SuperAdminOverview() {
 
   for (const doc of paymentsSnap.docs) {
     const p = doc.data();
-    const amount = (p.amount as number) ?? 0;
+    const amount = ((p.amount as number) ?? 0) / 100;
     const status = (p.status as string) ?? "";
     if (status === "completed" || status === "success") totalRevenue += amount;
     recentPayments.push({
