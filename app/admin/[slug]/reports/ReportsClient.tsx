@@ -19,6 +19,7 @@ type Summary = {
   dineInTotal: number;
   avgPrepMinutes: number | null;
   avgReadyMinutes: number | null;
+  cancelledTotal: number;
 };
 
 type Order = {
@@ -191,7 +192,7 @@ export default function ReportsClient({ slug }: { slug: string }) {
           </div>
 
           {/* Summary cards — payment breakdown */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
             {[
               { label: "Online Paid", value: fmt(summary.onlineTotal), accent: "text-blue-600" },
               { label: "Cash Sales", value: fmt(summary.cashTotal), accent: "text-green-600" },
@@ -199,6 +200,7 @@ export default function ReportsClient({ slug }: { slug: string }) {
               { label: "Bank Transfer", value: fmt(summary.bankTransferTotal), accent: "text-purple-600" },
               { label: "Card / POS", value: fmt(summary.cardTotal), accent: "text-indigo-600" },
               { label: "Unpaid", value: fmt(summary.unpaidTotal), accent: "text-red-500" },
+              { label: "Cancelled Total", value: fmt(summary.cancelledTotal), accent: "text-red-600" },
             ].map((card) => (
               <div key={card.label} className="bg-white rounded-2xl border border-gray-100 p-4">
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">{card.label}</p>
