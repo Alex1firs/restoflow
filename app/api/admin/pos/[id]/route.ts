@@ -120,7 +120,13 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       ) {
         return NextResponse.json({ error: "Invalid item in order" }, { status: 400 });
       }
-      const dbItem = menuMap.get(item.id);
+      let dbItem = menuMap.get(item.id);
+      if (!dbItem) {
+        // Fallback: try to match by name (case-insensitive) if Firestore document IDs were regenerated
+        dbItem = Array.from(menuMap.values()).find(
+          (m: any) => m.name.toLowerCase() === item.name?.toLowerCase()
+        );
+      }
       if (!dbItem) {
         return NextResponse.json(
           { error: "Item not found or does not belong to this restaurant" },
@@ -158,7 +164,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       }
 
       validatedItems.push({
-        id: item.id,
+        id: dbItem.id,
         name: dbItem.name,
         price: unitPrice,
         basePrice: dbItem.basePrice ?? dbItem.price ?? 0,
