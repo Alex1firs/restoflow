@@ -2965,6 +2965,9 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                 settleOfflineOrder(localOrderId, method, note, restaurant.name, activeCashierName)
               }
               onEdit={handleEditOrder}
+              onPrintReceipt={(bill) => {
+                openPOSReceiptWindow(bill, restaurant.name, activeCashierName, printCopies);
+              }}
               onVoid={(bill) => {
                 if (bill.cancellationRequested) {
                   setPendingVoidParams({ orderId: bill.id, reason: bill.cancellationReason || "Manager PIN Override" });
@@ -4086,6 +4089,7 @@ function OpenBillsPanel({
   onSettleOffline,
   onEdit,
   onVoid,
+  onPrintReceipt,
   cancellationManagerPinEnabled,
 }: {
   bills: TodayOrder[];
@@ -4093,6 +4097,7 @@ function OpenBillsPanel({
   onSettleOffline: (localOrderId: string, method: string, note: string) => void;
   onEdit: (bill: TodayOrder) => void;
   onVoid: (bill: TodayOrder) => void;
+  onPrintReceipt: (bill: TodayOrder) => void;
   cancellationManagerPinEnabled?: boolean;
 }) {
   const [offlineSettleId, setOfflineSettleId] = useState<string | null>(null);
@@ -4312,13 +4317,22 @@ function OpenBillsPanel({
                     Settle Bill
                   </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onVoid(bill)}
-                  className="w-full mt-2 bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-600 font-black text-xs py-2.5 rounded-xl transition-colors border border-red-100 text-center"
-                >
-                  ⚠️ Void / Cancel Bill
-                </button>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => onPrintReceipt(bill)}
+                    className="flex-1 bg-white hover:bg-teal-50 active:bg-teal-100 text-teal-700 font-black text-xs py-2.5 rounded-xl transition-colors border border-teal-200 text-center flex items-center justify-center gap-1.5 animate-fade-in"
+                  >
+                    🖨️ Print Receipt
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onVoid(bill)}
+                    className="flex-1 bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-600 font-black text-xs py-2.5 rounded-xl transition-colors border border-red-100 text-center flex items-center justify-center gap-1.5"
+                  >
+                    ⚠️ Void Bill
+                  </button>
+                </div>
               </>
             )}
           </div>
