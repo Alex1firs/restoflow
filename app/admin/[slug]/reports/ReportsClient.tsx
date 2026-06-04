@@ -305,9 +305,21 @@ export default function ReportsClient({ slug }: { slug: string }) {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`text-xs font-bold uppercase px-2 py-1 rounded-full ${STATUS_COLORS[o.status] ?? "bg-gray-100 text-gray-600"}`}>
-                              {o.status}
-                            </span>
+                            {o.status === "rejected" ? (
+                              <span className="text-xs font-bold uppercase px-2 py-1 rounded-full bg-red-100 text-red-700">
+                                Voided
+                              </span>
+                            ) : (
+                              <span className={`text-xs font-bold uppercase px-2 py-1 rounded-full ${
+                                o.paymentStatus === "paid"
+                                  ? "bg-green-100 text-green-700"
+                                  : o.paymentStatus === "part_paid"
+                                  ? "bg-yellow-100 text-yellow-700"
+                                  : "bg-red-100 text-red-700"
+                              }`}>
+                                {o.paymentStatus || "unpaid"}
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-xs text-gray-500 capitalize">{o.deliveryType || "—"}</td>
                           <td className="px-4 py-3">
@@ -357,9 +369,21 @@ export default function ReportsClient({ slug }: { slug: string }) {
                               {o.paymentStatus}
                             </span>
                           )}
-                          <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full ${STATUS_COLORS[o.status] ?? "bg-gray-100 text-gray-600"}`}>
-                            {o.status}
-                          </span>
+                          {o.status === "rejected" ? (
+                            <span className="text-xs font-bold uppercase px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                              Voided
+                            </span>
+                          ) : (
+                            <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full ${
+                              o.paymentStatus === "paid"
+                                ? "bg-green-100 text-green-700"
+                                : o.paymentStatus === "part_paid"
+                                ? "bg-yellow-100 text-yellow-700"
+                                : "bg-red-100 text-red-700"
+                            }`}>
+                              {o.paymentStatus || "unpaid"}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-1.5 items-center">
