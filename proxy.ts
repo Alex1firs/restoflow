@@ -9,6 +9,7 @@ const MAIN_HOSTS = [
   "restaflow.com",
   "www.restaflow.com",
   "localhost",
+  "127.0.0.1",
 ];
 
 const BASE_DOMAINS = [
@@ -16,6 +17,7 @@ const BASE_DOMAINS = [
   "restaflow.com",
   "localhost",
   "restoflow-nine.vercel.app",
+  "127.0.0.1",
 ];
 
 function isMainHost(host: string): boolean {
