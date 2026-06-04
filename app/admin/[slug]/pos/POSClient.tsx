@@ -1802,44 +1802,21 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
 
   const updateQuantity = useCallback((cartItemId: string, delta: number) => {
     setCart((prev) => {
-      const item = prev.find((x) => x.cartItemId === cartItemId);
-      if (item && delta < 0 && item.quantity === 1) {
-        // Void/delete authorization gate for staff
-        if (role === "staff") {
-          setVerifyingAction("void_item");
-          setPendingActionCallback(() => () => executeVoidItem(cartItemId));
-          return prev;
-        }
-      }
       return prev
         .map((c) => (c.cartItemId === cartItemId ? { ...c, quantity: c.quantity + delta } : c))
         .filter((c) => c.quantity > 0);
     });
-  }, [role]);
+  }, []);
 
   const executeVoidItem = (cartItemId: string) => {
     setCart((prev) => prev.filter((c) => c.cartItemId !== cartItemId));
-    setAuditLog((prev) => [
-      ...prev,
-      {
-        action: "void_item_approved",
-        cartItemId,
-        timestamp: new Date().toISOString(),
-        details: `Manager authorized void of line item.`,
-      },
-    ]);
     setVerifyingAction(null);
     setPinInput("");
   };
 
   const removeFromCart = useCallback((cartItemId: string) => {
-    if (role === "staff") {
-      setVerifyingAction("void_item");
-      setPendingActionCallback(() => () => executeVoidItem(cartItemId));
-      return;
-    }
     executeVoidItem(cartItemId);
-  }, [role]);
+  }, []);
 
   // ── Manager PIN authorization check ──
   const verifyPin = async () => {
