@@ -15,6 +15,62 @@ const app = initializeApp({
 const db = getFirestore(app);
 
 const newItems = [
+  {
+    name: "WHITE RICE + VEGETABLE STEW + ONE MEAT",
+    description: "Fluffy steamed white rice served with a rich vegetable stew and one piece of tender meat.",
+    price: 5500,
+    indoorPrice: 6000,
+    image: "https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?w=800&auto=format",
+    category: "Rice",
+    available: true,
+    itemType: "item",
+    basePrice: 5500,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "ORA SOUP + ONE MEAT",
+    description: "Authentic Nigerian Oha soup (Ora) served with one piece of tender meat.",
+    price: 3500,
+    indoorPrice: 4500,
+    image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format",
+    category: "Soup",
+    available: true,
+    itemType: "item",
+    basePrice: 3500,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "EDIKANIKONG SOUP + ONE MEAT",
+    description: "Traditional Nigerian Edikang Ikong soup served with one piece of tender meat.",
+    price: 4500,
+    indoorPrice: 5500,
+    image: "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&auto=format",
+    category: "Soup",
+    available: true,
+    itemType: "item",
+    basePrice: 4500,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
+  {
+    name: "OKRO SOUP + ONE MEAT",
+    description: "Traditional okra soup served with one piece of tender meat.",
+    price: 3500,
+    indoorPrice: 4500,
+    image: "https://images.unsplash.com/photo-1541832676-9b763b0239ab?w=800&auto=format",
+    category: "Soup",
+    available: true,
+    itemType: "item",
+    basePrice: 3500,
+    kitchenStation: "kitchen",
+    allowCustomPrice: false,
+    restaurantId: "tricias-kitchen"
+  },
   // List 1 Items (1 to 17)
   {
     name: "FRIED YAM + PEPPER GOAT MEAT",
