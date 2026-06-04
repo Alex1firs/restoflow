@@ -5,6 +5,8 @@ import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/aut
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
 type Mode = "login" | "forgot";
 
@@ -86,7 +88,14 @@ export default function LoginClient() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="relative min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <Link
+        href="/"
+        className="absolute top-6 left-6 flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-gray-900 bg-white/80 backdrop-blur-md px-4 py-2 rounded-full border border-gray-200/80 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to home
+      </Link>
       <div className="w-full max-w-md">
         <div className="text-center mb-10">
           <h1 className="text-4xl font-black text-gray-900 tracking-tighter italic uppercase">
