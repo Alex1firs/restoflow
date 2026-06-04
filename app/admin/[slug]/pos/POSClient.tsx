@@ -1867,6 +1867,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
           tabId: activeTab.id,
           items: cart.map((c) => ({
             id: c.id,
+            name: c.name,
             quantity: c.quantity,
             selectedSize: c.selectedSize,
             selectedModifiers: c.selectedModifiers,
@@ -1986,6 +1987,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
     const orderPayload = {
       items: cart.map((c) => ({
         id: c.id,
+        name: c.name,
         quantity: c.quantity,
         selectedSize: c.selectedSize,
         selectedModifiers: c.selectedModifiers,
