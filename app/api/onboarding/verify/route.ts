@@ -38,11 +38,12 @@ export async function POST(req: NextRequest) {
 
   const result = await processOnboarding(metadata.onboardingId, reference);
 
-  // Return only safe fields — never include resetLink or internal tokens
+  // Return fields needed for UI setup including resetLink
   return NextResponse.json({
     success: result.success,
     alreadyProcessed: result.alreadyProcessed,
     slug: result.slug,
     email: result.email,
+    resetLink: result.resetLink,
   });
 }

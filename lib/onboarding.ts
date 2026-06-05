@@ -23,6 +23,7 @@ export type OnboardingResult = {
   alreadyProcessed: boolean;
   slug: string;
   email: string;
+  resetLink?: string;
 };
 
 function toSlug(name: string): string {
@@ -74,6 +75,7 @@ export async function processOnboarding(
       alreadyProcessed: true,
       slug: record.slug,
       email: record.email,
+      resetLink: record.resetLink,
     };
   }
 
@@ -152,5 +154,6 @@ export async function processOnboarding(
     alreadyProcessed: false,
     slug,
     email,
+    resetLink,
   };
 }

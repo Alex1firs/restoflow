@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
         directActivation: true,
         slug: result.slug,
         email: result.email,
+        resetLink: result.resetLink,
       });
     }
 
