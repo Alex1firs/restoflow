@@ -9,6 +9,7 @@ interface Props {
   onChange: (s: HeroSettings) => void;
   logoUrl: string;
   coverUrl: string;
+  coverVideoUrl?: string;
   restaurantName: string;
   description: string;
   primaryColor: string;
@@ -24,6 +25,7 @@ export default function HeroCustomizationSection({
   onChange,
   logoUrl,
   coverUrl,
+  coverVideoUrl,
   restaurantName,
   description,
   primaryColor,
@@ -45,7 +47,20 @@ export default function HeroCustomizationSection({
 
         {/* High-end mini visual preview mock */}
         <div className="relative w-full md:w-56 h-36 bg-stone-900 rounded-xl overflow-hidden flex flex-col justify-end p-3 flex-shrink-0 shadow border border-white/10">
-          {coverUrl ? (
+          {coverVideoUrl ? (
+            <>
+              <video
+                src={coverVideoUrl}
+                poster={coverUrl}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="absolute inset-0 w-full h-full object-cover pointer-events-none opacity-80"
+              />
+              <div className="absolute inset-0 bg-black/40 pointer-events-none" />
+            </>
+          ) : coverUrl ? (
             <>
               <img
                 src={coverUrl}
@@ -121,6 +136,7 @@ export default function HeroCustomizationSection({
           onChange={onChange}
           logoUrl={logoUrl}
           coverUrl={coverUrl}
+          coverVideoUrl={coverVideoUrl}
           restaurantName={restaurantName}
           description={description}
           primaryColor={primaryColor}

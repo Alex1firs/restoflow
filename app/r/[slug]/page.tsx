@@ -23,6 +23,7 @@ interface RestaurantData {
   name: string;
   description: string;
   coverImage: string;
+  coverVideo?: string;
   subscriptionStatus?: string;
   subscriptionEndDate?: { toDate?: () => Date; seconds?: number; _seconds?: number };
   status?: string;
@@ -213,6 +214,7 @@ export default async function RestaurantPage({
     name: restaurant.name,
     description: restaurant.description,
     coverImage: restaurant.coverImage,
+    coverVideo: restaurant.coverVideo ?? "",
     logo: rData.logo ?? "",
     address: rData.address ?? "",
     slug,

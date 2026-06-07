@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import ImageUpload from "@/app/components/ImageUpload";
+import VideoUpload from "@/app/components/VideoUpload";
 import AiTextHelper from "@/app/components/AiTextHelper";
 import { DAYS, DEFAULT_DAY_HOURS, defaultOpeningHours, type OpeningHours } from "@/lib/restaurant-utils";
 import HeroCustomizationSection from "./HeroCustomizationSection";
@@ -18,6 +19,7 @@ type Props = {
     description: string;
     logo: string;
     coverImage: string;
+    coverVideo?: string;
     phone: string;
     address: string;
     telegramChatId: string;
@@ -53,6 +55,7 @@ export default function SettingsClient({ restaurant, aiEnabled = false, menuItem
     description: restaurant.description,
     logo: restaurant.logo,
     coverImage: restaurant.coverImage,
+    coverVideo: restaurant.coverVideo || "",
     phone: restaurant.phone,
     address: restaurant.address,
     telegramChatId: restaurant.telegramChatId,
@@ -179,7 +182,7 @@ export default function SettingsClient({ restaurant, aiEnabled = false, menuItem
               Your logo and cover photo help customers recognize your restaurant. A professional look builds trust and encourages more orders.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
             <ImageUpload
               label="Logo"
               value={form.logo}
@@ -193,6 +196,12 @@ export default function SettingsClient({ restaurant, aiEnabled = false, menuItem
               onChange={(url) => { setField("coverImage", url); setStatus("idle"); }}
               storagePath={`restaurants/${restaurant.slug}/cover`}
               aspect="wide"
+            />
+            <VideoUpload
+              label="Cover Video"
+              value={form.coverVideo}
+              onChange={(url) => { setField("coverVideo", url); setStatus("idle"); }}
+              storagePath={`restaurants/${restaurant.slug}/cover_video`}
             />
           </div>
           <Field label="Restaurant Name">
@@ -254,6 +263,7 @@ export default function SettingsClient({ restaurant, aiEnabled = false, menuItem
             onChange={(s) => { setHeroSettings(s); setStatus("idle"); }}
             logoUrl={form.logo}
             coverUrl={form.coverImage}
+            coverVideoUrl={form.coverVideo}
             restaurantName={form.name}
             description={form.description}
             primaryColor={form.primaryColor}

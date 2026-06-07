@@ -24,6 +24,7 @@ interface RestaurantClientProps {
     name: string;
     description: string;
     coverImage: string;
+    coverVideo?: string;
     logo: string;
     address: string;
     slug: string;
@@ -634,7 +635,26 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
             }`}
             style={{ minHeight: `${hs.heroHeight}vh` }}
           >
-            {restaurant.coverImage && (
+            {restaurant.coverVideo ? (
+              <div
+                className="absolute inset-0 z-0 pointer-events-none"
+                style={{ transform: `translateY(${scrollY * 0.25}px)` }}
+              >
+                <video
+                  src={restaurant.coverVideo}
+                  poster={restaurant.coverImage}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
+                <div
+                  className="absolute inset-0"
+                  style={oStyle}
+                />
+              </div>
+            ) : restaurant.coverImage ? (
               <div
                 className="absolute inset-0 z-0 pointer-events-none"
                 style={{ transform: `translateY(${scrollY * 0.25}px)` }}
@@ -653,7 +673,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                   style={oStyle}
                 />
               </div>
-            )}
+            ) : null}
 
             {/* Top Navbar */}
             <div

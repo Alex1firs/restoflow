@@ -21,6 +21,7 @@ export async function PUT(req: NextRequest) {
     description,
     logo,
     coverImage,
+    coverVideo,
     phone,
     address,
     telegramChatId,
@@ -48,6 +49,7 @@ export async function PUT(req: NextRequest) {
     description?: string;
     logo?: string;
     coverImage?: string;
+    coverVideo?: string;
     phone?: string;
     address?: string;
     telegramChatId?: string;
@@ -84,6 +86,7 @@ export async function PUT(req: NextRequest) {
       description: (description ?? "").trim(),
       logo: (logo ?? "").trim(),
       coverImage: (coverImage ?? "").trim(),
+      coverVideo: (coverVideo ?? "").trim(),
       phone: (phone ?? "").trim(),
       address: (address ?? "").trim(),
       telegramChatId: (telegramChatId ?? "").trim(),

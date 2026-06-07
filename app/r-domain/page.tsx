@@ -69,6 +69,7 @@ interface RestaurantData {
   name: string;
   description: string;
   coverImage: string;
+  coverVideo?: string;
   subscriptionStatus?: string;
   subscriptionEndDate?: { toDate?: () => Date; seconds?: number };
 }
@@ -235,6 +236,7 @@ export default async function RDomainPage({
     name: restaurant.name,
     description: restaurant.description,
     coverImage: restaurant.coverImage,
+    coverVideo: restaurant.coverVideo ?? "",
     logo: rData.logo ?? "",
     address: rData.address ?? "",
     slug,

@@ -8,6 +8,7 @@ interface Props {
   onChange: (s: HeroSettings) => void;
   logoUrl: string;
   coverUrl: string;
+  coverVideoUrl?: string;
   restaurantName: string;
   description: string;
   primaryColor: string;
@@ -27,6 +28,7 @@ export default function VisualCustomizer({
   onChange,
   logoUrl,
   coverUrl,
+  coverVideoUrl,
   restaurantName,
   description,
   primaryColor,
@@ -1066,7 +1068,20 @@ export default function VisualCustomizer({
                   minHeight: viewport === "mobile" ? undefined : `${settings.heroHeight}vh`,
                 }}
               >
-                {coverUrl && (
+                {coverVideoUrl ? (
+                  <div className="absolute inset-0 z-0 pointer-events-none">
+                    <video
+                      src={coverVideoUrl}
+                      poster={coverUrl}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0" style={overlayStyle} />
+                  </div>
+                ) : coverUrl && (
                   <div className="absolute inset-0 z-0 pointer-events-none">
                     <img
                       src={coverUrl}

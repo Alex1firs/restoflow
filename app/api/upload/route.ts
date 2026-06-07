@@ -3,8 +3,10 @@ import { getAuthenticatedUser } from "@/lib/auth-server";
 import { getAdminStorage } from "@/lib/firebase-admin";
 import { randomUUID } from "crypto";
 
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_SIZE = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_VIDEO_SIZE = 20 * 1024 * 1024; // 20MB
 
 export async function POST(req: NextRequest) {
   let user: Awaited<ReturnType<typeof getAuthenticatedUser>>;
@@ -28,11 +30,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden path" }, { status: 403 });
   }
 
-  if (!ALLOWED_TYPES.includes(file.type)) {
-    return NextResponse.json({ error: "Only JPG, PNG, or WebP allowed" }, { status: 400 });
+  const isImage = ALLOWED_IMAGE_TYPES.includes(file.type);
+  const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type);
+
+  if (!isImage && !isVideo) {
+    return NextResponse.json({ error: "Only JPG, PNG, WebP images, or MP4, WebM, MOV videos allowed" }, { status: 400 });
   }
-  if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: "Image must be under 5MB" }, { status: 400 });
+
+  const maxSize = isVideo ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
+  if (file.size > maxSize) {
+    return NextResponse.json({ error: `${isVideo ? "Video" : "Image"} must be under ${isVideo ? "20MB" : "5MB"}` }, { status: 400 });
   }
 
   try {

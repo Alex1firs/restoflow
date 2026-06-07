@@ -7,6 +7,15 @@ export function validateImageFile(file: File): string | null {
   return null;
 }
 
+const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
+const MAX_VIDEO_SIZE = 20 * 1024 * 1024; // 20MB
+
+export function validateVideoFile(file: File): string | null {
+  if (!ALLOWED_VIDEO_TYPES.includes(file.type)) return "Only MP4, WebM, or MOV videos are allowed.";
+  if (file.size > MAX_VIDEO_SIZE) return "Video must be under 20MB.";
+  return null;
+}
+
 export async function uploadImage(
   file: File,
   path: string,
