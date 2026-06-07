@@ -225,7 +225,7 @@ export default function AdminMenuClient({ restaurant, aiEnabled = false }: Props
                     value={formData.name}
                     onChange={(e) => setFormData({...formData, name: e.target.value})}
                     placeholder="e.g. Classic Burger"
-                    className="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none"
+                    className="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none text-gray-900 placeholder:text-gray-400 bg-white"
                   />
                 </div>
                 <div>
@@ -236,7 +236,7 @@ export default function AdminMenuClient({ restaurant, aiEnabled = false }: Props
                     value={formData.price}
                     onChange={(e) => setFormData({...formData, price: e.target.value})}
                     placeholder="e.g. 1299"
-                    className="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none"
+                    className="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none text-gray-900 placeholder:text-gray-400 bg-white"
                   />
                 </div>
                 <div>
@@ -246,7 +246,7 @@ export default function AdminMenuClient({ restaurant, aiEnabled = false }: Props
                     value={formData.category}
                     onChange={(e) => { setFormData({...formData, category: e.target.value}); setCategorySuggestions(null); }}
                     placeholder="e.g. Mains, Appetizers, Drinks"
-                    className="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none"
+                    className="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none text-gray-900 placeholder:text-gray-400 bg-white"
                   />
                   {aiEnabled && !categorySuggestions && (
                     <button
@@ -302,7 +302,7 @@ export default function AdminMenuClient({ restaurant, aiEnabled = false }: Props
                     onChange={(e) => setFormData({...formData, description: e.target.value})}
                     placeholder="Brief description of the item..."
                     rows={4}
-                    className="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none resize-none"
+                    className="w-full p-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none resize-none text-gray-900 placeholder:text-gray-400 bg-white"
                   />
                   {aiEnabled && (
                     <AiTextHelper
