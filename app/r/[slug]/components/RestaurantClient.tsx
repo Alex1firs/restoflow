@@ -680,7 +680,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
               style={navStyle}
               className={`${navbarPosClass} py-5`}
             >
-              <div className="max-w-4xl mx-auto w-full px-6 flex items-center justify-between">
+              <div className="max-w-6xl mx-auto w-full px-6 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   {hs.showLogo !== false && restaurant.logo ? (
                     <div
@@ -777,7 +777,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
 
             {/* Hero text */}
             <div
-              className="relative z-10 max-w-4xl mx-auto w-full px-6 text-white"
+              className="relative z-10 max-w-6xl mx-auto w-full px-6 text-white"
               style={{
                 paddingBottom: hs.textVerticalPosition === "bottom" ? "3rem" : undefined,
                 paddingTop: hs.textVerticalPosition === "top" ? "6rem" : undefined,
@@ -915,7 +915,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
       {/* ── B2B Partners Showcase Section (Phase 10H) ────────────────────────── */}
       {hs.showPartnersSection !== false && (
         <div className="bg-white dark:bg-[#0D0C0B] py-4 border-b border-[#EFECE6] dark:border-[#1F1F1C] overflow-hidden">
-          <div className="max-w-4xl mx-auto px-6">
+          <div className="max-w-6xl mx-auto px-6">
             <p className="text-[10px] font-black text-[#A19B91] dark:text-neutral-500 uppercase tracking-widest text-center mb-2.5">
               {hs.partnersSectionTitle || "Our Partners"}
             </p>
@@ -992,7 +992,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
       {/* ── Promo Banner ─────────────────────────────────────────────────────── */}
       {restaurant.promoBanner && !promoDismissed && (
         <div className="bg-gradient-to-r from-orange-500 to-amber-500 text-white px-6 py-3.5 shadow-sm">
-          <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+          <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
             <p className="text-xs md:text-sm font-black tracking-tight flex items-center gap-2">
               <span className="text-lg">🎉</span> {restaurant.promoBanner}
             </p>
@@ -1008,7 +1008,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
 
       {/* ── Sticky Section Navigation ────────────────────────────────────────── */}
       <nav className="sticky top-0 z-30 bg-[#FAF9F5]/90 dark:bg-[#0D0C0B]/90 backdrop-blur-md border-b border-[#EFECE6] dark:border-[#1F1F1C] shadow-sm py-2.5 transition-all">
-        <div className="max-w-4xl mx-auto px-6 w-full flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-6 w-full flex items-center justify-between">
           <div className="flex gap-1.5 overflow-x-auto scrollbar-hide py-1">
             {navSections.map((s) => (
               <button
@@ -1056,7 +1056,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
         }}
         className="w-full transition-all duration-300"
       >
-        <section id="menu" ref={menuSectionRef} className="scroll-mt-24 max-w-4xl mx-auto px-6 pt-12 pb-12">
+        <section id="menu" ref={menuSectionRef} className="scroll-mt-24 max-w-6xl mx-auto px-6 pt-12 pb-12">
           <div className="mb-8">
             {hs.menuShowHeaderLabel !== false && (
               <div
@@ -1314,7 +1314,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
       {/* ── Chef Specialties Showcase (Phase 10G) ───────────────────────────── */}
       {popularItems.length > 0 && (
         <section id="popular" ref={popularSectionRef} className="scroll-mt-24 border-t border-[#EFECE6] dark:border-[#1F1F1C] bg-white dark:bg-[#141412] transition-colors duration-300">
-          <div className="max-w-4xl mx-auto px-6 py-16">
+          <div className="max-w-6xl mx-auto px-6 py-16">
             <div data-fade="popular" className={fade("popular")}>
               <span className="text-[10px] font-black uppercase tracking-wider text-[var(--brand-primary)]">Chef&apos;s Showcase</span>
               <div className="flex items-center justify-between mb-8 mt-0.5">
@@ -1388,7 +1388,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
 
       {/* ── ABOUT SECTION (Phase 10D) ────────────────────────────────────────── */}
       <section id="about" ref={aboutSectionRef} className="scroll-mt-24 bg-white dark:bg-[#141412] border-t border-[#EFECE6] dark:border-[#1F1F1C] transition-colors duration-300">
-        <div className="max-w-4xl mx-auto px-6 py-16">
+        <div className="max-w-6xl mx-auto px-6 py-16">
           <div
             data-fade="about"
             className={`grid grid-cols-1 md:grid-cols-2 gap-12 ${fade("about")}`}
@@ -1466,7 +1466,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
 
       {/* ── FAQ SECTION (Phase 10I) ──────────────────────────────────────────── */}
       <section id="faq" ref={faqSectionRef} className="scroll-mt-24 bg-[#FAF9F5] dark:bg-[#0D0C0B] border-t border-[#EFECE6] dark:border-[#1F1F1C] transition-colors duration-300">
-        <div className="max-w-4xl mx-auto px-6 py-16">
+        <div className="max-w-6xl mx-auto px-6 py-16">
           <div data-fade="faq" className={fade("faq")}>
             <span className="text-[10px] font-black uppercase tracking-wider text-[var(--brand-primary)]">Assistance</span>
             <h2 className="text-2xl font-extrabold text-neutral-900 dark:text-neutral-50 tracking-tight mt-0.5 mb-8">Order Help &amp; FAQs</h2>
@@ -1523,7 +1523,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
 
       {/* ── FOOTER ────────────────────────────────────────────────────────────── */}
       <footer className="border-t border-[#EFECE6] dark:border-[#1F1F1C] bg-white dark:bg-[#141412] transition-colors duration-300">
-        <div className="max-w-4xl mx-auto px-6 py-16">
+        <div className="max-w-6xl mx-auto px-6 py-16">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-8">
             <div className="space-y-4">
               {restaurant.logo && (
@@ -1584,7 +1584,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
       {/* ── STICKY BOTTOM ORDER BAR (Phase 10E) ───────────────────────────────── */}
       {!cartOpen && !checkoutOpen && (
         <div className="fixed bottom-0 left-0 right-0 z-40 px-6 py-4 bg-white/95 dark:bg-[#141412]/95 backdrop-blur-md border-t border-[#EFECE6] dark:border-[#1F1F1C] shadow-[0_-8px_30px_rgba(0,0,0,0.04)] transition-all">
-          <div className="max-w-4xl mx-auto flex items-center gap-4">
+          <div className="max-w-6xl mx-auto flex items-center gap-4">
             {totalItems === 0 ? (
               <div className="flex gap-2 w-full">
                 <button

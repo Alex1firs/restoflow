@@ -1032,7 +1032,7 @@ export default function VisualCustomizer({
           <div
             className={`transition-all duration-300 ease-out flex flex-col ${
               viewport === "desktop"
-                ? "w-full max-w-4xl"
+                ? "w-full max-w-6xl"
                 : viewport === "tablet"
                 ? "w-[768px]"
                 : "w-[390px] border-[10px] border-neutral-900 rounded-[50px] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] bg-[#0d0c0b] overflow-hidden relative"
@@ -1105,7 +1105,7 @@ export default function VisualCustomizer({
                   style={navPreviewStyle}
                   className="absolute top-0 left-0 right-0 z-20 py-4 cursor-pointer hover:bg-white/5 transition-all"
                 >
-                  <div className="max-w-4xl mx-auto w-full px-5 flex items-center justify-between">
+                  <div className="max-w-6xl mx-auto w-full px-5 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       {settings.showLogo && logoUrl ? (
                         <div
@@ -1188,7 +1188,7 @@ export default function VisualCustomizer({
                     e.stopPropagation();
                     toggleTab("typography");
                   }}
-                  className="relative z-10 max-w-4xl mx-auto w-full px-5 text-white py-6"
+                  className="relative z-10 max-w-6xl mx-auto w-full px-5 text-white py-6"
                   style={{
                     textAlign: settings.textAlign,
                   }}
@@ -1323,7 +1323,7 @@ export default function VisualCustomizer({
                     activeTab === "partners" ? "ring-2 ring-orange-500/50" : ""
                   }`}
                 >
-                  <div className="max-w-4xl mx-auto px-4">
+                  <div className="max-w-6xl mx-auto px-4">
                     <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest text-center mb-1.5">
                       {settings.partnersSectionTitle || "Our Partners"}
                     </p>
@@ -1401,7 +1401,7 @@ export default function VisualCustomizer({
                   activeTab === "menu" ? "ring-2 ring-orange-500/50" : ""
                 }`}
               >
-                <div className="max-w-4xl mx-auto px-4">
+                <div className="max-w-6xl mx-auto px-4">
                   {/* Category Pills Navigation Mockup */}
                   <div className="flex gap-1.5 justify-center mb-6 overflow-x-auto pb-1 scrollbar-hide">
                     <span className="text-[9px] font-black uppercase bg-orange-500 text-white px-3 py-1.5 rounded-full shadow-sm">

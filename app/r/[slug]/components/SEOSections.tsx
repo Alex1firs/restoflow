@@ -94,7 +94,7 @@ export default function SEOSections({ restaurant, seo, menuItems }: SEOSectionsP
 
   return (
     <div className="bg-[#FAF9F5]/40 dark:bg-[#0D0C0B]/40 border-t border-[#EFECE6] dark:border-[#1F1F1C] transition-colors duration-300">
-      <div className="max-w-4xl mx-auto px-6 py-16 space-y-16">
+      <div className="max-w-6xl mx-auto px-6 py-16 space-y-16">
 
         {/* 1 — SEO Hero Intro */}
         <section aria-label="About this restaurant" className="space-y-3">
