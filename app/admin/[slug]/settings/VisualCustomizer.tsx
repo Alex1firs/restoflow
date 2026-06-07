@@ -1103,80 +1103,82 @@ export default function VisualCustomizer({
                     toggleTab("navbar");
                   }}
                   style={navPreviewStyle}
-                  className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-white/10 rounded-lg transition-all"
+                  className="absolute top-0 left-0 right-0 z-20 py-4 cursor-pointer hover:bg-white/5 transition-all"
                 >
-                  <div className="flex items-center gap-2">
-                    {settings.showLogo && logoUrl ? (
-                      <div
-                        className={`overflow-hidden flex-shrink-0 ${isLightNav ? "border border-stone-900/10 shadow-sm bg-white" : "border border-white/20 shadow"}`}
-                        style={{
-                          width: Math.round(settings.logoWidth * 0.7),
-                          height: Math.round(settings.logoHeight * 0.7),
-                          borderRadius: Math.round(settings.logoBorderRadius * 0.7),
-                        }}
-                      >
-                        <img
-                          src={logoUrl}
-                          alt="logo"
-                          className="w-full h-full"
+                  <div className="max-w-4xl mx-auto w-full px-5 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {settings.showLogo && logoUrl ? (
+                        <div
+                          className={`overflow-hidden flex-shrink-0 ${isLightNav ? "border border-stone-900/10 shadow-sm bg-white" : "border border-white/20 shadow"}`}
                           style={{
-                            objectFit: settings.logoObjectFit,
-                            objectPosition: `${settings.logoFocalX}% ${settings.logoFocalY}%`,
-                          }}
-                        />
-                      </div>
-                    ) : settings.showLogo ? (
-                      <div
-                        className={`backdrop-blur flex items-center justify-center border flex-shrink-0 ${
-                          isLightNav ? "bg-stone-900/10 border-stone-900/10 text-stone-850" : "bg-white/15 border-white/20 text-white"
-                        }`}
-                        style={{
-                          width: Math.round(settings.logoWidth * 0.7),
-                          height: Math.round(settings.logoHeight * 0.7),
-                          borderRadius: Math.round(settings.logoBorderRadius * 0.7),
-                        }}
-                      >
-                        <span className={`font-extrabold text-[9px] ${isLightNav ? "text-stone-800" : "text-white"}`}>
-                          {restaurantName.slice(0, 2).toUpperCase()}
-                        </span>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {/* Mockup Desktop/Tablet Menu Links */}
-                  {viewport !== "mobile" && (
-                    <div className="flex items-center gap-6">
-                      {[
-                        { label: settings.navbarMenuTextMenu || "Menu" },
-                        { label: settings.navbarMenuTextReviews || "Reviews" },
-                        { label: settings.navbarMenuTextInfo || "Info" },
-                      ].map((link, idx) => (
-                        <span
-                          key={idx}
-                          className={`uppercase tracking-widest font-black transition ${
-                            isLightNav ? "text-stone-600 hover:text-stone-900" : "text-white/80 hover:text-white"
-                          }`}
-                          style={{
-                            fontSize: `${Math.round(settings.navbarFontSize * 0.75)}px`,
+                            width: Math.round(settings.logoWidth * 0.7),
+                            height: Math.round(settings.logoHeight * 0.7),
+                            borderRadius: Math.round(settings.logoBorderRadius * 0.7),
                           }}
                         >
-                          {link.label}
-                        </span>
-                      ))}
+                          <img
+                            src={logoUrl}
+                            alt="logo"
+                            className="w-full h-full"
+                            style={{
+                              objectFit: settings.logoObjectFit,
+                              objectPosition: `${settings.logoFocalX}% ${settings.logoFocalY}%`,
+                            }}
+                          />
+                        </div>
+                      ) : settings.showLogo ? (
+                        <div
+                          className={`backdrop-blur flex items-center justify-center border flex-shrink-0 ${
+                            isLightNav ? "bg-stone-900/10 border-stone-900/10 text-stone-850" : "bg-white/15 border-white/20 text-white"
+                          }`}
+                          style={{
+                            width: Math.round(settings.logoWidth * 0.7),
+                            height: Math.round(settings.logoHeight * 0.7),
+                            borderRadius: Math.round(settings.logoBorderRadius * 0.7),
+                          }}
+                        >
+                          <span className={`font-extrabold text-[9px] ${isLightNav ? "text-stone-800" : "text-white"}`}>
+                            {restaurantName.slice(0, 2).toUpperCase()}
+                          </span>
+                        </div>
+                      ) : null}
                     </div>
-                  )}
 
-                  <div className="flex items-center gap-2">
-                    {settings.showOpenBadge && (
-                      <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[8px] font-bold uppercase tracking-wider ${
-                        isLightNav
-                          ? "bg-emerald-50 border-emerald-250 text-emerald-600"
-                          : "bg-emerald-500/25 border-emerald-400/30 text-emerald-400"
-                      }`}>
-                        <span className={`w-1 h-1 rounded-full ${isLightNav ? "bg-emerald-500" : "bg-emerald-400"}`} />
-                        Open
-                      </span>
+                    {/* Mockup Desktop/Tablet Menu Links */}
+                    {viewport !== "mobile" && (
+                      <div className="flex items-center gap-6">
+                        {[
+                          { label: settings.navbarMenuTextMenu || "Menu" },
+                          { label: settings.navbarMenuTextReviews || "Reviews" },
+                          { label: settings.navbarMenuTextInfo || "Info" },
+                        ].map((link, idx) => (
+                          <span
+                            key={idx}
+                            className={`uppercase tracking-widest font-black transition ${
+                              isLightNav ? "text-stone-600 hover:text-stone-900" : "text-white/80 hover:text-white"
+                            }`}
+                            style={{
+                              fontSize: `${Math.round(settings.navbarFontSize * 0.75)}px`,
+                            }}
+                          >
+                            {link.label}
+                          </span>
+                        ))}
+                      </div>
                     )}
+
+                    <div className="flex items-center gap-2">
+                      {settings.showOpenBadge && (
+                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[8px] font-bold uppercase tracking-wider ${
+                          isLightNav
+                            ? "bg-emerald-50 border-emerald-250 text-emerald-600"
+                            : "bg-emerald-500/25 border-emerald-400/30 text-emerald-400"
+                        }`}>
+                          <span className={`w-1 h-1 rounded-full ${isLightNav ? "bg-emerald-500" : "bg-emerald-400"}`} />
+                          Open
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 

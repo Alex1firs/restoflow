@@ -678,98 +678,100 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
             {/* Top Navbar */}
             <div
               style={navStyle}
-              className={`${navbarPosClass} flex items-center justify-between px-6 py-5`}
+              className={`${navbarPosClass} py-5`}
             >
-              <div className="flex items-center gap-3">
-                {hs.showLogo !== false && restaurant.logo ? (
-                  <div
-                    className={`overflow-hidden flex-shrink-0 ${isLightNav ? "border border-stone-900/10 shadow-sm bg-white" : "border border-white/20 shadow-md"}`}
-                    style={{
-                      width: hs.logoWidth,
-                      height: hs.logoHeight,
-                      borderRadius: hs.logoBorderRadius,
-                    }}
-                  >
-                    <img
-                      src={restaurant.logo}
-                      alt="logo"
-                      className="w-full h-full"
+              <div className="max-w-4xl mx-auto w-full px-6 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {hs.showLogo !== false && restaurant.logo ? (
+                    <div
+                      className={`overflow-hidden flex-shrink-0 ${isLightNav ? "border border-stone-900/10 shadow-sm bg-white" : "border border-white/20 shadow-md"}`}
                       style={{
-                        objectFit: hs.logoObjectFit,
-                        objectPosition: `${hs.logoFocalX}% ${hs.logoFocalY}%`,
+                        width: hs.logoWidth,
+                        height: hs.logoHeight,
+                        borderRadius: hs.logoBorderRadius,
                       }}
-                    />
-                  </div>
-                ) : hs.showLogo !== false ? (
-                  <div
-                    className={`backdrop-blur-md flex items-center justify-center border flex-shrink-0 ${
-                      isLightNav ? "bg-stone-900/10 border-stone-900/10 text-stone-850" : "bg-white/10 border-white/25 text-white"
-                    }`}
-                    style={{ width: hs.logoWidth, height: hs.logoHeight, borderRadius: hs.logoBorderRadius }}
-                  >
-                    <span className={`font-extrabold text-sm tracking-tight ${isLightNav ? "text-stone-850" : "text-white"}`}>
-                      {restaurant.name.slice(0, 2).toUpperCase()}
-                    </span>
-                  </div>
-                ) : null}
-              </div>
+                    >
+                      <img
+                        src={restaurant.logo}
+                        alt="logo"
+                        className="w-full h-full"
+                        style={{
+                          objectFit: hs.logoObjectFit,
+                          objectPosition: `${hs.logoFocalX}% ${hs.logoFocalY}%`,
+                        }}
+                      />
+                    </div>
+                  ) : hs.showLogo !== false ? (
+                    <div
+                      className={`backdrop-blur-md flex items-center justify-center border flex-shrink-0 ${
+                        isLightNav ? "bg-stone-900/10 border-stone-900/10 text-stone-850" : "bg-white/10 border-white/25 text-white"
+                      }`}
+                      style={{ width: hs.logoWidth, height: hs.logoHeight, borderRadius: hs.logoBorderRadius }}
+                    >
+                      <span className={`font-extrabold text-sm tracking-tight ${isLightNav ? "text-stone-850" : "text-white"}`}>
+                        {restaurant.name.slice(0, 2).toUpperCase()}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
 
-              <div className="hidden md:flex items-center gap-8">
-                {navSections.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => scrollTo(s.id)}
-                    style={{ fontSize: `${hs.navbarFontSize || 11}px` }}
-                    className={`font-bold uppercase tracking-widest transition-all hover:scale-105 active:scale-95 ${
-                      isLightNav ? "text-stone-600 hover:text-stone-950" : "text-white/80 hover:text-white"
-                    }`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
+                <div className="hidden md:flex items-center gap-8">
+                  {navSections.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => scrollTo(s.id)}
+                      style={{ fontSize: `${hs.navbarFontSize || 11}px` }}
+                      className={`font-bold uppercase tracking-widest transition-all hover:scale-105 active:scale-95 ${
+                        isLightNav ? "text-stone-600 hover:text-stone-950" : "text-white/80 hover:text-white"
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
 
-              <div className="flex items-center gap-3">
-                {restaurant.loyaltyEnabled && (
-                  <button
-                    onClick={() => {
-                      setLoyaltyOpen(true);
-                      setLoyaltyPhone("");
-                      setLoyaltyProfile(null);
-                      setLoyaltySearched(false);
-                      setLoyaltyError(null);
-                    }}
-                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-wider shadow-sm transition-all hover:scale-105 active:scale-95 ${
-                      isLightNav
-                        ? "bg-orange-500/10 border-orange-500/30 text-orange-650 hover:bg-orange-500/20"
-                        : "bg-white/10 border-white/20 text-white hover:bg-white/20"
-                    }`}
-                  >
-                    <span>★</span>
-                    My Stamps
-                  </button>
-                )}
-                {hs.showOpenBadge !== false && (
-                  restaurant.isOpen ? (
-                    <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-wider shadow-sm backdrop-blur-md ${
-                      isLightNav
-                        ? "bg-emerald-50 border-emerald-250 text-emerald-600"
-                        : "bg-emerald-500/20 border-emerald-400/30 text-emerald-400"
-                    }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${isLightNav ? "bg-emerald-500 animate-pulse" : "bg-emerald-400 animate-pulse"}`} />
-                      Open Now
-                    </span>
-                  ) : (
-                    <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-wider shadow-sm backdrop-blur-md ${
-                      isLightNav
-                        ? "bg-rose-50 border-rose-250 text-rose-600"
-                        : "bg-rose-500/20 border-rose-400/30 text-rose-400"
-                    }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${isLightNav ? "bg-rose-500" : "bg-rose-400/60"}`} />
-                      Closed
-                    </span>
-                  )
-                )}
+                <div className="flex items-center gap-3">
+                  {restaurant.loyaltyEnabled && (
+                    <button
+                      onClick={() => {
+                        setLoyaltyOpen(true);
+                        setLoyaltyPhone("");
+                        setLoyaltyProfile(null);
+                        setLoyaltySearched(false);
+                        setLoyaltyError(null);
+                      }}
+                      className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-wider shadow-sm transition-all hover:scale-105 active:scale-95 ${
+                        isLightNav
+                          ? "bg-orange-500/10 border-orange-500/30 text-orange-650 hover:bg-orange-500/20"
+                          : "bg-white/10 border-white/20 text-white hover:bg-white/20"
+                      }`}
+                    >
+                      <span>★</span>
+                      My Stamps
+                    </button>
+                  )}
+                  {hs.showOpenBadge !== false && (
+                    restaurant.isOpen ? (
+                      <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-wider shadow-sm backdrop-blur-md ${
+                        isLightNav
+                          ? "bg-emerald-50 border-emerald-250 text-emerald-600"
+                          : "bg-emerald-500/20 border-emerald-400/30 text-emerald-400"
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${isLightNav ? "bg-emerald-500 animate-pulse" : "bg-emerald-400 animate-pulse"}`} />
+                        Open Now
+                      </span>
+                    ) : (
+                      <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-wider shadow-sm backdrop-blur-md ${
+                        isLightNav
+                          ? "bg-rose-50 border-rose-250 text-rose-600"
+                          : "bg-rose-500/20 border-rose-400/30 text-rose-400"
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${isLightNav ? "bg-rose-500" : "bg-rose-400/60"}`} />
+                        Closed
+                      </span>
+                    )
+                  )}
+                </div>
               </div>
             </div>
 
