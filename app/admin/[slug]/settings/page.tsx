@@ -33,6 +33,7 @@ export default async function SettingsPage({ params }: Props) {
     description: (data.description as string) ?? "",
     logo: (data.logo as string) ?? "",
     coverImage: (data.coverImage as string) ?? "",
+    coverVideo: (data.coverVideo as string) ?? "",
     phone: (data.phone as string) ?? "",
     address: (data.address as string) ?? "",
     telegramChatId: (data.telegramChatId as string) ?? "",

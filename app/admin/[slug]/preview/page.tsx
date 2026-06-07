@@ -17,6 +17,7 @@ interface RestaurantData extends DocumentData {
   name: string;
   description: string;
   coverImage: string;
+  coverVideo?: string;
 }
 
 interface MenuItemData extends DocumentData {
@@ -105,6 +106,7 @@ export default async function PreviewPage({
     name: restaurant.name,
     description: restaurant.description,
     coverImage: restaurant.coverImage,
+    coverVideo: restaurant.coverVideo ?? "",
     logo: rData.logo ?? "",
     address: rData.address ?? "",
     slug,
