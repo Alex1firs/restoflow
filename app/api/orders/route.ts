@@ -154,28 +154,43 @@ export async function POST(request: NextRequest) {
 
     const trackingToken = randomBytes(16).toString("hex");
 
-    const orderRef = await db.collection("orders").add({
-      restaurantId: restaurantId.trim(),
-      customerName: customerName.trim(),
-      phone: phone.trim(),
-      address: address.trim(),
-      note: typeof note === "string" ? note.trim() : "",
-      items: validatedItems,
-      itemsTotal,
-      deliveryFee,
-      total,
-      paymentMethod: "cash",
-      paymentStatus: "pending",
-      status: isScheduled ? "scheduled" : "pending",
-      deliveryType: resolvedDeliveryType,
-      orderType: isScheduled ? "scheduled" : "normal",
-      ...(isDineIn ? { serviceMode: "dine_in", tableLabel: typeof tableLabel === "string" ? tableLabel.trim() : "" } : {}),
-      ...(isScheduled ? { scheduledFor } : {}),
-      trackingToken,
-      createdAt: FieldValue.serverTimestamp(),
-    });
-
+    let orderNumber: number;
+    const orderRef = db.collection("orders").doc();
     const orderId = orderRef.id;
+
+    await db.runTransaction(async (transaction) => {
+      const rRef = db.collection("restaurants").doc(restaurantId.trim());
+      const rDoc = await transaction.get(rRef);
+      if (!rDoc.exists) {
+        throw new Error("Restaurant not found");
+      }
+      const rDataObj = rDoc.data()!;
+      const currentCounter = (rDataObj.orderCounter as number | undefined) ?? 99;
+      orderNumber = currentCounter + 1;
+
+      transaction.update(rRef, { orderCounter: orderNumber });
+      transaction.set(orderRef, {
+        restaurantId: restaurantId.trim(),
+        customerName: customerName.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        note: typeof note === "string" ? note.trim() : "",
+        items: validatedItems,
+        itemsTotal,
+        deliveryFee,
+        total,
+        paymentMethod: "cash",
+        paymentStatus: "pending",
+        status: isScheduled ? "scheduled" : "pending",
+        deliveryType: resolvedDeliveryType,
+        orderType: isScheduled ? "scheduled" : "normal",
+        ...(isDineIn ? { serviceMode: "dine_in", tableLabel: typeof tableLabel === "string" ? tableLabel.trim() : "" } : {}),
+        ...(isScheduled ? { scheduledFor } : {}),
+        trackingToken,
+        createdAt: FieldValue.serverTimestamp(),
+        orderNumber,
+      });
+    });
     const restaurantName = (rData.name as string | undefined) ?? restaurantId.trim();
     const itemsSummary = validatedItems.map((i) => `${i.quantity}× ${i.name}`).join(", ");
 

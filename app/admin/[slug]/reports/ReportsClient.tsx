@@ -42,6 +42,7 @@ type Order = {
   orderSource: string;
   serviceMode: string;
   tableLabel: string;
+  orderNumber?: number | null;
 };
 
 type BestSeller = { name: string; count: number; revenue: number };
@@ -438,7 +439,7 @@ export default function ReportsClient({ slug }: { slug: string }) {
                 <div className="border-t border-dashed border-gray-300 py-2 space-y-1 text-[11px]">
                   <div className="flex justify-between">
                     <span>Order ID:</span>
-                    <span className="font-bold text-gray-900">#{selectedOrder.orderId.slice(-6).toUpperCase()}</span>
+                    <span className="font-bold text-gray-900">#{selectedOrder.orderNumber ? selectedOrder.orderNumber : selectedOrder.orderId.slice(-6).toUpperCase()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Source:</span>

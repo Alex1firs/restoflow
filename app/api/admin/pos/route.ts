@@ -162,35 +162,51 @@ export async function POST(request: NextRequest) {
       details: `Created counter POS order with ${validatedItems.length} items. Total: ₦${itemsTotal.toLocaleString("en-NG")}`,
     });
 
-    const orderRef = await db.collection("orders").add({
-      restaurantId: restaurantSlug,
-      customerName:
-        typeof customerName === "string" && customerName.trim()
-          ? customerName.trim()
-          : isDineIn
-          ? resolvedTableLabel
-          : "Walk-in Customer",
-      phone: "",
-      address: "",
-      note: typeof note === "string" ? note.trim() : "",
-      items: validatedItems,
-      itemsTotal,
-      deliveryFee: 0,
-      total,
-      paymentMethod,
-      paymentStatus,
-      status: "pending",
-      deliveryType: isDineIn ? "dine_in" : "counter",
-      orderType: "normal",
-      orderSource: "counter",
-      serviceMode: resolvedServiceMode,
-      ...(isDineIn ? { tableLabel: resolvedTableLabel } : {}),
-      waiterName: typeof waiterName === "string" ? waiterName.trim() : null,
-      pricingMode: typeof pricingMode === "string" ? pricingMode : "regular",
-      staffId: user.uid,
-      staffName: typeof staffName === "string" ? staffName.trim() : "",
-      createdAt: FieldValue.serverTimestamp(),
-      auditLog,
+    let orderNumber = 0;
+    const orderRef = db.collection("orders").doc();
+
+    await db.runTransaction(async (transaction) => {
+      const rRef = db.collection("restaurants").doc(restaurantSlug);
+      const rDoc = await transaction.get(rRef);
+      if (!rDoc.exists) {
+        throw new Error("Restaurant not found");
+      }
+      const rDataObj = rDoc.data()!;
+      const currentCounter = (rDataObj.orderCounter as number | undefined) ?? 99;
+      orderNumber = currentCounter + 1;
+
+      transaction.update(rRef, { orderCounter: orderNumber });
+      transaction.set(orderRef, {
+        restaurantId: restaurantSlug,
+        customerName:
+          typeof customerName === "string" && customerName.trim()
+            ? customerName.trim()
+            : isDineIn
+            ? resolvedTableLabel
+            : "Walk-in Customer",
+        phone: "",
+        address: "",
+        note: typeof note === "string" ? note.trim() : "",
+        items: validatedItems,
+        itemsTotal,
+        deliveryFee: 0,
+        total,
+        paymentMethod,
+        paymentStatus,
+        status: "pending",
+        deliveryType: isDineIn ? "dine_in" : "counter",
+        orderType: "normal",
+        orderSource: "counter",
+        serviceMode: resolvedServiceMode,
+        ...(isDineIn ? { tableLabel: resolvedTableLabel } : {}),
+        waiterName: typeof waiterName === "string" ? waiterName.trim() : null,
+        pricingMode: typeof pricingMode === "string" ? pricingMode : "regular",
+        staffId: user.uid,
+        staffName: typeof staffName === "string" ? staffName.trim() : "",
+        createdAt: FieldValue.serverTimestamp(),
+        auditLog,
+        orderNumber,
+      });
     });
 
     return NextResponse.json(
@@ -201,6 +217,7 @@ export async function POST(request: NextRequest) {
         total,
         serviceMode: resolvedServiceMode,
         tableLabel: resolvedTableLabel,
+        orderNumber,
       },
       { status: 201 }
     );

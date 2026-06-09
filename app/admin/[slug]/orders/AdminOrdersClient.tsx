@@ -32,6 +32,7 @@ type Order = {
   cancellationReason?: string;
   cancellationRequestedBy?: string;
   cancellationRequestedAt?: Timestamp;
+  orderNumber?: number | null;
 };
 
 type FilterTab = "active" | "completed" | "all";
@@ -321,7 +322,7 @@ export default function AdminOrdersClient({ restaurant, role }: Props) {
                 <div className="space-y-2 flex-1">
                   <div className="flex items-center gap-3">
                     <span className="font-mono text-xs text-red-700 bg-red-100/60 px-2 py-0.5 rounded font-black">
-                      #{order.id.slice(-6).toUpperCase()}
+                      #{order.orderNumber ? order.orderNumber : order.id.slice(-6).toUpperCase()}
                     </span>
                     <span className="text-xs text-gray-500 font-semibold">
                       {order.createdAt?.toDate ? order.createdAt.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ""}
@@ -402,7 +403,7 @@ export default function AdminOrdersClient({ restaurant, role }: Props) {
                   <div className="p-4 md:p-5 md:w-[60%] border-b md:border-b-0 md:border-r border-gray-100">
                     <div className="flex justify-between items-start mb-4">
                       <div>
-                        <span className="font-mono text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded font-bold">{order.id.slice(0, 8).toUpperCase()}</span>
+                        <span className="font-mono text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded font-bold">{order.orderNumber ? `#${order.orderNumber}` : order.id.slice(0, 8).toUpperCase()}</span>
                         <p className="text-xs text-gray-400 mt-1 font-medium">{fmt(order.createdAt)}</p>
                       </div>
                       <span className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase border ${cfg.badge}`}>
@@ -567,7 +568,7 @@ export default function AdminOrdersClient({ restaurant, role }: Props) {
 
           <div className="space-y-0.5" style={{ fontSize: "9px" }}>
             <div className="flex justify-between font-mono text-[8px]" style={{ fontSize: "8px" }}>
-              <span>TICKET: #{printingOrder.id.slice(0, 8).toUpperCase()}</span>
+              <span>TICKET: #{printingOrder.orderNumber ? printingOrder.orderNumber : printingOrder.id.slice(0, 8).toUpperCase()}</span>
               <span>{fmt(printingOrder.createdAt)}</span>
             </div>
             <div className="flex justify-between font-black uppercase" style={{ fontSize: "9px", marginTop: "1px" }}>

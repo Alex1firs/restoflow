@@ -77,6 +77,7 @@ type PaymentStatus = "paid" | "unpaid" | "part_paid" | "cancelled";
 
 type CompletedOrder = {
   orderId: string;
+  orderNumber?: number | null;
   items: any[];
   itemsTotal: number;
   total: number;
@@ -95,6 +96,7 @@ type CompletedOrder = {
 
 type TodayOrder = {
   id: string;
+  orderNumber?: number | null;
   customerName: string;
   items: any[];
   itemsTotal: number;
@@ -310,7 +312,7 @@ function openPOSReceiptWindow(
         <div class="div"></div>
       </div>
       
-      <div class="kv"><span class="kl">Ticket:</span><span class="kv-v font-mono">#${(order.orderId || order.id).slice(-8).toUpperCase()}</span></div>
+      <div class="kv"><span class="kl">Ticket:</span><span class="kv-v font-mono">#${order.orderNumber ? order.orderNumber : (order.orderId || order.id).slice(-8).toUpperCase()}</span></div>
       <div class="kv"><span class="kl">Date:</span><span class="kv-v font-mono">${dateStr} · ${timeStr}</span></div>
       ${customerHtml}
       <div class="kv"><span class="kl">Cashier:</span><span class="kv-v">${staffName}</span></div>
@@ -497,7 +499,7 @@ function openKitchenSlip(order: any, restaurantName: string, cashierName: string
   const createdAt = order.createdAt instanceof Date ? order.createdAt : new Date();
   const dateStr = createdAt.toLocaleDateString("en-NG", { weekday: "short", year: "numeric", month: "short", day: "numeric" });
   const timeStr = createdAt.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" });
-  const shortId = order.orderId?.slice(-8).toUpperCase() ?? "NEW";
+  const shortId = order.orderNumber ? order.orderNumber.toString() : (order.orderId?.slice(-8).toUpperCase() ?? "NEW");
 
   const totalQty = (order.items as any[]).reduce((s: number, i: any) => s + i.quantity, 0);
 
@@ -576,7 +578,7 @@ function openCancellationSlip(order: any, restaurantName: string, cashierName: s
   const createdAt = order.createdAt?.toDate ? order.createdAt.toDate() : new Date();
   const dateStr = createdAt.toLocaleDateString("en-NG", { weekday: "short", year: "numeric", month: "short", day: "numeric" });
   const timeStr = createdAt.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" });
-  const shortId = order.id?.slice(-8).toUpperCase() ?? "NEW";
+  const shortId = order.orderNumber ? order.orderNumber.toString() : (order.id?.slice(-8).toUpperCase() ?? "NEW");
 
   const totalQty = (order.items as any[]).reduce((s: number, i: any) => s + i.quantity, 0);
 
@@ -682,7 +684,7 @@ function openSettledBillWindow(order: TodayOrder, result: SettlementResult, rest
 <html>
 <head>
   <meta charset="utf-8"/>
-  <title>Receipt · ${result.tableLabel} · #${order.id.slice(-8).toUpperCase()}</title>
+  <title>Receipt · ${result.tableLabel} · #${order.orderNumber ? order.orderNumber : order.id.slice(-8).toUpperCase()}</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:-apple-system,system-ui,sans-serif;font-size:9.5px;max-width:260px;width:100%;margin:0 auto;padding:4px 6px;color:black;background:white;line-height:1.1}
@@ -722,7 +724,7 @@ function openSettledBillWindow(order: TodayOrder, result: SettlementResult, rest
     <div class="meta" style="margin-top:2px">${dateStr} · ${timeStr}</div>
   </div>
   <div class="div"></div>
-  <div class="kv"><span class="kl">Order #</span><span class="kv-v font-mono">#${order.id.slice(-8).toUpperCase()}</span></div>
+  <div class="kv"><span class="kl">Order #</span><span class="kv-v font-mono">#${order.orderNumber ? order.orderNumber : order.id.slice(-8).toUpperCase()}</span></div>
   ${order.customerName && order.customerName !== order.tableLabel ? `<div class="kv"><span class="kl">Guest</span><span class="kv-v">${order.customerName}</span></div>` : ""}
   <div class="kv"><span class="kl">Settled by</span><span class="kv-v">${result.staffName}</span></div>
   <div class="div"></div>
@@ -1967,7 +1969,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
     setPricingMode((bill.pricingMode as "regular" | "indoor") || "regular");
     setEditingOrderId(bill.id);
     setRightTab("order");
-    showSystemToast(`Loaded Order #${bill.id.slice(-6).toUpperCase()} for editing`);
+    showSystemToast(`Loaded Order #${bill.orderNumber ? bill.orderNumber : bill.id.slice(-6).toUpperCase()} for editing`);
   }, []);
 
   const handleSubmit = async () => {
@@ -2035,6 +2037,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
       
       const completed = {
         orderId: data.orderId,
+        orderNumber: data.orderNumber,
         items: data.items,
         itemsTotal: data.itemsTotal,
         total: data.total,
@@ -2060,7 +2063,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
         setNote("");
         setEditingOrderId(null);
         setRightTab("bills");
-        showSystemToast(`Order #${data.orderId.slice(-6).toUpperCase()} placed — awaiting payment`);
+        showSystemToast(`Order #${data.orderNumber ? data.orderNumber : data.orderId.slice(-6).toUpperCase()} placed — awaiting payment`);
         return;
       }
 
@@ -4097,7 +4100,7 @@ function OpenBillsPanel({
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
       {bills.map((bill) => {
-        const shortId = bill.id.slice(-6).toUpperCase();
+        const shortId = bill.orderNumber ? bill.orderNumber.toString() : bill.id.slice(-6).toUpperCase();
         const dineIn = isDineIn(bill);
         const age = bill.createdAt?.toDate
           ? (() => {
@@ -4338,7 +4341,7 @@ function SettleBillModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const shortId = order.id.slice(-6).toUpperCase();
+  const shortId = order.orderNumber ? order.orderNumber.toString() : order.id.slice(-6).toUpperCase();
   const createdAt = order.createdAt?.toDate?.() ?? new Date();
 
   const settle = async () => {
@@ -4545,7 +4548,7 @@ function SettlementSuccessModal({
   onPrint: () => void;
 }) {
   void restaurantName;
-  const shortId = result.orderId.slice(-6).toUpperCase();
+  const shortId = order?.orderNumber ? order.orderNumber.toString() : result.orderId.slice(-6).toUpperCase();
 
   return (
     <div className="absolute inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -4674,7 +4677,7 @@ function ReadyOrdersPanel({
           {orders.map((order, idx) => {
             const isBusy = servingId === order.id;
             const isDineIn = order.serviceMode === "dine_in";
-            const shortId = order.id.slice(-6).toUpperCase();
+            const shortId = order.orderNumber ? order.orderNumber.toString() : order.id.slice(-6).toUpperCase();
             const displayName = isDineIn
               ? (order.tableLabel ?? `#${shortId}`)
               : `#${shortId}`;
@@ -4834,7 +4837,7 @@ function ReceiptView({
           <div className="px-6 py-4 border-b border-dashed border-gray-200 space-y-2">
             <ReceiptRow
               label="Order #"
-              value={order.orderId.slice(-8).toUpperCase()}
+              value={order.orderNumber ? order.orderNumber.toString() : order.orderId.slice(-8).toUpperCase()}
               mono
             />
             {isDineIn && order.tableLabel && (
@@ -5011,7 +5014,7 @@ function VoidBillModal({
         <div className="px-6 py-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
           <div>
             <h3 className="font-black text-gray-900 text-sm uppercase tracking-wider">⚠️ Void / Cancel Bill</h3>
-            <p className="text-[10px] text-gray-400 font-semibold mt-0.5">Order #{order.id.slice(-6).toUpperCase()}</p>
+            <p className="text-[10px] text-gray-400 font-semibold mt-0.5">Order #{order.orderNumber ? order.orderNumber : order.id.slice(-6).toUpperCase()}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">✕</button>
         </div>

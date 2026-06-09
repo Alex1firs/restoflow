@@ -184,40 +184,54 @@ export async function POST(request: NextRequest) {
 
     const isDineIn = resolvedServiceMode === "dine_in";
 
-    const orderData = {
-      restaurantId: restaurantSlug,
-      localOrderId,
-      customerName: typeof customerName === "string" && customerName.trim()
-        ? customerName.trim()
-        : isDineIn ? resolvedTableLabel : "Walk-in Customer",
-      phone: "",
-      address: "",
-      note: typeof note === "string" ? note.trim() : "",
-      items: validatedItems,
-      itemsTotal,
-      deliveryFee: 0,
-      total: itemsTotal,
-      paymentMethod: VALID_PAYMENT_METHODS.includes(paymentMethod as PaymentMethod) ? paymentMethod : "cash",
-      paymentStatus: VALID_PAYMENT_STATUSES.includes(paymentStatus as PaymentStatus) ? paymentStatus : "paid",
-      status: "pending",
-      deliveryType: isDineIn ? "dine_in" : "counter",
-      orderType: "normal",
-      orderSource: "counter",
-      serviceMode: resolvedServiceMode,
-      ...(isDineIn ? { tableLabel: resolvedTableLabel } : {}),
-      waiterName: typeof waiterName === "string" ? waiterName.trim() : null,
-      pricingMode: typeof pricingMode === "string" ? pricingMode : "regular",
-      staffId: cashierId || user.uid,
-      staffName: cashierName || "Offline Staff",
-      deviceId: deviceId || "unknown",
-      terminalName: terminalName || "Terminal",
-      createdAt: createdAt ? new Date(createdAt) : new Date(),
-      syncedAt: FieldValue.serverTimestamp(),
-      priceAuditAlert,
-      auditLog,
-    };
+    let orderNumber = 0;
+    const orderRef = db.collection("orders").doc();
 
-    const orderRef = await db.collection("orders").add(orderData);
+    await db.runTransaction(async (transaction) => {
+      const rRef = db.collection("restaurants").doc(restaurantSlug);
+      const rDoc = await transaction.get(rRef);
+      if (!rDoc.exists) {
+        throw new Error("Restaurant not found");
+      }
+      const rDataObj = rDoc.data()!;
+      const currentCounter = (rDataObj.orderCounter as number | undefined) ?? 99;
+      orderNumber = currentCounter + 1;
+
+      transaction.update(rRef, { orderCounter: orderNumber });
+      transaction.set(orderRef, {
+        restaurantId: restaurantSlug,
+        localOrderId,
+        customerName: typeof customerName === "string" && customerName.trim()
+          ? customerName.trim()
+          : isDineIn ? resolvedTableLabel : "Walk-in Customer",
+        phone: "",
+        address: "",
+        note: typeof note === "string" ? note.trim() : "",
+        items: validatedItems,
+        itemsTotal,
+        deliveryFee: 0,
+        total: itemsTotal,
+        paymentMethod: VALID_PAYMENT_METHODS.includes(paymentMethod as PaymentMethod) ? paymentMethod : "cash",
+        paymentStatus: VALID_PAYMENT_STATUSES.includes(paymentStatus as PaymentStatus) ? paymentStatus : "paid",
+        status: "pending",
+        deliveryType: isDineIn ? "dine_in" : "counter",
+        orderType: "normal",
+        orderSource: "counter",
+        serviceMode: resolvedServiceMode,
+        ...(isDineIn ? { tableLabel: resolvedTableLabel } : {}),
+        waiterName: typeof waiterName === "string" ? waiterName.trim() : null,
+        pricingMode: typeof pricingMode === "string" ? pricingMode : "regular",
+        staffId: cashierId || user.uid,
+        staffName: cashierName || "Offline Staff",
+        deviceId: deviceId || "unknown",
+        terminalName: terminalName || "Terminal",
+        createdAt: createdAt ? new Date(createdAt) : new Date(),
+        syncedAt: FieldValue.serverTimestamp(),
+        priceAuditAlert,
+        auditLog,
+        orderNumber,
+      });
+    });
 
     return NextResponse.json({
       success: true,
@@ -226,6 +240,7 @@ export async function POST(request: NextRequest) {
       itemsTotal,
       total: itemsTotal,
       priceAuditAlert,
+      orderNumber,
     }, { status: 201 });
   } catch (error) {
     console.error("POS offline sync failed:", error);
