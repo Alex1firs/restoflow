@@ -70,8 +70,11 @@ function parseList(s?: string): string[] {
 }
 
 function hexToRgb(hex: string) {
-  const clean = hex.replace("#", "");
-  const bigint = parseInt(clean, 16);
+  let clean = hex.replace("#", "");
+  if (clean.length === 3) {
+    clean = clean.split("").map((c) => c + c).join("");
+  }
+  const bigint = parseInt(clean, 16) || 0;
   const r = (bigint >> 16) & 255;
   const g = (bigint >> 8) & 255;
   const b = bigint & 255;
@@ -548,19 +551,41 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
 
         const getOverlayStyle = () => {
           const opacity = (hs.overlayOpacity / 100).toFixed(2);
+          const blendMode = hs.overlayBlendMode || "normal";
+
+          const styles: React.CSSProperties = {
+            mixBlendMode: blendMode,
+          };
+
           switch (hs.overlayType) {
             case "solid-brand":
               return {
+                ...styles,
                 background: `rgba(${hexToRgb(primary)}, ${opacity})`,
               };
             case "gradient-brand":
               return {
+                ...styles,
                 background: `linear-gradient(to top, rgba(${hexToRgb(primary)}, ${opacity}) 0%, rgba(0,0,0,${(hs.overlayOpacity * 0.5 / 100).toFixed(2)}) 80%, rgba(0,0,0,${(hs.overlayOpacity * 0.2 / 100).toFixed(2)}) 100%)`,
               };
+            case "custom-solid":
+              const customColor = hs.overlayCustomColor || "#000000";
+              return {
+                ...styles,
+                background: `rgba(${hexToRgb(customColor)}, ${opacity})`,
+              };
+            case "custom-gradient":
+              const gradStart = hs.overlayCustomColor || "#000000";
+              const gradEnd = hs.overlayGradientColorEnd || "#000000";
+              return {
+                ...styles,
+                background: `linear-gradient(to top, rgba(${hexToRgb(gradStart)}, ${opacity}) 0%, rgba(${hexToRgb(gradEnd)}, ${opacity}) 100%)`,
+              };
             case "none":
-              return { background: "none" };
+              return { ...styles, background: "none" };
             default:
               return {
+                ...styles,
                 background: `linear-gradient(to top, rgba(0,0,0,${opacity}) 0%, rgba(0,0,0,${(hs.overlayOpacity * 0.47 / 100).toFixed(2)}) 50%, rgba(0,0,0,${(hs.overlayOpacity * 0.12 / 100).toFixed(2)}) 100%)`,
               };
           }

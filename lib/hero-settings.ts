@@ -16,10 +16,13 @@ export interface HeroSettings {
   focalPointX: number;     // 0–100
   focalPointY: number;     // 0–100
   overlayOpacity: number;  // 0–100
+  overlayCustomColor?: string;
+  overlayGradientColorEnd?: string;
+  overlayBlendMode?: "normal" | "multiply" | "screen" | "overlay" | "darken" | "lighten";
 
   // Premium visual control variables
   fontPairing: "default" | "modern-serif" | "sleek-sans" | "warm-display";
-  overlayType: "dark" | "solid-brand" | "gradient-brand" | "none";
+  overlayType: "dark" | "solid-brand" | "gradient-brand" | "custom-solid" | "custom-gradient" | "none";
   buttonStyle: "pill" | "rounded" | "sharp";
   primaryCtaText: string;
   secondaryCtaText: string;
@@ -77,6 +80,9 @@ export const DEFAULT_HERO_SETTINGS: HeroSettings = {
   focalPointX: 50,
   focalPointY: 50,
   overlayOpacity: 85,
+  overlayCustomColor: "#000000",
+  overlayGradientColorEnd: "#000000",
+  overlayBlendMode: "normal",
 
   // Default values for new premium properties
   fontPairing: "default",

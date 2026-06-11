@@ -149,19 +149,41 @@ export default function VisualCustomizer({
   // Overlay styles resolver
   const getOverlayStyle = () => {
     const opacity = (settings.overlayOpacity / 100).toFixed(2);
+    const blendMode = settings.overlayBlendMode || "normal";
+
+    const styles: React.CSSProperties = {
+      mixBlendMode: blendMode,
+    };
+
     switch (settings.overlayType) {
       case "solid-brand":
         return {
+          ...styles,
           background: `rgba(${hexToRgb(primaryColor)}, ${opacity})`,
         };
       case "gradient-brand":
         return {
+          ...styles,
           background: `linear-gradient(to top, rgba(${hexToRgb(primaryColor)}, ${opacity}) 0%, rgba(0,0,0,${(settings.overlayOpacity * 0.5 / 100).toFixed(2)}) 80%, rgba(0,0,0,${(settings.overlayOpacity * 0.2 / 100).toFixed(2)}) 100%)`,
         };
+      case "custom-solid":
+        const customColor = settings.overlayCustomColor || "#000000";
+        return {
+          ...styles,
+          background: `rgba(${hexToRgb(customColor)}, ${opacity})`,
+        };
+      case "custom-gradient":
+        const gradStart = settings.overlayCustomColor || "#000000";
+        const gradEnd = settings.overlayGradientColorEnd || "#000000";
+        return {
+          ...styles,
+          background: `linear-gradient(to top, rgba(${hexToRgb(gradStart)}, ${opacity}) 0%, rgba(${hexToRgb(gradEnd)}, ${opacity}) 100%)`,
+        };
       case "none":
-        return { background: "none" };
+        return { ...styles, background: "none" };
       default:
         return {
+          ...styles,
           background: `linear-gradient(to top, rgba(0,0,0,${opacity}) 0%, rgba(0,0,0,${(settings.overlayOpacity * 0.47 / 100).toFixed(2)}) 50%, rgba(0,0,0,${(settings.overlayOpacity * 0.12 / 100).toFixed(2)}) 100%)`,
         };
     }
@@ -169,8 +191,11 @@ export default function VisualCustomizer({
 
   // Helper to convert hex to comma-separated RGB
   function hexToRgb(hex: string) {
-    const clean = hex.replace("#", "");
-    const bigint = parseInt(clean, 16);
+    let clean = hex.replace("#", "");
+    if (clean.length === 3) {
+      clean = clean.split("").map((c) => c + c).join("");
+    }
+    const bigint = parseInt(clean, 16) || 0;
     const r = (bigint >> 16) & 255;
     const g = (bigint >> 8) & 255;
     const b = bigint & 255;
@@ -431,11 +456,80 @@ export default function VisualCustomizer({
                       { value: "dark", label: "Classic Dark" },
                       { value: "solid-brand", label: "Solid Brand" },
                       { value: "gradient-brand", label: "Brand Gradient" },
+                      { value: "custom-solid", label: "Custom Solid" },
+                      { value: "custom-gradient", label: "Custom Gradient" },
                       { value: "none", label: "None" },
                     ]}
                     value={settings.overlayType}
                     onChange={(v) => set("overlayType", v as any)}
                   />
+                </div>
+
+                {/* Custom solid overlay color input */}
+                {(settings.overlayType === "custom-solid" || settings.overlayType === "custom-gradient") && (
+                  <div className="space-y-3 pt-1">
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
+                        {settings.overlayType === "custom-gradient" ? "Overlay Gradient Start" : "Overlay Color"}
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="color"
+                          value={settings.overlayCustomColor || "#000000"}
+                          onChange={(e) => set("overlayCustomColor", e.target.value)}
+                          className="w-10 h-8 rounded-lg cursor-pointer border border-gray-200"
+                        />
+                        <input
+                          type="text"
+                          value={settings.overlayCustomColor || "#000000"}
+                          onChange={(e) => set("overlayCustomColor", e.target.value)}
+                          className="flex-1 border border-gray-200 rounded-xl px-3 py-1.5 text-xs text-gray-900 focus:outline-none focus:border-orange-500 transition bg-white font-medium"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Custom gradient overlay end color input */}
+                {settings.overlayType === "custom-gradient" && (
+                  <div className="space-y-3 pt-1">
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
+                        Overlay Gradient End
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="color"
+                          value={settings.overlayGradientColorEnd || "#000000"}
+                          onChange={(e) => set("overlayGradientColorEnd", e.target.value)}
+                          className="w-10 h-8 rounded-lg cursor-pointer border border-gray-200"
+                        />
+                        <input
+                          type="text"
+                          value={settings.overlayGradientColorEnd || "#000000"}
+                          onChange={(e) => set("overlayGradientColorEnd", e.target.value)}
+                          className="flex-1 border border-gray-200 rounded-xl px-3 py-1.5 text-xs text-gray-900 focus:outline-none focus:border-orange-500 transition bg-white font-medium"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Blend Mode selector */}
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Overlay Blend Mode</label>
+                  <select
+                    value={settings.overlayBlendMode || "normal"}
+                    onChange={(e) => set("overlayBlendMode", e.target.value as any)}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-orange-500 transition bg-white font-medium"
+                  >
+                    <option value="normal">Normal (Standard)</option>
+                    <option value="multiply">Multiply (Rich shadows)</option>
+                    <option value="screen">Screen (Light blend)</option>
+                    <option value="overlay">Overlay (High contrast)</option>
+                    <option value="darken">Darken</option>
+                    <option value="lighten">Lighten</option>
+                  </select>
                 </div>
 
                 <Slider label="Overlay Opacity" min={0} max={100} value={settings.overlayOpacity} onChange={(v) => set("overlayOpacity", v)} suffix="%" />
