@@ -1540,6 +1540,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
             deliveryEnabled: restaurant.deliveryEnabled,
             pickupEnabled: restaurant.pickupEnabled,
             deliveryFee: restaurant.deliveryFee,
+            hidePrices: restaurant.hidePrices,
           }}
           seo={seo}
           menuItems={menuItems}

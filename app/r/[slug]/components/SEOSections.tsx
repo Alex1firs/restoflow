@@ -17,6 +17,7 @@ interface SEOSectionsProps {
     deliveryEnabled: boolean;
     pickupEnabled: boolean;
     deliveryFee: number;
+    hidePrices?: boolean;
   };
   seo: {
     seoTitle?: string;
@@ -189,9 +190,11 @@ export default function SEOSections({ restaurant, seo, menuItems }: SEOSectionsP
                         </p>
                       )}
                     </div>
-                    <p className="text-[var(--brand-primary)] font-extrabold text-sm mt-3 tracking-tight">
-                      {fmt(item.price)}
-                    </p>
+                    {!restaurant.hidePrices && (
+                      <p className="text-[var(--brand-primary)] font-extrabold text-sm mt-3 tracking-tight">
+                        {fmt(item.price)}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}
