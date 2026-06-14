@@ -103,7 +103,15 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   const [orderId, setOrderId] = useState<string | null>(null);
   const [trackingToken, setTrackingToken] = useState<string | null>(null);
   const [orderSuccess, setOrderSuccess] = useState(false);
-  const [activeSection, setActiveSection] = useState("menu");
+  const [activeTab, setActiveTab] = useState<"menu" | "about" | "faq">("menu");
+
+  const selectTabAndScroll = (tabId: "menu" | "about" | "faq") => {
+    setActiveTab(tabId);
+    setTimeout(() => {
+      scrollTo(tabId);
+    }, 50);
+  };
+
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
   const [promoDismissed, setPromoDismissed] = useState(false);
@@ -224,25 +232,6 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
     return () => { document.body.style.overflow = ""; };
   }, [cartOpen, checkoutOpen, scheduleOpen, loyaltyOpen]);
 
-  // Active section tracking (sticky nav highlight)
-  useEffect(() => {
-    const refs = [
-      { id: "menu", ref: menuSectionRef },
-      { id: "about", ref: aboutSectionRef },
-      { id: "popular", ref: popularSectionRef },
-      { id: "faq", ref: faqSectionRef },
-    ];
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) setActiveSection(entry.target.id);
-        }
-      },
-      { rootMargin: "-20% 0px -60% 0px" }
-    );
-    refs.forEach(({ ref }) => { if (ref.current) observer.observe(ref.current); });
-    return () => observer.disconnect();
-  }, []);
 
   // Section fade-in on scroll
   useEffect(() => {
@@ -260,7 +249,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
     );
     els.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
-  }, []);
+  }, [activeTab]);
 
   const fade = useCallback(
     (id: string) =>
@@ -494,7 +483,13 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
           </div>
         )}
         <button
-          onClick={() => { setOrderSuccess(false); setOrderId(null); setTrackingToken(null); setIsScheduledOrder(false); }}
+          onClick={() => {
+            setOrderSuccess(false);
+            setOrderId(null);
+            setTrackingToken(null);
+            setIsScheduledOrder(false);
+            setActiveTab("menu");
+          }}
           className="text-xs font-bold text-[#7A7368] hover:text-neutral-900 dark:text-[#A19B91] dark:hover:text-white transition-colors py-2 px-4 rounded-full border border-[#EFECE6] dark:border-[#1F1F1C] bg-white dark:bg-[#141412] hover:bg-stone-50"
         >
           Return to Storefront
@@ -506,9 +501,8 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   const navSections = [
     { id: "menu", label: hs.navbarMenuTextMenu || "Menu" },
     { id: "about", label: hs.navbarMenuTextInfo || "About" },
-    ...(popularItems.length > 0 ? [{ id: "popular", label: hs.navbarMenuTextReviews || "Top Picks" }] : []),
     { id: "faq", label: "FAQ" },
-  ];
+  ] as const;
 
   // ── Main Page Storefront ───────────────────────────────────────────────────
   return (
@@ -744,7 +738,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                   {navSections.map((s) => (
                     <button
                       key={s.id}
-                      onClick={() => scrollTo(s.id)}
+                      onClick={() => selectTabAndScroll(s.id)}
                       style={{ fontSize: `${hs.navbarFontSize || 11}px` }}
                       className={`font-bold uppercase tracking-widest transition-all hover:scale-105 active:scale-95 ${
                         isLightNav ? "text-stone-600 hover:text-stone-950" : "text-white/80 hover:text-white"
@@ -898,7 +892,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                   }`}
                 >
                   <button
-                    onClick={() => scrollTo("menu")}
+                    onClick={() => selectTabAndScroll("menu")}
                     style={{ backgroundColor: primary }}
                     className={`text-white text-xs font-black uppercase tracking-wider py-3.5 px-6 shadow-md shadow-[var(--brand-primary-10)] active:scale-95 transition-all hover:opacity-95 ${btnStyleCls}`}
                   >
@@ -1038,10 +1032,10 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
             {navSections.map((s) => (
               <button
                 key={s.id}
-                onClick={() => scrollTo(s.id)}
-                style={activeSection === s.id ? { backgroundColor: primary } : {}}
+                onClick={() => selectTabAndScroll(s.id)}
+                style={activeTab === s.id ? { backgroundColor: primary } : {}}
                 className={`flex-shrink-0 px-4.5 py-2 rounded-full text-xs font-black uppercase tracking-wider transition-all ${
-                  activeSection === s.id
+                  activeTab === s.id
                     ? "text-white shadow-md shadow-[var(--brand-primary-20)] scale-105"
                     : "text-[#7A7368] hover:text-neutral-900 dark:text-[#A19B91] dark:hover:text-white hover:bg-stone-100/50 dark:hover:bg-stone-900/50"
                 }`}
@@ -1070,17 +1064,19 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
       </nav>
 
       {/* ── MENU EXPERIENCE REDESIGN (Phase 10B) ──────────────────────────────── */}
-      <div
-        style={{
-          background:
-            hs.menuBgColorType === "solid"
-              ? hs.menuCustomBgColor || undefined
-              : hs.menuBgColorType === "gradient"
-              ? hs.menuCustomGradient || undefined
-              : undefined,
-        }}
-        className="w-full transition-all duration-300"
-      >
+      {activeTab === "menu" && (
+        <>
+          <div
+            style={{
+              background:
+                hs.menuBgColorType === "solid"
+                  ? hs.menuCustomBgColor || undefined
+                  : hs.menuBgColorType === "gradient"
+                  ? hs.menuCustomGradient || undefined
+                  : undefined,
+            }}
+            className="w-full transition-all duration-300"
+          >
         <section id="menu" ref={menuSectionRef} className="scroll-mt-24 max-w-6xl mx-auto px-6 pt-12 pb-12">
           <div className="mb-8">
             {hs.menuShowHeaderLabel !== false && (
@@ -1410,9 +1406,12 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
           </div>
         </section>
       )}
+    </>
+  )}
 
       {/* ── ABOUT SECTION (Phase 10D) ────────────────────────────────────────── */}
-      <section id="about" ref={aboutSectionRef} className="scroll-mt-24 bg-white dark:bg-[#141412] border-t border-[#EFECE6] dark:border-[#1F1F1C] transition-colors duration-300">
+      {activeTab === "about" && (
+        <section id="about" ref={aboutSectionRef} className="scroll-mt-24 bg-white dark:bg-[#141412] border-t border-[#EFECE6] dark:border-[#1F1F1C] transition-colors duration-300">
         <div className="max-w-6xl mx-auto px-6 py-16">
           <div
             data-fade="about"
@@ -1488,9 +1487,11 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
           </div>
         </div>
       </section>
+    )}
 
       {/* ── FAQ SECTION (Phase 10I) ──────────────────────────────────────────── */}
-      <section id="faq" ref={faqSectionRef} className="scroll-mt-24 bg-[#FAF9F5] dark:bg-[#0D0C0B] border-t border-[#EFECE6] dark:border-[#1F1F1C] transition-colors duration-300">
+      {activeTab === "faq" && (
+        <section id="faq" ref={faqSectionRef} className="scroll-mt-24 bg-[#FAF9F5] dark:bg-[#0D0C0B] border-t border-[#EFECE6] dark:border-[#1F1F1C] transition-colors duration-300">
         <div className="max-w-6xl mx-auto px-6 py-16">
           <div data-fade="faq" className={fade("faq")}>
             <span className="text-[10px] font-black uppercase tracking-wider text-[var(--brand-primary)]">Assistance</span>
@@ -1528,6 +1529,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
           </div>
         </div>
       </section>
+    )}
 
       {/* ── Phase 10J — SEO Integration Strip ────────────────────────────────── */}
       {seo && (
@@ -1564,7 +1566,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
             </div>
             <div className="flex flex-col items-start sm:items-end gap-3.5 w-full sm:w-auto">
               <button
-                onClick={() => scrollTo("menu")}
+                onClick={() => selectTabAndScroll("menu")}
                 style={{ backgroundColor: primary }}
                 className="w-full sm:w-auto text-white font-bold px-6 py-3.5 rounded-2xl text-xs uppercase tracking-widest transition-opacity hover:opacity-95 active:scale-95 shadow-md shadow-[var(--brand-primary-20)]"
               >
