@@ -1726,7 +1726,7 @@ function AccordionItem({
       </button>
       <div
         className={`transition-all duration-300 ease-in-out ${
-          active ? "max-h-[800px] border-t border-[#EFECE6] p-4 opacity-100" : "max-h-0 opacity-0 pointer-events-none"
+          active ? "max-h-[2000px] border-t border-[#EFECE6] p-4 opacity-100" : "max-h-0 opacity-0 pointer-events-none"
         } overflow-hidden`}
       >
         {children}
