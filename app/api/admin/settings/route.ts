@@ -44,6 +44,7 @@ export async function PUT(req: NextRequest) {
     heroSettings,
     cancellationManagerPinEnabled,
     cancellationOwnerApprovalEnabled,
+    deliveryZones,
   } = body as {
     name?: string;
     description?: string;
@@ -72,6 +73,7 @@ export async function PUT(req: NextRequest) {
     heroSettings?: HeroSettings;
     cancellationManagerPinEnabled?: boolean;
     cancellationOwnerApprovalEnabled?: boolean;
+    deliveryZones?: { id: string; name: string; fee: number }[];
   };
 
   if (!name?.trim()) {
@@ -110,6 +112,7 @@ export async function PUT(req: NextRequest) {
       dineInEnabled: dineInEnabled === true,
       cancellationManagerPinEnabled: cancellationManagerPinEnabled !== false,
       cancellationOwnerApprovalEnabled: cancellationOwnerApprovalEnabled !== false,
+      ...(deliveryZones && Array.isArray(deliveryZones) ? { deliveryZones } : {}),
       ...(heroSettings && typeof heroSettings === "object" ? { heroSettings } : {}),
     });
 

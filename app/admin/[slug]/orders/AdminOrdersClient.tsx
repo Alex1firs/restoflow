@@ -33,6 +33,7 @@ type Order = {
   cancellationRequestedBy?: string;
   cancellationRequestedAt?: Timestamp;
   orderNumber?: number | null;
+  deliveryZoneName?: string | null;
 };
 
 type FilterTab = "active" | "completed" | "all";
@@ -431,7 +432,10 @@ export default function AdminOrdersClient({ restaurant, role }: Props) {
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Customer</p>
                         <p className="font-bold text-gray-900">{order.customerName}</p>
                         <p className="text-sm text-gray-500">{order.phone}</p>
-                        <p className="text-xs text-gray-400 italic mt-0.5 leading-relaxed">{order.address}</p>
+                        <p className="text-xs text-gray-400 italic mt-0.5 leading-relaxed">
+                          {order.address}
+                          {order.deliveryZoneName && <span className="block mt-0.5 font-bold text-gray-500">Zone: {order.deliveryZoneName}</span>}
+                        </p>
                       </div>
                       <div>
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Items</p>
@@ -583,7 +587,10 @@ export default function AdminOrdersClient({ restaurant, role }: Props) {
           <div className="space-y-0.5" style={{ fontSize: "9px" }}>
             <p className="font-black" style={{ fontSize: "10px", margin: "0" }}>{printingOrder.customerName}</p>
             <p className="font-bold" style={{ margin: "0" }}>{printingOrder.phone}</p>
-            <p className="text-gray-600 leading-none" style={{ fontSize: "8px", margin: "0" }}>{printingOrder.address}</p>
+            <p className="text-gray-600 leading-none" style={{ fontSize: "8px", margin: "0" }}>
+              {printingOrder.address}
+              {printingOrder.deliveryZoneName && ` (Zone: ${printingOrder.deliveryZoneName})`}
+            </p>
           </div>
 
           {/* Special note */}

@@ -4,7 +4,7 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import RestaurantClient from './components/RestaurantClient';
 import { CartProvider } from './components/CartContext';
 import Link from 'next/link';
-import { checkIsOpen, todayHours, type OpeningHours } from '@/lib/restaurant-utils';
+import { checkIsOpen, todayHours, type OpeningHours, type DeliveryZone } from '@/lib/restaurant-utils';
 import { buildPageTitle, buildPageDescription, buildJsonLd, buildCanonicalUrl, type RestaurantSEOData } from '@/lib/seo-utils';
 import { GRACE_DAYS } from '@/lib/constants';
 import { DEFAULT_HERO_SETTINGS, type HeroSettings } from '@/lib/hero-settings';
@@ -29,6 +29,7 @@ interface RestaurantData {
   status?: string;
   hidePrices?: boolean;
   heroSettings?: HeroSettings;
+  deliveryZones?: DeliveryZone[];
 }
 
 function isExpired(restaurant: RestaurantData): boolean {
@@ -201,6 +202,7 @@ export default async function RestaurantPage({
     rating?: number;
     ordersToday?: number;
     deliveryTime?: string;
+    deliveryZones?: DeliveryZone[];
   };
 
   const todayH = todayHours(rData.openingHours);
@@ -235,6 +237,7 @@ export default async function RestaurantPage({
     hidePrices: restaurant.hidePrices === true,
     heroSettings: (restaurant.heroSettings ?? DEFAULT_HERO_SETTINGS),
     loyaltyEnabled: !!(restaurant as any).loyalty?.enabled,
+    deliveryZones: rData.deliveryZones ?? [],
   };
 
   return (

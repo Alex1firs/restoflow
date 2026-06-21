@@ -36,3 +36,9 @@ export function todayHours(openingHours?: OpeningHours | null): DayHours | null 
   const lagosNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Lagos" }));
   return openingHours[lagosNow.getDay().toString()] ?? null;
 }
+
+export type DeliveryZone = {
+  id: string;
+  name: string;
+  fee: number;
+};

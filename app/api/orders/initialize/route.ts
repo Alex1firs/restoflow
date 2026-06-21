@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { restaurantId, customerName, phone, address, note, items, deliveryType } =
+  const { restaurantId, customerName, phone, address, note, items, deliveryType, serviceMode, tableLabel, orderType, scheduledFor, deliveryZoneId } =
     body as Record<string, unknown>;
 
   if (
@@ -80,7 +80,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Online payments are not set up for this restaurant." }, { status: 422 });
     }
 
-    const deliveryFee = (rData.deliveryFee as number) ?? 0;
+    const isDineIn = serviceMode === "dine_in" || deliveryType === "dine_in";
+    const resolvedDeliveryType = isDineIn ? "dine_in" : deliveryType === "pickup" ? "pickup" : "delivery";
+
+    let deliveryFee = 0;
+    let deliveryZoneName = null;
+
+    if (resolvedDeliveryType === "delivery") {
+      if (deliveryZoneId && typeof deliveryZoneId === "string" && Array.isArray(rData.deliveryZones)) {
+        const zone = rData.deliveryZones.find((z: any) => z.id === deliveryZoneId);
+        if (zone) {
+          deliveryFee = typeof zone.fee === "number" ? zone.fee : Number(zone.fee);
+          deliveryZoneName = zone.name;
+        } else {
+          deliveryFee = (rData.deliveryFee as number) ?? 0;
+        }
+      } else {
+        deliveryFee = (rData.deliveryFee as number) ?? 0;
+      }
+    }
+
     const minimumOrder = (rData.minimumOrder as number) ?? 0;
 
     const menuSnap = await db
@@ -159,7 +178,11 @@ export async function POST(req: NextRequest) {
       itemsTotal,
       deliveryFee,
       total,
-      deliveryType: deliveryType === "pickup" ? "pickup" : "delivery",
+      deliveryType: resolvedDeliveryType,
+      ...(isDineIn ? { serviceMode: "dine_in", tableLabel: typeof tableLabel === "string" ? tableLabel.trim() : "" } : {}),
+      ...(deliveryZoneName ? { deliveryZoneName } : {}),
+      orderType: orderType === "scheduled" ? "scheduled" : "normal",
+      ...(orderType === "scheduled" ? { scheduledFor } : {}),
       createdAt: FieldValue.serverTimestamp(),
     });
 

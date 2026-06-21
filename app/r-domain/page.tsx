@@ -8,6 +8,7 @@ import {
   checkIsOpen,
   todayHours,
   type OpeningHours,
+  type DeliveryZone,
 } from "@/lib/restaurant-utils";
 import { buildPageTitle, buildPageDescription, buildJsonLd, type RestaurantSEOData } from "@/lib/seo-utils";
 import { GRACE_DAYS } from "@/lib/constants";
@@ -203,6 +204,7 @@ export default async function RDomainPage({
     deliveryEnabled?: boolean;
     pickupEnabled?: boolean;
     dineInEnabled?: boolean;
+    deliveryZones?: DeliveryZone[];
   };
 
   const todayH = todayHours(rData.openingHours);
@@ -249,6 +251,7 @@ export default async function RDomainPage({
     dineInEnabled: rData.dineInEnabled === true,
     todayHoursLabel,
     hidePrices: restaurantDoc.data().hidePrices === true,
+    deliveryZones: rData.deliveryZones ?? [],
   };
 
   return (

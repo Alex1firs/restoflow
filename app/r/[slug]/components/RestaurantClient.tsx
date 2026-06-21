@@ -45,6 +45,7 @@ interface RestaurantClientProps {
     hidePrices?: boolean;
     heroSettings?: HeroSettings;
     loyaltyEnabled?: boolean;
+    deliveryZones?: { id: string; name: string; fee: number }[];
   };
   menuItems: MenuItemData[];
   seo?: {
@@ -97,6 +98,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
     if (restaurant.deliveryEnabled) return "delivery";
     return "pickup";
   });
+  const [selectedDeliveryZoneId, setSelectedDeliveryZoneId] = useState<string>("");
   const [formData, setFormData] = useState({ customerName: "", phone: "", address: "", note: "", tableNumber: initialTable ?? "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
@@ -140,7 +142,8 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   const categories = [...new Set(menuItems.map((i) => i.category))].filter(Boolean);
   const filteredItems = activeCategory ? menuItems.filter((i) => i.category === activeCategory) : menuItems;
   const subtotal = totalPrice;
-  const effectiveDeliveryFee = (deliveryType === "pickup" || deliveryType === "dine_in") ? 0 : restaurant.deliveryFee;
+  const activeDeliveryZone = restaurant.deliveryZones?.find(z => z.id === selectedDeliveryZoneId);
+  const effectiveDeliveryFee = (deliveryType === "pickup" || deliveryType === "dine_in") ? 0 : (activeDeliveryZone ? activeDeliveryZone.fee : restaurant.deliveryFee);
   const orderTotal = subtotal + effectiveDeliveryFee;
   const meetsMinimum = restaurant.hidePrices || restaurant.minimumOrder <= 0 || subtotal >= restaurant.minimumOrder;
 
@@ -302,7 +305,12 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   const validateForm = (): string | null => {
     if (!formData.customerName.trim()) return "Please enter your name.";
     if (!formData.phone.trim()) return "Please enter your phone number.";
-    if (deliveryType === "delivery" && !formData.address.trim()) return "Please enter your delivery address.";
+    if (deliveryType === "delivery") {
+      if (restaurant.deliveryZones && restaurant.deliveryZones.length > 0 && !selectedDeliveryZoneId) {
+        return "Please select a delivery location.";
+      }
+      if (!formData.address.trim()) return "Please enter your delivery address.";
+    }
     if (!meetsMinimum) return `Minimum order is ${fmt(restaurant.minimumOrder)}.`;
     return null;
   };
@@ -322,6 +330,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
       : (restaurant.address || "Pickup"),
     note: formData.note.trim(),
     deliveryType,
+    ...(deliveryType === "delivery" && selectedDeliveryZoneId ? { deliveryZoneId: selectedDeliveryZoneId } : {}),
     ...(deliveryType === "dine_in" ? { serviceMode: "dine_in", tableLabel } : {}),
     items: items.map((i) => ({ id: i.id, quantity: i.quantity })),
   });
@@ -1874,17 +1883,41 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
 
               {/* Delivery Address Block */}
               {deliveryType === "delivery" && (
-                <div className="space-y-1.5 animate-scaleUp">
-                  <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Delivery Destination</p>
-                  <textarea
-                    placeholder="Enter your comprehensive delivery address details *"
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    rows={2.5}
-                    className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4.5 py-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary-20)] text-neutral-900 dark:text-neutral-100 placeholder-[#A19B91] resize-none transition-all bg-[#FAF9F5] dark:bg-[#0D0C0B]"
-                    onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
-                    onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
-                  />
+                <div className="space-y-4 animate-scaleUp">
+                  {restaurant.deliveryZones && restaurant.deliveryZones.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Delivery Zone *</p>
+                      <div className="relative">
+                        <select
+                          value={selectedDeliveryZoneId}
+                          onChange={(e) => setSelectedDeliveryZoneId(e.target.value)}
+                          className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4.5 py-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary-20)] text-neutral-900 dark:text-neutral-100 transition-all bg-[#FAF9F5] dark:bg-[#0D0C0B] appearance-none"
+                          onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
+                          onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
+                        >
+                          <option value="" disabled>Select your delivery area</option>
+                          {restaurant.deliveryZones.map(z => (
+                            <option key={z.id} value={z.id}>{z.name} ({fmt(z.fee)})</option>
+                          ))}
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#A19B91]">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Delivery Destination *</p>
+                    <textarea
+                      placeholder="Enter your comprehensive delivery address details *"
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      rows={2.5}
+                      className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4.5 py-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary-20)] text-neutral-900 dark:text-neutral-100 placeholder-[#A19B91] resize-none transition-all bg-[#FAF9F5] dark:bg-[#0D0C0B]"
+                      onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
+                      onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
+                    />
+                  </div>
                 </div>
               )}
 
@@ -2160,17 +2193,41 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
 
                   {/* Delivery Address Details */}
                   {deliveryType === "delivery" && (
-                    <div className="space-y-1.5">
-                      <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Delivery Destination</p>
-                      <textarea
-                        placeholder="Enter your full delivery address *"
-                        value={formData.address}
-                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                        rows={2}
-                        className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4.5 py-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary-20)] text-neutral-900 dark:text-neutral-100 placeholder-[#A19B91] resize-none transition-all bg-[#FAF9F5] dark:bg-[#0D0C0B]"
-                        onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
-                        onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
-                      />
+                    <div className="space-y-4">
+                      {restaurant.deliveryZones && restaurant.deliveryZones.length > 0 && (
+                        <div className="space-y-1.5">
+                          <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Delivery Zone *</p>
+                          <div className="relative">
+                            <select
+                              value={selectedDeliveryZoneId}
+                              onChange={(e) => setSelectedDeliveryZoneId(e.target.value)}
+                              className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4.5 py-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary-20)] text-neutral-900 dark:text-neutral-100 transition-all bg-[#FAF9F5] dark:bg-[#0D0C0B] appearance-none"
+                              onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
+                              onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
+                            >
+                              <option value="" disabled>Select your delivery area</option>
+                              {restaurant.deliveryZones.map(z => (
+                                <option key={z.id} value={z.id}>{z.name} ({fmt(z.fee)})</option>
+                              ))}
+                            </select>
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#A19B91]">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Delivery Destination *</p>
+                        <textarea
+                          placeholder="Enter your full delivery address *"
+                          value={formData.address}
+                          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                          rows={2}
+                          className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4.5 py-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary-20)] text-neutral-900 dark:text-neutral-100 placeholder-[#A19B91] resize-none transition-all bg-[#FAF9F5] dark:bg-[#0D0C0B]"
+                          onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
+                          onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
+                        />
+                      </div>
                     </div>
                   )}
 
