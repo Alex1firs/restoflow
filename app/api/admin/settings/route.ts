@@ -45,6 +45,8 @@ export async function PUT(req: NextRequest) {
     cancellationManagerPinEnabled,
     cancellationOwnerApprovalEnabled,
     deliveryZones,
+    whatsappNumber,
+    showContactSupport,
   } = body as {
     name?: string;
     description?: string;
@@ -74,6 +76,8 @@ export async function PUT(req: NextRequest) {
     cancellationManagerPinEnabled?: boolean;
     cancellationOwnerApprovalEnabled?: boolean;
     deliveryZones?: { id: string; name: string; fee: number }[];
+    whatsappNumber?: string;
+    showContactSupport?: boolean;
   };
 
   if (!name?.trim()) {
@@ -112,6 +116,8 @@ export async function PUT(req: NextRequest) {
       dineInEnabled: dineInEnabled === true,
       cancellationManagerPinEnabled: cancellationManagerPinEnabled !== false,
       cancellationOwnerApprovalEnabled: cancellationOwnerApprovalEnabled !== false,
+      whatsappNumber: (whatsappNumber ?? "").trim(),
+      showContactSupport: showContactSupport !== false,
       ...(deliveryZones && Array.isArray(deliveryZones) ? { deliveryZones } : {}),
       ...(heroSettings && typeof heroSettings === "object" ? { heroSettings } : {}),
     });

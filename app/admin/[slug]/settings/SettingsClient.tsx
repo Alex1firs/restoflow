@@ -46,6 +46,8 @@ type Props = {
     cancellationManagerPinEnabled?: boolean;
     cancellationOwnerApprovalEnabled?: boolean;
     deliveryZones?: DeliveryZone[];
+    whatsappNumber?: string;
+    showContactSupport?: boolean;
   };
   menuItems?: any[];
 };
@@ -78,6 +80,8 @@ export default function SettingsClient({ restaurant, aiEnabled = false, menuItem
     cancellationManagerPinEnabled: restaurant.cancellationManagerPinEnabled !== false,
     cancellationOwnerApprovalEnabled: restaurant.cancellationOwnerApprovalEnabled !== false,
     deliveryZones: restaurant.deliveryZones ?? [],
+    whatsappNumber: restaurant.whatsappNumber ?? "",
+    showContactSupport: restaurant.showContactSupport !== false,
   });
 
   const [openingHours, setOpeningHours] = useState<OpeningHours>(
@@ -392,6 +396,30 @@ export default function SettingsClient({ restaurant, aiEnabled = false, menuItem
             />
             <p className="text-xs text-gray-400 mt-1">Shown publicly on your store page</p>
           </Field>
+          <Field label="WhatsApp Support Number">
+            <input
+              type="tel"
+              value={form.whatsappNumber}
+              onChange={(e) => setField("whatsappNumber", e.target.value)}
+              placeholder="08012345678"
+              className={inputCls}
+            />
+            <p className="text-xs text-gray-400 mt-1">If provided, we will show a &quot;Chat on WhatsApp&quot; button for customer support.</p>
+          </Field>
+          <div className="pt-2">
+            <div className="flex items-center justify-between gap-4 bg-gray-50 border border-gray-100 p-4 rounded-xl">
+              <div>
+                <p className="text-sm font-bold text-gray-900">Enable Customer Support Links</p>
+                <p className="text-xs text-gray-500 mt-0.5">Show the &quot;Call Us&quot; and &quot;WhatsApp Support&quot; buttons on your storefront.</p>
+              </div>
+              <div
+                onClick={() => setField("showContactSupport", !form.showContactSupport)}
+                className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer shrink-0 ${form.showContactSupport ? "bg-orange-500" : "bg-gray-200"}`}
+              >
+                <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.showContactSupport ? "translate-x-5.5" : "translate-x-0.5"}`} />
+              </div>
+            </div>
+          </div>
 
           {/* Opening Hours */}
           <div>

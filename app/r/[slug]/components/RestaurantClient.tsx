@@ -46,6 +46,8 @@ interface RestaurantClientProps {
     heroSettings?: HeroSettings;
     loyaltyEnabled?: boolean;
     deliveryZones?: { id: string; name: string; fee: number }[];
+    whatsappNumber?: string;
+    showContactSupport?: boolean;
     phone?: string;
   };
   menuItems: MenuItemData[];
@@ -760,18 +762,37 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                 </div>
 
                 <div className="flex items-center gap-3">
-                  {restaurant.phone && (
-                    <a
-                      href={`tel:${restaurant.phone}`}
-                      className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-wider shadow-sm transition-all hover:scale-105 active:scale-95 ${
-                        isLightNav
-                          ? "bg-white/80 border-[#EFECE6] text-stone-700 hover:bg-white"
-                          : "bg-black/30 border-white/20 text-white hover:bg-black/50"
-                      }`}
-                    >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                      <span className="hidden sm:inline">Call Us</span>
-                    </a>
+                  {restaurant.showContactSupport !== false && (
+                    <>
+                      {restaurant.phone && (
+                        <a
+                          href={`tel:${restaurant.phone}`}
+                          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-wider shadow-sm transition-all hover:scale-105 active:scale-95 ${
+                            isLightNav
+                              ? "bg-white/80 border-[#EFECE6] text-stone-700 hover:bg-white"
+                              : "bg-black/30 border-white/20 text-white hover:bg-black/50"
+                          }`}
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                          <span className="hidden sm:inline">Call Us</span>
+                        </a>
+                      )}
+                      {restaurant.whatsappNumber && (
+                        <a
+                          href={`https://wa.me/${restaurant.whatsappNumber.replace(/[^0-9]/g, '')}?text=Hi,%20I%20am%20trying%20to%20place%20an%20order%20on%20your%20RestoFlow%20website%20but%20I%20need%20some%20help.`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-wider shadow-sm transition-all hover:scale-105 active:scale-95 ${
+                            isLightNav
+                              ? "bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+                              : "bg-green-500/20 border-green-500/30 text-green-400 hover:bg-green-500/30"
+                          }`}
+                        >
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 0C5.389 0 0 5.39 0 12.031c0 2.128.552 4.195 1.6 6.02L.153 24l6.096-1.597A11.967 11.967 0 0012.031 24c6.643 0 12.031-5.39 12.031-12.031S18.674 0 12.031 0zM12.031 22A9.97 9.97 0 016.924 20.6l-.366-.217-4.52 1.184 1.2-4.407-.238-.378A9.957 9.957 0 012.062 12.03C2.062 6.53 6.53 2.06 12.031 2.06s9.969 4.47 9.969 9.97-4.468 9.97-9.969 9.97zm5.46-7.466c-.299-.15-1.77-.874-2.045-.975-.274-.1-.475-.15-.674.15-.2.3-.77 1-.945 1.201-.174.202-.349.227-.648.077-.299-.15-1.264-.466-2.408-1.488-.89-.795-1.492-1.778-1.667-2.078-.175-.3 0-.46.149-.611.135-.135.3-.35.45-.525.149-.175.2-.299.299-.5.1-.2.05-.375-.025-.525-.075-.15-.674-1.625-.923-2.225-.244-.588-.493-.508-.674-.518-.175-.01-.375-.01-.574-.01-.2 0-.524.075-.799.375-.275.3-1.048 1.025-1.048 2.5 0 1.475 1.073 2.9 1.223 3.1.15.2 2.115 3.225 5.123 4.525.717.31 1.277.495 1.713.633.72.23 1.375.198 1.892.12.578-.088 1.77-.725 2.02-1.425.25-.7.25-1.3.175-1.425-.075-.125-.275-.2-.575-.35z"/></svg>
+                          <span className="hidden sm:inline">WhatsApp</span>
+                        </a>
+                      )}
+                    </>
                   )}
                   {restaurant.loyaltyEnabled && (
                     <button
@@ -1648,13 +1669,24 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                   </svg>
                   <span className="text-xs md:text-sm font-black uppercase tracking-wider">Browse &amp; Preorder</span>
                 </button>
-                {restaurant.phone && (
+                {restaurant.showContactSupport !== false && restaurant.phone && (
                   <a
                     href={`tel:${restaurant.phone}`}
                     className="flex-1 text-[#7A7368] dark:text-[#A19B91] bg-white dark:bg-[#1E1E1C] border border-[#EFECE6] dark:border-[#1F1F1C] font-bold py-4.5 rounded-2xl flex items-center justify-center gap-2.5 transition-opacity hover:opacity-95 active:scale-[0.99] shadow-sm"
                   >
                     <svg className="w-5 h-5 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                     <span className="text-xs md:text-sm font-black uppercase tracking-wider">Need Help? Call Us</span>
+                  </a>
+                )}
+                {restaurant.showContactSupport !== false && restaurant.whatsappNumber && (
+                  <a
+                    href={`https://wa.me/${restaurant.whatsappNumber.replace(/[^0-9]/g, '')}?text=Hi,%20I%20am%20trying%20to%20place%20an%20order%20on%20your%20RestoFlow%20website%20but%20I%20need%20some%20help.`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 text-green-700 dark:text-green-500 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/30 font-bold py-4.5 rounded-2xl flex items-center justify-center gap-2.5 transition-opacity hover:opacity-95 active:scale-[0.99] shadow-sm"
+                  >
+                    <svg className="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 0C5.389 0 0 5.39 0 12.031c0 2.128.552 4.195 1.6 6.02L.153 24l6.096-1.597A11.967 11.967 0 0012.031 24c6.643 0 12.031-5.39 12.031-12.031S18.674 0 12.031 0zM12.031 22A9.97 9.97 0 016.924 20.6l-.366-.217-4.52 1.184 1.2-4.407-.238-.378A9.957 9.957 0 012.062 12.03C2.062 6.53 6.53 2.06 12.031 2.06s9.969 4.47 9.969 9.97-4.468 9.97-9.969 9.97zm5.46-7.466c-.299-.15-1.77-.874-2.045-.975-.274-.1-.475-.15-.674.15-.2.3-.77 1-.945 1.201-.174.202-.349.227-.648.077-.299-.15-1.264-.466-2.408-1.488-.89-.795-1.492-1.778-1.667-2.078-.175-.3 0-.46.149-.611.135-.135.3-.35.45-.525.149-.175.2-.299.299-.5.1-.2.05-.375-.025-.525-.075-.15-.674-1.625-.923-2.225-.244-.588-.493-.508-.674-.518-.175-.01-.375-.01-.574-.01-.2 0-.524.075-.799.375-.275.3-1.048 1.025-1.048 2.5 0 1.475 1.073 2.9 1.223 3.1.15.2 2.115 3.225 5.123 4.525.717.31 1.277.495 1.713.633.72.23 1.375.198 1.892.12.578-.088 1.77-.725 2.02-1.425.25-.7.25-1.3.175-1.425-.075-.125-.275-.2-.575-.35z"/></svg>
+                    <span className="text-xs md:text-sm font-black uppercase tracking-wider">WhatsApp Support</span>
                   </a>
                 )}
                 {restaurant.loyaltyEnabled && (
@@ -1828,16 +1860,31 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
               </button>
             </div>
             <div className="px-6 py-6 space-y-6">
-              {restaurant.phone && (
-                <div className="bg-[#FAF9F5] dark:bg-[#1E1E1C] border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl p-4 flex items-center justify-between shadow-sm">
+              {restaurant.showContactSupport !== false && (restaurant.phone || restaurant.whatsappNumber) && (
+                <div className="bg-[#FAF9F5] dark:bg-[#1E1E1C] border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl p-4 flex items-center justify-between shadow-sm flex-wrap gap-3">
                   <div>
                     <h3 className="text-sm font-black text-neutral-900 dark:text-neutral-50 tracking-tight">Need help placing your order?</h3>
-                    <p className="text-xs text-[#7A7368] dark:text-[#A19B91] mt-0.5">Call us directly, and we'll handle the rest.</p>
+                    <p className="text-xs text-[#7A7368] dark:text-[#A19B91] mt-0.5">Reach out to our support team.</p>
                   </div>
-                  <a href={`tel:${restaurant.phone}`} className="shrink-0 bg-white dark:bg-[#0D0C0B] border border-[#EFECE6] dark:border-[#1F1F1C] hover:border-[var(--brand-primary)] text-neutral-900 dark:text-neutral-100 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow-sm active:scale-95">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                    Call Now
-                  </a>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {restaurant.phone && (
+                      <a href={`tel:${restaurant.phone}`} className="bg-white dark:bg-[#0D0C0B] border border-[#EFECE6] dark:border-[#1F1F1C] hover:border-[var(--brand-primary)] text-neutral-900 dark:text-neutral-100 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow-sm active:scale-95">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                        Call Now
+                      </a>
+                    )}
+                    {restaurant.whatsappNumber && (
+                      <a 
+                        href={`https://wa.me/${restaurant.whatsappNumber.replace(/[^0-9]/g, '')}?text=Hi,%20I%20am%20trying%20to%20place%20an%20order%20on%20your%20RestoFlow%20website%20but%20I%20need%20some%20help.`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow-sm active:scale-95 border border-transparent"
+                      >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 0C5.389 0 0 5.39 0 12.031c0 2.128.552 4.195 1.6 6.02L.153 24l6.096-1.597A11.967 11.967 0 0012.031 24c6.643 0 12.031-5.39 12.031-12.031S18.674 0 12.031 0zM12.031 22A9.97 9.97 0 016.924 20.6l-.366-.217-4.52 1.184 1.2-4.407-.238-.378A9.957 9.957 0 012.062 12.03C2.062 6.53 6.53 2.06 12.031 2.06s9.969 4.47 9.969 9.97-4.468 9.97-9.969 9.97zm5.46-7.466c-.299-.15-1.77-.874-2.045-.975-.274-.1-.475-.15-.674.15-.2.3-.77 1-.945 1.201-.174.202-.349.227-.648.077-.299-.15-1.264-.466-2.408-1.488-.89-.795-1.492-1.778-1.667-2.078-.175-.3 0-.46.149-.611.135-.135.3-.35.45-.525.149-.175.2-.299.299-.5.1-.2.05-.375-.025-.525-.075-.15-.674-1.625-.923-2.225-.244-.588-.493-.508-.674-.518-.175-.01-.375-.01-.574-.01-.2 0-.524.075-.799.375-.275.3-1.048 1.025-1.048 2.5 0 1.475 1.073 2.9 1.223 3.1.15.2 2.115 3.225 5.123 4.525.717.31 1.277.495 1.713.633.72.23 1.375.198 1.892.12.578-.088 1.77-.725 2.02-1.425.25-.7.25-1.3.175-1.425-.075-.125-.275-.2-.575-.35z"/></svg>
+                        WhatsApp
+                      </a>
+                    )}
+                  </div>
                 </div>
               )}
               {/* Fulfillment mode selector */}

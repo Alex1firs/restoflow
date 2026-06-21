@@ -204,6 +204,8 @@ export default async function RestaurantPage({
     deliveryTime?: string;
     deliveryZones?: DeliveryZone[];
     phone?: string;
+    whatsappNumber?: string;
+    showContactSupport?: boolean;
   };
 
   const todayH = todayHours(rData.openingHours);
@@ -221,6 +223,8 @@ export default async function RestaurantPage({
     logo: rData.logo ?? "",
     address: rData.address ?? "",
     phone: rData.phone ?? "",
+    whatsappNumber: rData.whatsappNumber ?? "",
+    showContactSupport: rData.showContactSupport !== false,
     slug,
     onlinePaymentEnabled: !!rData.paystackSubaccountCode,
     deliveryFee: rData.deliveryFee ?? 0,
