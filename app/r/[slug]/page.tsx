@@ -203,6 +203,7 @@ export default async function RestaurantPage({
     ordersToday?: number;
     deliveryTime?: string;
     deliveryZones?: DeliveryZone[];
+    phone?: string;
   };
 
   const todayH = todayHours(rData.openingHours);
@@ -219,6 +220,7 @@ export default async function RestaurantPage({
     coverVideo: restaurant.coverVideo ?? "",
     logo: rData.logo ?? "",
     address: rData.address ?? "",
+    phone: rData.phone ?? "",
     slug,
     onlinePaymentEnabled: !!rData.paystackSubaccountCode,
     deliveryFee: rData.deliveryFee ?? 0,

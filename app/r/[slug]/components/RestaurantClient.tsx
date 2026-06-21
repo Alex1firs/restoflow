@@ -46,6 +46,7 @@ interface RestaurantClientProps {
     heroSettings?: HeroSettings;
     loyaltyEnabled?: boolean;
     deliveryZones?: { id: string; name: string; fee: number }[];
+    phone?: string;
   };
   menuItems: MenuItemData[];
   seo?: {
@@ -759,6 +760,19 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                 </div>
 
                 <div className="flex items-center gap-3">
+                  {restaurant.phone && (
+                    <a
+                      href={`tel:${restaurant.phone}`}
+                      className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-wider shadow-sm transition-all hover:scale-105 active:scale-95 ${
+                        isLightNav
+                          ? "bg-white/80 border-[#EFECE6] text-stone-700 hover:bg-white"
+                          : "bg-black/30 border-white/20 text-white hover:bg-black/50"
+                      }`}
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                      <span className="hidden sm:inline">Call Us</span>
+                    </a>
+                  )}
                   {restaurant.loyaltyEnabled && (
                     <button
                       onClick={() => {
@@ -1634,6 +1648,15 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                   </svg>
                   <span className="text-xs md:text-sm font-black uppercase tracking-wider">Browse &amp; Preorder</span>
                 </button>
+                {restaurant.phone && (
+                  <a
+                    href={`tel:${restaurant.phone}`}
+                    className="flex-1 text-[#7A7368] dark:text-[#A19B91] bg-white dark:bg-[#1E1E1C] border border-[#EFECE6] dark:border-[#1F1F1C] font-bold py-4.5 rounded-2xl flex items-center justify-center gap-2.5 transition-opacity hover:opacity-95 active:scale-[0.99] shadow-sm"
+                  >
+                    <svg className="w-5 h-5 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                    <span className="text-xs md:text-sm font-black uppercase tracking-wider">Need Help? Call Us</span>
+                  </a>
+                )}
                 {restaurant.loyaltyEnabled && (
                   <button
                     onClick={() => {
@@ -1804,8 +1827,19 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                 ✕
               </button>
             </div>
-
             <div className="px-6 py-6 space-y-6">
+              {restaurant.phone && (
+                <div className="bg-[#FAF9F5] dark:bg-[#1E1E1C] border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl p-4 flex items-center justify-between shadow-sm">
+                  <div>
+                    <h3 className="text-sm font-black text-neutral-900 dark:text-neutral-50 tracking-tight">Need help placing your order?</h3>
+                    <p className="text-xs text-[#7A7368] dark:text-[#A19B91] mt-0.5">Call us directly, and we'll handle the rest.</p>
+                  </div>
+                  <a href={`tel:${restaurant.phone}`} className="shrink-0 bg-white dark:bg-[#0D0C0B] border border-[#EFECE6] dark:border-[#1F1F1C] hover:border-[var(--brand-primary)] text-neutral-900 dark:text-neutral-100 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow-sm active:scale-95">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                    Call Now
+                  </a>
+                </div>
+              )}
               {/* Fulfillment mode selector */}
               {(restaurant.deliveryEnabled || restaurant.pickupEnabled || restaurant.dineInEnabled) && (
                 <div className="space-y-1.5">

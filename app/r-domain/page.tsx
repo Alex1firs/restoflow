@@ -205,6 +205,7 @@ export default async function RDomainPage({
     pickupEnabled?: boolean;
     dineInEnabled?: boolean;
     deliveryZones?: DeliveryZone[];
+    phone?: string;
   };
 
   const todayH = todayHours(rData.openingHours);
@@ -241,6 +242,7 @@ export default async function RDomainPage({
     coverVideo: restaurant.coverVideo ?? "",
     logo: rData.logo ?? "",
     address: rData.address ?? "",
+    phone: rData.phone ?? (restaurantDoc.data().phone as string) ?? "",
     slug,
     onlinePaymentEnabled: !!rData.paystackSubaccountCode,
     deliveryFee: rData.deliveryFee ?? 0,
