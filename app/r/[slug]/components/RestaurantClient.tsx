@@ -85,6 +85,14 @@ function hexToRgb(hex: string) {
   return `${r}, ${g}, ${b}`;
 }
 
+function formatWhatsAppNumber(phone: string): string {
+  const digits = phone.replace(/[^0-9]/g, '');
+  if (digits.startsWith('0') && digits.length === 11) {
+    return `234${digits.substring(1)}`;
+  }
+  return digits;
+}
+
 export default function RestaurantClient({ restaurant, menuItems, seo, isPreview, initialTable }: RestaurantClientProps) {
   const { items, addToCart, updateQuantity, clearCart, totalPrice, totalItems } = useCart();
 
@@ -779,7 +787,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                       )}
                       {restaurant.whatsappNumber && (
                         <a
-                          href={`https://wa.me/${restaurant.whatsappNumber.replace(/[^0-9]/g, '')}?text=Hi,%20I%20am%20trying%20to%20place%20an%20order%20on%20your%20RestoFlow%20website%20but%20I%20need%20some%20help.`}
+                          href={`https://wa.me/${formatWhatsAppNumber(restaurant.whatsappNumber)}?text=Hi,%20I%20am%20trying%20to%20place%20an%20order%20on%20your%20RestoFlow%20website%20but%20I%20need%20some%20help.`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-wider shadow-sm transition-all hover:scale-105 active:scale-95 ${
@@ -1680,7 +1688,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                 )}
                 {restaurant.showContactSupport !== false && restaurant.whatsappNumber && (
                   <a
-                    href={`https://wa.me/${restaurant.whatsappNumber.replace(/[^0-9]/g, '')}?text=Hi,%20I%20am%20trying%20to%20place%20an%20order%20on%20your%20RestoFlow%20website%20but%20I%20need%20some%20help.`}
+                    href={`https://wa.me/${formatWhatsAppNumber(restaurant.whatsappNumber)}?text=Hi,%20I%20am%20trying%20to%20place%20an%20order%20on%20your%20RestoFlow%20website%20but%20I%20need%20some%20help.`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex-1 text-green-700 dark:text-green-500 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/30 font-bold py-4.5 rounded-2xl flex items-center justify-center gap-2.5 transition-opacity hover:opacity-95 active:scale-[0.99] shadow-sm"
@@ -1875,7 +1883,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                     )}
                     {restaurant.whatsappNumber && (
                       <a 
-                        href={`https://wa.me/${restaurant.whatsappNumber.replace(/[^0-9]/g, '')}?text=Hi,%20I%20am%20trying%20to%20place%20an%20order%20on%20your%20RestoFlow%20website%20but%20I%20need%20some%20help.`}
+                        href={`https://wa.me/${formatWhatsAppNumber(restaurant.whatsappNumber)}?text=Hi,%20I%20am%20trying%20to%20place%20an%20order%20on%20your%20RestoFlow%20website%20but%20I%20need%20some%20help.`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition-all shadow-sm active:scale-95 border border-transparent"
