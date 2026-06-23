@@ -48,6 +48,7 @@ type Props = {
     deliveryZones?: DeliveryZone[];
     whatsappNumber?: string;
     showContactSupport?: boolean;
+    payOnDeliveryEnabled?: boolean;
   };
   menuItems?: any[];
 };
@@ -82,6 +83,7 @@ export default function SettingsClient({ restaurant, aiEnabled = false, menuItem
     deliveryZones: restaurant.deliveryZones ?? [],
     whatsappNumber: restaurant.whatsappNumber ?? "",
     showContactSupport: restaurant.showContactSupport !== false,
+    payOnDeliveryEnabled: restaurant.payOnDeliveryEnabled !== false,
   });
 
   const [openingHours, setOpeningHours] = useState<OpeningHours>(
@@ -481,6 +483,12 @@ export default function SettingsClient({ restaurant, aiEnabled = false, menuItem
               description="Customers order from their table via QR code"
               enabled={form.dineInEnabled}
               onToggle={() => setField("dineInEnabled", !form.dineInEnabled)}
+            />
+            <Toggle
+              label="Pay on Delivery"
+              description="Customers can pay cash upon receiving delivery"
+              enabled={form.payOnDeliveryEnabled}
+              onToggle={() => setField("payOnDeliveryEnabled", !form.payOnDeliveryEnabled)}
             />
           </div>
 

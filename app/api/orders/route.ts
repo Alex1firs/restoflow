@@ -128,6 +128,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (resolvedDeliveryType === "delivery" && rData.payOnDeliveryEnabled === false) {
+      return NextResponse.json({ error: "Pay on delivery is not enabled for this restaurant." }, { status: 422 });
+    }
+
     const minimumOrder = (rData.minimumOrder as number) ?? 0;
 
     const menuSnap = await db

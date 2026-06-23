@@ -47,6 +47,7 @@ export async function PUT(req: NextRequest) {
     deliveryZones,
     whatsappNumber,
     showContactSupport,
+    payOnDeliveryEnabled,
   } = body as {
     name?: string;
     description?: string;
@@ -78,6 +79,7 @@ export async function PUT(req: NextRequest) {
     deliveryZones?: { id: string; name: string; fee: number }[];
     whatsappNumber?: string;
     showContactSupport?: boolean;
+    payOnDeliveryEnabled?: boolean;
   };
 
   if (!name?.trim()) {
@@ -118,6 +120,7 @@ export async function PUT(req: NextRequest) {
       cancellationOwnerApprovalEnabled: cancellationOwnerApprovalEnabled !== false,
       whatsappNumber: (whatsappNumber ?? "").trim(),
       showContactSupport: showContactSupport !== false,
+      payOnDeliveryEnabled: payOnDeliveryEnabled !== false,
       ...(deliveryZones && Array.isArray(deliveryZones) ? { deliveryZones } : {}),
       ...(heroSettings && typeof heroSettings === "object" ? { heroSettings } : {}),
     });

@@ -30,6 +30,7 @@ interface RestaurantData {
   hidePrices?: boolean;
   heroSettings?: HeroSettings;
   deliveryZones?: DeliveryZone[];
+  payOnDeliveryEnabled?: boolean;
 }
 
 function isExpired(restaurant: RestaurantData): boolean {
@@ -206,6 +207,7 @@ export default async function RestaurantPage({
     phone?: string;
     whatsappNumber?: string;
     showContactSupport?: boolean;
+    payOnDeliveryEnabled?: boolean;
   };
 
   const todayH = todayHours(rData.openingHours);
@@ -244,6 +246,7 @@ export default async function RestaurantPage({
     heroSettings: (restaurant.heroSettings ?? DEFAULT_HERO_SETTINGS),
     loyaltyEnabled: !!(restaurant as any).loyalty?.enabled,
     deliveryZones: rData.deliveryZones ?? [],
+    payOnDeliveryEnabled: rData.payOnDeliveryEnabled !== false,
   };
 
   return (

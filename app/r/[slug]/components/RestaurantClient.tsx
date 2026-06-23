@@ -49,6 +49,7 @@ interface RestaurantClientProps {
     whatsappNumber?: string;
     showContactSupport?: boolean;
     phone?: string;
+    payOnDeliveryEnabled?: boolean;
   };
   menuItems: MenuItemData[];
   seo?: {
@@ -164,7 +165,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
 
   const paymentMethods = [
     restaurant.onlinePaymentEnabled ? "Online payment (card/transfer)" : null,
-    restaurant.deliveryEnabled ? "Cash on delivery" : null,
+    (restaurant.deliveryEnabled && restaurant.payOnDeliveryEnabled !== false) ? "Cash on delivery" : null,
     restaurant.pickupEnabled ? "Cash on pickup" : null,
   ].filter(Boolean) as string[];
 
@@ -321,6 +322,9 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
         return "Please select a delivery location.";
       }
       if (!formData.address.trim()) return "Please enter your delivery address.";
+      if (restaurant.payOnDeliveryEnabled === false && !restaurant.onlinePaymentEnabled) {
+        return "Delivery orders are currently unavailable at this store.";
+      }
     }
     if (!meetsMinimum) return `Minimum order is ${fmt(restaurant.minimumOrder)}.`;
     return null;
@@ -2108,19 +2112,25 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
               {/* Secure payment actions (Phase 10C) */}
               <div className="space-y-2.5 pb-2">
                 {restaurant.hidePrices ? (
-                  <button
-                    onClick={handleCashOrder}
-                    disabled={isSubmitting}
-                    style={{ backgroundColor: primary }}
-                    className="w-full text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2.5 transition-opacity hover:opacity-95 disabled:opacity-60 active:scale-[0.99] text-sm uppercase tracking-widest shadow-md shadow-[var(--brand-primary-20)]"
-                  >
-                    <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
-                    {isSubmitting
-                      ? "Placing Order safely…"
-                      : "Confirm & Place Order"}
-                  </button>
+                  !(deliveryType === "delivery" && restaurant.payOnDeliveryEnabled === false) ? (
+                    <button
+                      onClick={handleCashOrder}
+                      disabled={isSubmitting}
+                      style={{ backgroundColor: primary }}
+                      className="w-full text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2.5 transition-opacity hover:opacity-95 disabled:opacity-60 active:scale-[0.99] text-sm uppercase tracking-widest shadow-md shadow-[var(--brand-primary-20)]"
+                    >
+                      <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7m0 0l-7 7m7-7H3" />
+                      </svg>
+                      {isSubmitting
+                        ? "Placing Order safely…"
+                        : "Confirm & Place Order"}
+                    </button>
+                  ) : (
+                    <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-200/50 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 text-xs md:text-sm font-bold px-4.5 py-4 rounded-2xl leading-relaxed text-center">
+                      ⚠️ Delivery orders are not available with cash. Please select Pickup or Dine-in.
+                    </div>
+                  )
                 ) : (
                   <>
                     {restaurant.onlinePaymentEnabled && (
@@ -2136,22 +2146,28 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                         {isSubmitting ? "Redirecting safely…" : "Authorize Pay Online (Paystack)"}
                       </button>
                     )}
-                    <button
-                      onClick={handleCashOrder}
-                      disabled={isSubmitting}
-                      className="w-full bg-stone-50 hover:bg-stone-100 dark:bg-[#1E1E1C] dark:hover:bg-[#2A2A27] text-neutral-800 dark:text-neutral-200 font-bold py-4 rounded-2xl flex items-center justify-center gap-2.5 transition-all border border-[#EFECE6] dark:border-[#1F1F1C] disabled:opacity-60 active:scale-[0.99] text-sm uppercase tracking-widest shadow-xs"
-                    >
-                      <svg className="w-4.5 h-4.5 text-[#7A7368]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                      </svg>
-                      {isSubmitting
-                        ? "Placing Order safely…"
-                        : deliveryType === "pickup"
-                        ? "Confirm Pay on Pickup"
-                        : deliveryType === "dine_in"
-                        ? "Confirm Pay at Table"
-                        : "Confirm Pay on Delivery"}
-                    </button>
+                    {!(deliveryType === "delivery" && restaurant.payOnDeliveryEnabled === false) ? (
+                      <button
+                        onClick={handleCashOrder}
+                        disabled={isSubmitting}
+                        className="w-full bg-stone-50 hover:bg-stone-100 dark:bg-[#1E1E1C] dark:hover:bg-[#2A2A27] text-neutral-800 dark:text-neutral-200 font-bold py-4 rounded-2xl flex items-center justify-center gap-2.5 transition-all border border-[#EFECE6] dark:border-[#1F1F1C] disabled:opacity-60 active:scale-[0.99] text-sm uppercase tracking-widest shadow-xs"
+                      >
+                        <svg className="w-4.5 h-4.5 text-[#7A7368]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        {isSubmitting
+                          ? "Placing Order safely…"
+                          : deliveryType === "pickup"
+                          ? "Confirm Pay on Pickup"
+                          : deliveryType === "dine_in"
+                          ? "Confirm Pay at Table"
+                          : "Confirm Pay on Delivery"}
+                      </button>
+                    ) : !restaurant.onlinePaymentEnabled ? (
+                      <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-200/50 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 text-xs md:text-sm font-bold px-4.5 py-4 rounded-2xl leading-relaxed text-center">
+                        ⚠️ Delivery orders are not available with cash. Please select Pickup or Dine-in.
+                      </div>
+                    ) : null}
                   </>
                 )}
               </div>
