@@ -57,3 +57,18 @@ body {
     radial-gradient(circle at 15% 50%, rgba(249, 115, 22, 0.08) 0%, transparent 50%),
     radial-gradient(circle at 85% 30%, rgba(249, 115, 22, 0.05) 0%, transparent 50%);
 }
+
+/* Force admin input fields and placeholder text to remain dark/readable under system dark mode overrides */
+.admin-layout input:not([type="checkbox"]):not([type="radio"]),
+.admin-layout textarea,
+.admin-layout select {
+  color: #111827 !important;
+  color-scheme: only light !important;
+}
+
+.admin-layout input::placeholder,
+.admin-layout textarea::placeholder {
+  color: #9ca3af !important;
+  opacity: 1 !important;
+}
+

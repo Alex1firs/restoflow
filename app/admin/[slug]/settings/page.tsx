@@ -71,7 +71,7 @@ export default async function SettingsPage({ params }: Props) {
   }));
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <div className="flex min-h-screen bg-gray-100 admin-layout">
       <AdminNav slug={slug} role="owner" />
       <div className="flex-1 min-w-0 pt-14 pb-16 lg:pt-0 lg:pb-0">
         <SubscriptionBanner subscription={subscription} />

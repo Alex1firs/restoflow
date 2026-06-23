@@ -170,7 +170,7 @@ export default function SettingsClient({ restaurant, aiEnabled = false, menuItem
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8" style={{ colorScheme: "light" }}>
+    <div className="max-w-3xl mx-auto px-4 py-8" style={{ colorScheme: "only light" }}>
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-black text-gray-900">Store Settings</h1>
