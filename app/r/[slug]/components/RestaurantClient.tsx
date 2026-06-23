@@ -136,6 +136,14 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   const [loyaltySearched, setLoyaltySearched] = useState(false);
   const [loyaltyError, setLoyaltyError] = useState<string | null>(null);
 
+  const [checkoutZoneSearch, setCheckoutZoneSearch] = useState("");
+  const [checkoutZoneOpen, setCheckoutZoneOpen] = useState(false);
+  const [scheduleZoneSearch, setScheduleZoneSearch] = useState("");
+  const [scheduleZoneOpen, setScheduleZoneOpen] = useState(false);
+
+  const checkoutDropdownRef = useRef<HTMLDivElement>(null);
+  const scheduleDropdownRef = useRef<HTMLDivElement>(null);
+
   const categoryTabsRef = useRef<HTMLDivElement>(null);
   const menuSectionRef = useRef<HTMLElement>(null);
   const aboutSectionRef = useRef<HTMLElement>(null);
@@ -212,10 +220,30 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   // Keyboard accessibility
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { setCartOpen(false); setCheckoutOpen(false); setLoyaltyOpen(false); }
+      if (e.key === "Escape") { 
+        setCartOpen(false); 
+        setCheckoutOpen(false); 
+        setLoyaltyOpen(false); 
+        setCheckoutZoneOpen(false);
+        setScheduleZoneOpen(false);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Click outside to close searchable location dropdowns
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (checkoutDropdownRef.current && !checkoutDropdownRef.current.contains(e.target as Node)) {
+        setCheckoutZoneOpen(false);
+      }
+      if (scheduleDropdownRef.current && !scheduleDropdownRef.current.contains(e.target as Node)) {
+        setScheduleZoneOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, []);
 
   // Google Font preloader for custom visual storefront font pairings
@@ -1978,24 +2006,76 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
               {deliveryType === "delivery" && (
                 <div className="space-y-4 animate-scaleUp">
                   {restaurant.deliveryZones && restaurant.deliveryZones.length > 0 && (
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5" ref={checkoutDropdownRef}>
                       <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Delivery Zone *</p>
                       <div className="relative">
-                        <select
-                          value={selectedDeliveryZoneId}
-                          onChange={(e) => setSelectedDeliveryZoneId(e.target.value)}
-                          className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4.5 py-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary-20)] text-neutral-900 dark:text-neutral-100 transition-all bg-[#FAF9F5] dark:bg-[#0D0C0B] appearance-none"
-                          onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
-                          onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCheckoutZoneOpen(!checkoutZoneOpen);
+                            setCheckoutZoneSearch("");
+                          }}
+                          className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4.5 py-4 text-sm outline-none text-left flex items-center justify-between transition-all bg-[#FAF9F5] dark:bg-[#0D0C0B]"
+                          style={{ borderColor: checkoutZoneOpen ? primary : "" }}
                         >
-                          <option value="" disabled>Select your delivery area</option>
-                          {restaurant.deliveryZones.map(z => (
-                            <option key={z.id} value={z.id}>{z.name} ({fmt(z.fee)})</option>
-                          ))}
-                        </select>
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#A19B91]">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                        </div>
+                          <span className={selectedDeliveryZoneId ? "text-neutral-900 dark:text-neutral-100 font-medium" : "text-[#A19B91]"}>
+                            {selectedDeliveryZoneId 
+                              ? `${restaurant.deliveryZones.find(z => z.id === selectedDeliveryZoneId)?.name} (${fmt(restaurant.deliveryZones.find(z => z.id === selectedDeliveryZoneId)?.fee || 0)})`
+                              : "Search or select your delivery area *"
+                            }
+                          </span>
+                          <span className="text-[#A19B91] transition-transform duration-200" style={{ transform: checkoutZoneOpen ? "rotate(180deg)" : "" }}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                          </span>
+                        </button>
+
+                        {checkoutZoneOpen && (
+                          <div className="absolute left-0 right-0 mt-2 bg-white dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl shadow-xl z-50 overflow-hidden animate-fadeIn">
+                            <div className="p-3 border-b border-[#EFECE6] dark:border-[#1F1F1C]">
+                              <div className="relative">
+                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#A19B91]">
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                </span>
+                                <input
+                                  type="text"
+                                  placeholder="Type to search location..."
+                                  value={checkoutZoneSearch}
+                                  onChange={(e) => setCheckoutZoneSearch(e.target.value)}
+                                  className="w-full bg-[#FAF9F5] dark:bg-[#0D0C0B] border border-[#EFECE6] dark:border-[#1F1F1C] rounded-xl pl-9.5 pr-4 py-2.5 text-xs outline-none text-neutral-900 dark:text-neutral-100 focus:border-[var(--brand-primary)]"
+                                  autoFocus
+                                />
+                              </div>
+                            </div>
+                            <div className="max-h-60 overflow-y-auto py-1">
+                              {(() => {
+                                const filtered = restaurant.deliveryZones.filter(z => 
+                                  z.name.toLowerCase().includes(checkoutZoneSearch.toLowerCase())
+                                );
+                                if (filtered.length === 0) {
+                                  return (
+                                    <div className="px-4 py-6 text-center text-xs text-[#A19B91]">
+                                      No delivery locations found.
+                                    </div>
+                                  );
+                                }
+                                return filtered.map(z => (
+                                  <button
+                                    key={z.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedDeliveryZoneId(z.id);
+                                      setCheckoutZoneOpen(false);
+                                    }}
+                                    className={`w-full text-left px-4.5 py-3 text-xs hover:bg-[#FAF9F5] dark:hover:bg-[#1E1E1C] transition-colors flex items-center justify-between ${z.id === selectedDeliveryZoneId ? "bg-orange-50/50 dark:bg-orange-950/10 font-bold" : ""}`}
+                                  >
+                                    <span className="text-neutral-950 dark:text-neutral-50">{z.name}</span>
+                                    <span className="text-[#7A7368] font-mono">{fmt(z.fee)}</span>
+                                  </button>
+                                ));
+                              })()}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -2300,24 +2380,76 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                   {deliveryType === "delivery" && (
                     <div className="space-y-4">
                       {restaurant.deliveryZones && restaurant.deliveryZones.length > 0 && (
-                        <div className="space-y-1.5">
+                        <div className="space-y-1.5" ref={scheduleDropdownRef}>
                           <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Delivery Zone *</p>
                           <div className="relative">
-                            <select
-                              value={selectedDeliveryZoneId}
-                              onChange={(e) => setSelectedDeliveryZoneId(e.target.value)}
-                              className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4.5 py-4 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-primary-20)] text-neutral-900 dark:text-neutral-100 transition-all bg-[#FAF9F5] dark:bg-[#0D0C0B] appearance-none"
-                              onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
-                              onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setScheduleZoneOpen(!scheduleZoneOpen);
+                                setScheduleZoneSearch("");
+                              }}
+                              className="w-full border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4.5 py-4 text-sm outline-none text-left flex items-center justify-between transition-all bg-[#FAF9F5] dark:bg-[#0D0C0B]"
+                              style={{ borderColor: scheduleZoneOpen ? primary : "" }}
                             >
-                              <option value="" disabled>Select your delivery area</option>
-                              {restaurant.deliveryZones.map(z => (
-                                <option key={z.id} value={z.id}>{z.name} ({fmt(z.fee)})</option>
-                              ))}
-                            </select>
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#A19B91]">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                            </div>
+                              <span className={selectedDeliveryZoneId ? "text-neutral-900 dark:text-neutral-100 font-medium" : "text-[#A19B91]"}>
+                                {selectedDeliveryZoneId 
+                                  ? `${restaurant.deliveryZones.find(z => z.id === selectedDeliveryZoneId)?.name} (${fmt(restaurant.deliveryZones.find(z => z.id === selectedDeliveryZoneId)?.fee || 0)})`
+                                  : "Search or select your delivery area *"
+                                }
+                              </span>
+                              <span className="text-[#A19B91] transition-transform duration-200" style={{ transform: scheduleZoneOpen ? "rotate(180deg)" : "" }}>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                              </span>
+                            </button>
+
+                            {scheduleZoneOpen && (
+                              <div className="absolute left-0 right-0 mt-2 bg-white dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl shadow-xl z-50 overflow-hidden animate-fadeIn">
+                                <div className="p-3 border-b border-[#EFECE6] dark:border-[#1F1F1C]">
+                                  <div className="relative">
+                                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#A19B91]">
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                    </span>
+                                    <input
+                                      type="text"
+                                      placeholder="Type to search location..."
+                                      value={scheduleZoneSearch}
+                                      onChange={(e) => setScheduleZoneSearch(e.target.value)}
+                                      className="w-full bg-[#FAF9F5] dark:bg-[#0D0C0B] border border-[#EFECE6] dark:border-[#1F1F1C] rounded-xl pl-9.5 pr-4 py-2.5 text-xs outline-none text-neutral-900 dark:text-neutral-100 focus:border-[var(--brand-primary)]"
+                                      autoFocus
+                                    />
+                                  </div>
+                                </div>
+                                <div className="max-h-60 overflow-y-auto py-1">
+                                  {(() => {
+                                    const filtered = restaurant.deliveryZones.filter(z => 
+                                      z.name.toLowerCase().includes(scheduleZoneSearch.toLowerCase())
+                                    );
+                                    if (filtered.length === 0) {
+                                      return (
+                                        <div className="px-4 py-6 text-center text-xs text-[#A19B91]">
+                                          No delivery locations found.
+                                        </div>
+                                      );
+                                    }
+                                    return filtered.map(z => (
+                                      <button
+                                        key={z.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedDeliveryZoneId(z.id);
+                                          setScheduleZoneOpen(false);
+                                        }}
+                                        className={`w-full text-left px-4.5 py-3 text-xs hover:bg-[#FAF9F5] dark:hover:bg-[#1E1E1C] transition-colors flex items-center justify-between ${z.id === selectedDeliveryZoneId ? "bg-orange-50/50 dark:bg-orange-950/10 font-bold" : ""}`}
+                                      >
+                                        <span className="text-neutral-950 dark:text-neutral-50">{z.name}</span>
+                                        <span className="text-[#7A7368] font-mono">{fmt(z.fee)}</span>
+                                      </button>
+                                    ));
+                                  })()}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
