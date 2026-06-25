@@ -5,7 +5,7 @@ import { getSubscriptionInfo } from "@/lib/subscription";
 import AdminNav from "../components/AdminNav";
 import SubscriptionBanner from "../components/SubscriptionBanner";
 import SettingsClient from "./SettingsClient";
-import type { OpeningHours } from "@/lib/restaurant-utils";
+import type { OpeningHours, DeliveryZone } from "@/lib/restaurant-utils";
 import { DEFAULT_HERO_SETTINGS, type HeroSettings } from "@/lib/hero-settings";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -57,6 +57,7 @@ export default async function SettingsPage({ params }: Props) {
     hidePrices: (data.hidePrices as boolean) ?? false,
     dineInEnabled: (data.dineInEnabled as boolean) ?? false,
     heroSettings: ((data.heroSettings as HeroSettings) ?? DEFAULT_HERO_SETTINGS),
+    deliveryZones: (data.deliveryZones as DeliveryZone[]) ?? [],
   };
 
   const menuSnap = await getAdminDb().collection("menu_items").where("restaurantId", "==", slug).get();
