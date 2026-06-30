@@ -6,6 +6,7 @@ import { ArrowRight, CheckCircle2, PlayCircle, Smartphone, Store, ShieldCheck, Z
 import PublicNav from "./components/PublicNav";
 import { HeroDashboardMockup, MobileOrderMockup } from "./components/LandingMockups";
 import Footer from "./components/Footer";
+import { CircularTestimonials } from "@/components/ui/circular-testimonials";
 import { PLANS } from "@/lib/plans";
 
 const FEATURES = [
@@ -35,6 +36,41 @@ const TRUST_LOGOS = [
   { name: "Grills Capitol" },
   { name: "Smokeyard" },
   { name: "Bargs" },
+];
+
+const TESTIMONIALS = [
+  {
+    quote:
+      "RestoFlow replaced our entire WhatsApp ordering mess overnight. Orders now land straight on the kitchen screen, payments hit our account instantly, and we haven't lost a single ticket since.",
+    name: "Adaeze Okonkwo",
+    designation: "Owner, Grills Capitol",
+    src:
+      "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=1368&auto=format&fit=crop&ixlib=rb-4.0.3",
+  },
+  {
+    quote:
+      "We stopped paying 25% commission to delivery apps and our margins jumped immediately. Customers scan, order, and pay in seconds. Setup took less than a day.",
+    name: "Tunde Bakare",
+    designation: "Founder, Smokeyard",
+    src:
+      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=1368&auto=format&fit=crop&ixlib=rb-4.0.3",
+  },
+  {
+    quote:
+      "The live kitchen dashboard changed how we run service. No more shouting orders or chasing DMs. Everything is organized, fast, and completely under our own brand.",
+    name: "Chioma Eze",
+    designation: "Manager, Bargs",
+    src:
+      "https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=1368&auto=format&fit=crop&ixlib=rb-4.0.3",
+  },
+  {
+    quote:
+      "Repeat customers are up and manual work is down. RestoFlow feels like having an extra staff member who never sleeps. Honestly the best decision we made this year.",
+    name: "Emeka Nwosu",
+    designation: "Owner, Lagos Kitchen",
+    src:
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1368&auto=format&fit=crop&ixlib=rb-4.0.3",
+  },
 ];
 
 export default function LandingPage() {
@@ -284,6 +320,44 @@ export default function LandingPage() {
               Start Free Trial →
             </Link>
           </motion.div>
+        </div>
+      </section>
+
+      {/* 6.5 TESTIMONIALS SECTION */}
+      <section className="py-24 px-4 border-t border-white/5 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-orange-500/5 to-transparent opacity-30 pointer-events-none" />
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="text-center mb-16 max-w-2xl mx-auto">
+            <div className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-6">
+              Loved by restaurants
+            </div>
+            <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter mb-4">
+              What our <span className="text-orange-500 italic">customers</span> say
+            </h2>
+            <p className="text-white/60 text-lg">
+              Real restaurant owners building their digital infrastructure with RestoFlow.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-center">
+            <CircularTestimonials
+              testimonials={TESTIMONIALS}
+              autoplay={true}
+              colors={{
+                name: "#ffffff",
+                designation: "#f97316",
+                testimony: "rgba(255,255,255,0.75)",
+                arrowBackground: "#f97316",
+                arrowForeground: "#ffffff",
+                arrowHoverBackground: "#fb923c",
+              }}
+              fontSizes={{
+                name: "28px",
+                designation: "18px",
+                quote: "20px",
+              }}
+            />
+          </div>
         </div>
       </section>
 
