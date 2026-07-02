@@ -25,6 +25,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sl
     days?: number;
     planId?: string;
     reason?: string;
+    whatsappCheckoutEnabled?: boolean;
+    whatsappAdminPin?: string;
   };
   const db = getAdminDb();
   const ref = db.collection("restaurants").doc(slug);
@@ -109,6 +111,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sl
     }
     case "suspendRestaurant": {
       await ref.update({ status: "suspended", updatedAt: FieldValue.serverTimestamp() });
+      break;
+    }
+    case "updateWhatsappSettings": {
+      if (whatsappCheckoutEnabled && (!whatsappAdminPin || !/^\d{4}$/.test(whatsappAdminPin))) {
+        return NextResponse.json({ error: "A 4-digit PIN is required when WhatsApp Checkout is enabled." }, { status: 400 });
+      }
+      await ref.update({
+        whatsappCheckoutEnabled: !!whatsappCheckoutEnabled,
+        whatsappAdminPin: whatsappAdminPin || "",
+        updatedAt: FieldValue.serverTimestamp(),
+      });
       break;
     }
     default:

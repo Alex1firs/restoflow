@@ -34,6 +34,8 @@ export default async function SuperAdminRestaurantsPage() {
       endDate: endDate ? endDate.toISOString() : null,
       createdAt: createdAt ? createdAt.toISOString() : null,
       ownerUid: (d.ownerUid as string) ?? "",
+      whatsappCheckoutEnabled: !!d.whatsappCheckoutEnabled,
+      whatsappAdminPin: (d.whatsappAdminPin as string) ?? "",
     };
   });
 

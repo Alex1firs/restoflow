@@ -50,6 +50,7 @@ interface RestaurantClientProps {
     showContactSupport?: boolean;
     phone?: string;
     payOnDeliveryEnabled?: boolean;
+    whatsappCheckoutEnabled?: boolean;
   };
   menuItems: MenuItemData[];
   seo?: {
@@ -173,6 +174,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
 
   const paymentMethods = [
     restaurant.onlinePaymentEnabled ? "Online payment (card/transfer)" : null,
+    restaurant.whatsappCheckoutEnabled ? "WhatsApp Order" : null,
     (restaurant.deliveryEnabled && restaurant.payOnDeliveryEnabled !== false) ? "Cash on delivery" : null,
     restaurant.pickupEnabled ? "Cash on pickup" : null,
   ].filter(Boolean) as string[];
@@ -477,6 +479,64 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
       const data = await res.json();
       if (!res.ok) { setOrderError(data.error ?? "Could not initialize payment."); setIsSubmitting(false); return; }
       window.location.href = data.authorizationUrl;
+    } catch {
+      setOrderError("Network error. Please check your connection.");
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleWhatsappPayment = async () => {
+    if (isPreview) {
+      setOrderError("Orders cannot be placed in Preview Mode.");
+      return;
+    }
+    const err = validateForm();
+    if (err) { setOrderError(err); return; }
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setOrderError(null);
+    try {
+      const payload = { ...buildPayload(), paymentMethod: "whatsapp" };
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) { setOrderError(data.error ?? "Failed to place order."); setIsSubmitting(false); return; }
+      
+      const orderId = data.orderId;
+      const tToken = data.trackingToken;
+      setOrderId(orderId);
+      setTrackingToken(tToken ?? null);
+      clearCart();
+      setFormData({ customerName: "", phone: "", address: "", note: "", tableNumber: "" });
+      setCheckoutOpen(false);
+      
+      // Construct WhatsApp Message
+      const domain = window.location.origin;
+      let msg = `*New Order: ${orderId}*\n\n`;
+      msg += `*Customer:* ${payload.customerName}\n`;
+      msg += `*Phone:* ${payload.phone}\n`;
+      msg += `*Total:* ${fmt(orderTotal)}\n\n`;
+      msg += `*Items:*\n`;
+      items.forEach(i => {
+        msg += `- ${i.quantity}x ${i.name}\n`;
+      });
+      msg += `\n*Delivery:* ${deliveryType === "delivery" ? payload.address : deliveryType}\n`;
+      if (payload.note) msg += `*Note:* ${payload.note}\n`;
+      
+      msg += `\n*Quick Action (Requires PIN):*\n`;
+      msg += `${domain}/r/${restaurant.slug}/action?orderId=${orderId}\n`;
+      msg += `\n*Track Order:*\n`;
+      msg += `${domain}/track/${orderId}?t=${tToken}\n`;
+      
+      const waNumber = restaurant.whatsappNumber ? formatWhatsAppNumber(restaurant.whatsappNumber) : (restaurant.phone ? formatWhatsAppNumber(restaurant.phone) : "");
+      if (waNumber) {
+        window.location.href = `https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`;
+      } else {
+        setOrderSuccess(true);
+      }
     } catch {
       setOrderError("Network error. Please check your connection.");
       setIsSubmitting(false);
@@ -2226,6 +2286,16 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                         {isSubmitting ? "Redirecting safely…" : "Authorize Pay Online (Paystack)"}
                       </button>
                     )}
+                    {restaurant.whatsappCheckoutEnabled && (
+                      <button
+                        onClick={handleWhatsappPayment}
+                        disabled={isSubmitting}
+                        className="w-full bg-[#25D366] hover:bg-[#20b958] text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2.5 transition-opacity disabled:opacity-60 active:scale-[0.99] text-sm uppercase tracking-widest shadow-md shadow-[#25D366]/30"
+                      >
+                        <svg className="w-4.5 h-4.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 0C5.389 0 0 5.39 0 12.031c0 2.128.552 4.195 1.6 6.02L.153 24l6.096-1.597A11.967 11.967 0 0012.031 24c6.643 0 12.031-5.39 12.031-12.031S18.674 0 12.031 0zM12.031 22A9.97 9.97 0 016.924 20.6l-.366-.217-4.52 1.184 1.2-4.407-.238-.378A9.957 9.957 0 012.062 12.03C2.062 6.53 6.53 2.06 12.031 2.06s9.969 4.47 9.969 9.97-4.468 9.97-9.969 9.97zm5.46-7.466c-.299-.15-1.77-.874-2.045-.975-.274-.1-.475-.15-.674.15-.2.3-.77 1-.945 1.201-.174.202-.349.227-.648.077-.299-.15-1.264-.466-2.408-1.488-.89-.795-1.492-1.778-1.667-2.078-.175-.3 0-.46.149-.611.135-.135.3-.35.45-.525.149-.175.2-.299.299-.5.1-.2.05-.375-.025-.525-.075-.15-.674-1.625-.923-2.225-.244-.588-.493-.508-.674-.518-.175-.01-.375-.01-.574-.01-.2 0-.524.075-.799.375-.275.3-1.048 1.025-1.048 2.5 0 1.475 1.073 2.9 1.223 3.1.15.2 2.115 3.225 5.123 4.525.717.31 1.277.495 1.713.633.72.23 1.375.198 1.892.12.578-.088 1.77-.725 2.02-1.425.25-.7.25-1.3.175-1.425-.075-.125-.275-.2-.575-.35z"/></svg>
+                        {isSubmitting ? "Redirecting safely…" : "Place Order via WhatsApp"}
+                      </button>
+                    )}
                     {!(deliveryType === "delivery" && restaurant.payOnDeliveryEnabled === false) ? (
                       <button
                         onClick={handleCashOrder}
@@ -2243,7 +2313,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                           ? "Confirm Pay at Table"
                           : "Confirm Pay on Delivery"}
                       </button>
-                    ) : !restaurant.onlinePaymentEnabled ? (
+                    ) : !restaurant.onlinePaymentEnabled && !restaurant.whatsappCheckoutEnabled ? (
                       <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-200/50 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 text-xs md:text-sm font-bold px-4.5 py-4 rounded-2xl leading-relaxed text-center">
                         ⚠️ Delivery orders are not available with cash. Please select Pickup or Dine-in.
                       </div>

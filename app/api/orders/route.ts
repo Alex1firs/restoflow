@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { restaurantId, customerName, phone, address, note, items, deliveryType, orderType, scheduledFor, serviceMode, tableLabel, deliveryZoneId } =
+  const { restaurantId, customerName, phone, address, note, items, deliveryType, orderType, scheduledFor, serviceMode, tableLabel, deliveryZoneId, paymentMethod } =
     body as Record<string, unknown>;
 
   if (
@@ -199,8 +199,8 @@ export async function POST(request: NextRequest) {
         itemsTotal,
         deliveryFee,
         total,
-        paymentMethod: "cash",
-        paymentStatus: "pending",
+        paymentMethod: paymentMethod === "whatsapp" ? "whatsapp" : "cash",
+        paymentStatus: paymentMethod === "whatsapp" ? "unpaid" : "pending",
         status: isScheduled ? "scheduled" : "pending",
         deliveryType: resolvedDeliveryType,
         orderType: isScheduled ? "scheduled" : "normal",
@@ -218,8 +218,8 @@ export async function POST(request: NextRequest) {
     sendNewOrderAlert({
       restaurantSlug: restaurantId.trim(),
       total,
-      paymentMethod: "cash",
-      paymentStatus: "pending",
+      paymentMethod: paymentMethod === "whatsapp" ? "whatsapp" : "cash",
+      paymentStatus: paymentMethod === "whatsapp" ? "unpaid" : "pending",
       customerName: customerName.trim(),
     }).catch(() => {});
 
@@ -231,7 +231,7 @@ export async function POST(request: NextRequest) {
       restaurantAddress: rData.address as string | undefined,
       total,
       itemsSummary,
-      paymentMethod: "cash",
+      paymentMethod: paymentMethod === "whatsapp" ? "whatsapp" : "cash",
       deliveryType: resolvedDeliveryType,
     }).catch(() => {});
 

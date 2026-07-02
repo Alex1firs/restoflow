@@ -247,6 +247,7 @@ export default async function RestaurantPage({
     loyaltyEnabled: !!(restaurant as any).loyalty?.enabled,
     deliveryZones: rData.deliveryZones ?? [],
     payOnDeliveryEnabled: rData.payOnDeliveryEnabled !== false,
+    whatsappCheckoutEnabled: !!(rData as any).whatsappCheckoutEnabled,
   };
 
   return (
