@@ -58,6 +58,8 @@ export default async function SettingsPage({ params }: Props) {
     dineInEnabled: (data.dineInEnabled as boolean) ?? false,
     heroSettings: ((data.heroSettings as HeroSettings) ?? DEFAULT_HERO_SETTINGS),
     deliveryZones: (data.deliveryZones as DeliveryZone[]) ?? [],
+    whatsappCheckoutEnabled: (data.whatsappCheckoutEnabled as boolean) ?? false,
+    whatsappAdminPin: (data.whatsappAdminPin as string) ?? "",
   };
 
   const menuSnap = await getAdminDb().collection("menu_items").where("restaurantId", "==", slug).get();

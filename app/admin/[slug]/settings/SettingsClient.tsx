@@ -49,6 +49,8 @@ type Props = {
     whatsappNumber?: string;
     showContactSupport?: boolean;
     payOnDeliveryEnabled?: boolean;
+    whatsappCheckoutEnabled?: boolean;
+    whatsappAdminPin?: string;
   };
   menuItems?: any[];
 };
@@ -84,6 +86,8 @@ export default function SettingsClient({ restaurant, aiEnabled = false, menuItem
     whatsappNumber: restaurant.whatsappNumber ?? "",
     showContactSupport: restaurant.showContactSupport !== false,
     payOnDeliveryEnabled: restaurant.payOnDeliveryEnabled !== false,
+    whatsappCheckoutEnabled: restaurant.whatsappCheckoutEnabled === true,
+    whatsappAdminPin: restaurant.whatsappAdminPin ?? "",
   });
 
   const [openingHours, setOpeningHours] = useState<OpeningHours>(
@@ -499,6 +503,36 @@ export default function SettingsClient({ restaurant, aiEnabled = false, menuItem
               enabled={form.hidePrices}
               onToggle={() => setField("hidePrices", !form.hidePrices)}
             />
+          </div>
+
+          <div className="border border-gray-100 rounded-2xl p-5 space-y-4 bg-green-50/30 mt-4">
+            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+              <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 0C5.389 0 0 5.39 0 12.031c0 2.128.552 4.195 1.6 6.02L.153 24l6.096-1.597A11.967 11.967 0 0012.031 24c6.643 0 12.031-5.39 12.031-12.031S18.674 0 12.031 0zM12.031 22A9.97 9.97 0 016.924 20.6l-.366-.217-4.52 1.184 1.2-4.407-.238-.378A9.957 9.957 0 012.062 12.03C2.062 6.53 6.53 2.06 12.031 2.06s9.969 4.47 9.969 9.97-4.468 9.97-9.969 9.97zm5.46-7.466c-.299-.15-1.77-.874-2.045-.975-.274-.1-.475-.15-.674.15-.2.3-.77 1-.945 1.201-.174.202-.349.227-.648.077-.299-.15-1.264-.466-2.408-1.488-.89-.795-1.492-1.778-1.667-2.078-.175-.3 0-.46.149-.611.135-.135.3-.35.45-.525.149-.175.2-.299.299-.5.1-.2.05-.375-.025-.525-.075-.15-.674-1.625-.923-2.225-.244-.588-.493-.508-.674-.518-.175-.01-.375-.01-.574-.01-.2 0-.524.075-.799.375-.275.3-1.048 1.025-1.048 2.5 0 1.475 1.073 2.9 1.223 3.1.15.2 2.115 3.225 5.123 4.525.717.31 1.277.495 1.713.633.72.23 1.375.198 1.892.12.578-.088 1.77-.725 2.02-1.425.25-.7.25-1.3.175-1.425-.075-.125-.275-.2-.575-.35z"/></svg>
+              WhatsApp Checkout Integration
+            </h3>
+            <p className="text-xs text-gray-500 mt-1">Allow customers to place orders directly via WhatsApp. This requires a 4-digit PIN for the quick action link to securely mark orders as paid.</p>
+            
+            <Toggle
+              label="Enable WhatsApp Checkout"
+              description="Show WhatsApp order button on checkout"
+              enabled={form.whatsappCheckoutEnabled}
+              onToggle={() => setField("whatsappCheckoutEnabled", !form.whatsappCheckoutEnabled)}
+            />
+
+            {form.whatsappCheckoutEnabled && (
+              <Field label="Admin Quick Action PIN (4 digits)">
+                <input
+                  type="text"
+                  value={form.whatsappAdminPin}
+                  onChange={(e) => setField("whatsappAdminPin", e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  placeholder="e.g. 1234"
+                  className={inputCls}
+                  maxLength={4}
+                  required={form.whatsappCheckoutEnabled}
+                />
+                <p className="text-xs text-gray-400 mt-1">Used to accept/reject orders via the WhatsApp link.</p>
+              </Field>
+            )}
           </div>
 
           {form.deliveryEnabled && (

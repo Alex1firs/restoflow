@@ -48,6 +48,8 @@ export async function PUT(req: NextRequest) {
     whatsappNumber,
     showContactSupport,
     payOnDeliveryEnabled,
+    whatsappCheckoutEnabled,
+    whatsappAdminPin,
   } = body as {
     name?: string;
     description?: string;
@@ -80,10 +82,16 @@ export async function PUT(req: NextRequest) {
     whatsappNumber?: string;
     showContactSupport?: boolean;
     payOnDeliveryEnabled?: boolean;
+    whatsappCheckoutEnabled?: boolean;
+    whatsappAdminPin?: string;
   };
 
   if (!name?.trim()) {
     return NextResponse.json({ error: "Restaurant name is required" }, { status: 400 });
+  }
+
+  if (whatsappCheckoutEnabled && (!whatsappAdminPin || !/^\d{4}$/.test(whatsappAdminPin))) {
+    return NextResponse.json({ error: "A 4-digit PIN is required when WhatsApp Checkout is enabled." }, { status: 400 });
   }
 
   await getAdminDb()
@@ -121,6 +129,8 @@ export async function PUT(req: NextRequest) {
       whatsappNumber: (whatsappNumber ?? "").trim(),
       showContactSupport: showContactSupport !== false,
       payOnDeliveryEnabled: payOnDeliveryEnabled !== false,
+      whatsappCheckoutEnabled: !!whatsappCheckoutEnabled,
+      whatsappAdminPin: whatsappAdminPin || "",
       ...(deliveryZones && Array.isArray(deliveryZones) ? { deliveryZones } : {}),
       ...(heroSettings && typeof heroSettings === "object" ? { heroSettings } : {}),
     });

@@ -13,8 +13,6 @@ type Restaurant = {
   endDate: string | null;
   createdAt: string | null;
   ownerUid: string;
-  whatsappCheckoutEnabled: boolean;
-  whatsappAdminPin: string;
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -34,18 +32,12 @@ export default function RestaurantsClient({ restaurants }: { restaurants: Restau
   const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
   const [extendDays, setExtendDays] = useState(30);
 
-  const [waSettings, setWaSettings] = useState<{ [slug: string]: { enabled: boolean; pin: string } }>({});
-
   // Initialize WA settings when expanded
   const handleExpand = (r: Restaurant) => {
     if (expandedSlug === r.slug) {
       setExpandedSlug(null);
     } else {
       setExpandedSlug(r.slug);
-      setWaSettings((prev) => ({
-        ...prev,
-        [r.slug]: { enabled: r.whatsappCheckoutEnabled, pin: r.whatsappAdminPin },
-      }));
     }
   };
 
@@ -219,43 +211,6 @@ export default function RestaurantsClient({ restaurants }: { restaurants: Restau
                             <option value="pro">Restaflow Pro</option>
                           </select>
                         </div>
-                        
-                        <div className="flex flex-wrap gap-4 items-center">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={waSettings[r.slug]?.enabled || false}
-                              onChange={(e) => setWaSettings(prev => ({ ...prev, [r.slug]: { ...prev[r.slug], enabled: e.target.checked } }))}
-                              className="w-4 h-4 text-orange-600 rounded border-gray-300 focus:ring-orange-500"
-                            />
-                            <span className="text-sm font-bold text-gray-700">Enable WhatsApp Checkout</span>
-                          </label>
-
-                          {waSettings[r.slug]?.enabled && (
-                            <input
-                              type="text"
-                              value={waSettings[r.slug]?.pin || ""}
-                              onChange={(e) => {
-                                const val = e.target.value.replace(/\D/g, "").slice(0, 4);
-                                setWaSettings(prev => ({ ...prev, [r.slug]: { ...prev[r.slug], pin: val } }));
-                              }}
-                              placeholder="4-Digit PIN"
-                              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-32 outline-none focus:border-orange-500"
-                              maxLength={4}
-                            />
-                          )}
-
-                          <button
-                            disabled={!!loading}
-                            onClick={() => doAction(r.slug, "updateWhatsappSettings", {
-                              whatsappCheckoutEnabled: waSettings[r.slug]?.enabled,
-                              whatsappAdminPin: waSettings[r.slug]?.pin,
-                            })}
-                            className="text-xs font-bold px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:opacity-50 transition-colors ml-auto"
-                          >
-                            {loading === `${r.slug}-updateWhatsappSettings` ? "Saving..." : "Save WA Settings"}
-                          </button>
-                        </div>
                       </td>
                     </tr>
                   )}
@@ -358,43 +313,6 @@ export default function RestaurantsClient({ restaurants }: { restaurants: Restau
                       <option value="" disabled>Change plan…</option>
                       <option value="pro">Restaflow Pro</option>
                     </select>
-                  </div>
-                  
-                  <div className="flex flex-col gap-3">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={waSettings[r.slug]?.enabled || false}
-                        onChange={(e) => setWaSettings(prev => ({ ...prev, [r.slug]: { ...prev[r.slug], enabled: e.target.checked } }))}
-                        className="w-4 h-4 text-orange-600 rounded border-gray-300 focus:ring-orange-500"
-                      />
-                      <span className="text-sm font-bold text-gray-700">Enable WhatsApp Checkout</span>
-                    </label>
-
-                    {waSettings[r.slug]?.enabled && (
-                      <input
-                        type="text"
-                        value={waSettings[r.slug]?.pin || ""}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/\D/g, "").slice(0, 4);
-                          setWaSettings(prev => ({ ...prev, [r.slug]: { ...prev[r.slug], pin: val } }));
-                        }}
-                        placeholder="4-Digit PIN"
-                        className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-full outline-none focus:border-orange-500"
-                        maxLength={4}
-                      />
-                    )}
-
-                    <button
-                      disabled={!!loading}
-                      onClick={() => doAction(r.slug, "updateWhatsappSettings", {
-                        whatsappCheckoutEnabled: waSettings[r.slug]?.enabled,
-                        whatsappAdminPin: waSettings[r.slug]?.pin,
-                      })}
-                      className="text-xs font-bold px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 disabled:opacity-50 transition-colors w-full"
-                    >
-                      {loading === `${r.slug}-updateWhatsappSettings` ? "Saving..." : "Save WA Settings"}
-                    </button>
                   </div>
                 </div>
               )}
