@@ -6,8 +6,8 @@ export type AlertPreference = "telegram" | "sms" | "both";
 export interface NewOrderAlertParams {
   restaurantSlug: string;
   total: number;
-  paymentMethod: "online" | "cash";
-  paymentStatus: "paid" | "pending";
+  paymentMethod: "online" | "cash" | "whatsapp";
+  paymentStatus: "paid" | "pending" | "unpaid";
   customerName: string;
 }
 
@@ -69,7 +69,7 @@ async function dispatchTelegram(
 ): Promise<void> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const paymentMethodLabel =
-    params.paymentMethod === "online" ? "Online" : "Cash on Delivery";
+    params.paymentMethod === "online" ? "Online" : params.paymentMethod === "whatsapp" ? "WhatsApp" : "Cash on Delivery";
   const paymentStatusLabel = params.paymentStatus === "paid" ? "Paid ✓" : "Pending";
   const totalFormatted = `₦${params.total.toLocaleString("en-NG")}`;
   const link = `${appUrl}/admin/${params.restaurantSlug}/orders`;
@@ -98,7 +98,7 @@ async function dispatchSMS(
   const raw = params.notificationPhone.replace(/\D/g, "");
   const to = raw.startsWith("0") && raw.length === 11 ? "234" + raw.slice(1) : raw;
 
-  const paymentMethod = params.paymentMethod === "online" ? "Online" : "Cash";
+  const paymentMethod = params.paymentMethod === "online" ? "Online" : params.paymentMethod === "whatsapp" ? "WhatsApp" : "Cash";
   const paymentStatus = params.paymentStatus === "paid" ? "Paid ✓" : "Pending";
   const message =
     `🍽️ New Order — ${params.restaurantName ?? params.restaurantSlug}\n\n` +
@@ -131,7 +131,7 @@ async function dispatchSMS(
 export async function sendNewOrderSMS(
   restaurantSlug: string,
   total: number,
-  paymentMethod: "online" | "cash"
+  paymentMethod: "online" | "cash" | "whatsapp"
 ): Promise<void> {
   await sendNewOrderAlert({
     restaurantSlug,

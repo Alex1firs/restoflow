@@ -20,7 +20,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sl
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
 
-  const { action, days, planId, reason } = body as {
+  const { action, days, planId, reason, whatsappCheckoutEnabled, whatsappAdminPin } = body as {
     action: string;
     days?: number;
     planId?: string;

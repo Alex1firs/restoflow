@@ -15,7 +15,7 @@ export interface CustomerOrderData {
   restaurantAddress?: string;
   total: number;
   itemsSummary: string;
-  paymentMethod: "online" | "cash";
+  paymentMethod: "online" | "cash" | "whatsapp";
   deliveryType?: "delivery" | "pickup" | "dine_in";
 }
 
