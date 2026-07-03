@@ -111,7 +111,7 @@ export default function GetStartedClient() {
               type="text"
               required
               placeholder="e.g. Mama's Kitchen"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-orange-500 transition"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 !text-white placeholder-gray-600 text-sm focus:outline-none focus:border-orange-500 transition"
             />
           </div>
 
@@ -125,7 +125,7 @@ export default function GetStartedClient() {
               type="email"
               required
               placeholder="you@restaurant.com"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-orange-500 transition"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 !text-white placeholder-gray-600 text-sm focus:outline-none focus:border-orange-500 transition"
             />
           </div>
 
@@ -139,7 +139,7 @@ export default function GetStartedClient() {
               type="tel"
               required
               placeholder="08012345678"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-orange-500 transition"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 !text-white placeholder-gray-600 text-sm focus:outline-none focus:border-orange-500 transition"
             />
           </div>
 
@@ -153,7 +153,7 @@ export default function GetStartedClient() {
               type="text"
               required
               placeholder="15 Allen Avenue, Lagos"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-orange-500 transition"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 !text-white placeholder-gray-600 text-sm focus:outline-none focus:border-orange-500 transition"
             />
           </div>
 
