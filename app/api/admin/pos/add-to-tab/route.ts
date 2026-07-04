@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
         }
         unitPrice = Number(item.customPrice);
       } else {
-        const base = item.selectedSize ? Number(item.selectedSize.price) : Number(dbItem.basePrice ?? dbItem.price ?? 0);
+        const base = item.selectedSize ? Number(item.selectedSize.price) : Number(dbItem.price ?? dbItem.basePrice ?? 0);
         const mods = Array.isArray(item.selectedModifiers)
           ? item.selectedModifiers.reduce((sum: number, m: any) => sum + Number(m.price || 0), 0)
           : 0;
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
         id: item.id,
         name: dbItem.name,
         price: unitPrice,
-        basePrice: dbItem.basePrice ?? dbItem.price ?? 0,
+        basePrice: dbItem.price ?? dbItem.basePrice ?? 0,
         quantity: item.quantity,
         selectedSize: item.selectedSize || null,
         selectedModifiers: item.selectedModifiers || [],

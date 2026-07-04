@@ -110,8 +110,8 @@ export async function POST(request: NextRequest) {
       } else {
         const resolvedPricingMode = typeof pricingMode === "string" ? pricingMode : "regular";
         const resolvedBasePrice = (resolvedPricingMode === "indoor" && dbItem.indoorPrice && dbItem.indoorPrice > 0)
-          ? Number(dbItem.indoorPrice)
-          : Number(dbItem.basePrice ?? dbItem.price ?? 0);
+          ? dbItem.indoorPrice
+          : Number(dbItem.price ?? dbItem.basePrice ?? 0);
 
         const base = item.selectedSize ? Number(item.selectedSize.price) : resolvedBasePrice;
         const mods = Array.isArray(item.selectedModifiers)
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
         id: item.id,
         name: dbItem.name,
         price: offlineUnitPrice, // We respect the transaction amount but flag the warning
-        basePrice: dbItem.basePrice ?? dbItem.price ?? 0,
+        basePrice: dbItem.price ?? dbItem.basePrice ?? 0,
         quantity: item.quantity,
         selectedSize: item.selectedSize || null,
         selectedModifiers: item.selectedModifiers || [],

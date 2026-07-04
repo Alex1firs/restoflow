@@ -138,6 +138,7 @@ export default function AdminMenuClient({ restaurant, aiEnabled = false }: Props
         restaurantId: restaurant.slug,
         name: formData.name.trim(),
         price: priceNum,
+        basePrice: priceNum,
         category: formData.category.trim(),
         description: formData.description.trim(),
         image: formData.image || "",

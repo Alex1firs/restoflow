@@ -1476,7 +1476,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
         kitchenStation,
         allowCustomPrice,
         comboItems,
-        basePrice: item.basePrice ?? item.price ?? 0,
+        basePrice: item.price ?? item.basePrice ?? 0,
       };
     });
   }, [menuItems]);
@@ -1653,7 +1653,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                 image: matchedItem.image || "",
                 kitchenStation: matchedItem.kitchenStation || "kitchen",
                 allowCustomPrice: matchedItem.allowCustomPrice || false,
-                basePrice: matchedItem.basePrice ?? matchedItem.price ?? 0,
+                basePrice: matchedItem.price ?? matchedItem.basePrice ?? 0,
                 selectedSize: null,
                 selectedModifiers: [],
                 customPrice: null,
@@ -1679,7 +1679,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
       );
       if (existingIdx !== -1) {
         return prev.map((c, i) =>
-          i === existingIdx ? { ...c, quantity: c.quantity + 1 } : c
+          i === existingIdx ? { ...c, quantity: c.quantity + 1, basePrice: item.price ?? c.basePrice } : c
         );
       }
       return [
@@ -1692,7 +1692,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
           image: item.image || "",
           kitchenStation: item.kitchenStation || "kitchen",
           allowCustomPrice: item.allowCustomPrice || false,
-          basePrice: item.basePrice ?? item.price ?? 0,
+          basePrice: item.price ?? item.basePrice ?? 0,
           selectedSize: null,
           selectedModifiers: [],
           customPrice: null,
@@ -1771,7 +1771,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
         image: customizingItem.image || "",
         kitchenStation: customizingItem.kitchenStation || "kitchen",
         allowCustomPrice: customizingItem.allowCustomPrice || false,
-        basePrice: customizingItem.basePrice ?? customizingItem.price ?? 0,
+        basePrice: customizingItem.price ?? customizingItem.basePrice ?? 0,
         selectedSize: activeSize,
         selectedModifiers: activeModifiers,
         customPrice: finalPriceOverride,
