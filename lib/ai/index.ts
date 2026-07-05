@@ -98,6 +98,9 @@ export {
   type TranslatorOutput,
 } from "./purchasing";
 
+// Voice AI Restaurant Manager (a client on top of the stack — reuses every engine)
+export { handleVoiceTurn, toSpeech, type VoiceTurnOptions } from "./voice";
+
 // AI Automation (approval-first orchestration over approved recs/purchasing actions)
 export {
   createAutomationFromRecommendation,

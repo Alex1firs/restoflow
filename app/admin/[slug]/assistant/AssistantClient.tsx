@@ -3,10 +3,11 @@
 import { useState } from "react";
 import {
   Sparkles, Send, Clock, Database, AlertTriangle, Info,
-  Wallet, TrendingUp, Flame, PackageCheck, Timer, Repeat, Users,
+  Wallet, TrendingUp, Flame, PackageCheck, Timer, Repeat, Users, Mic, MessageSquare,
   type LucideIcon,
 } from "lucide-react";
 import { QUICK_ACTIONS } from "@/lib/ai/quick-actions";
+import VoiceAssistant from "./VoiceAssistant";
 
 const ASSISTANT_NAME = "Restaurant Intelligence";
 const ASSISTANT_TAGLINE = "Ask about your restaurant's performance and get answers from your own data.";
@@ -54,6 +55,7 @@ const TOOL_LABELS: Record<string, string> = {
 };
 
 export default function AssistantClient() {
+  const [mode, setMode] = useState<"chat" | "voice">("chat");
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -106,6 +108,29 @@ export default function AssistantClient() {
           <p className="text-xs sm:text-sm text-gray-500 font-medium">{ASSISTANT_TAGLINE}</p>
         </div>
       </div>
+
+      {/* Chat / Voice mode toggle */}
+      <div className="mt-4 inline-flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+        <button
+          type="button"
+          onClick={() => setMode("chat")}
+          className={`inline-flex items-center gap-1.5 text-xs font-black px-3 py-1.5 rounded-lg transition-colors ${mode === "chat" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}
+        >
+          <MessageSquare className="w-3.5 h-3.5" /> Chat
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("voice")}
+          className={`inline-flex items-center gap-1.5 text-xs font-black px-3 py-1.5 rounded-lg transition-colors ${mode === "voice" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}
+        >
+          <Mic className="w-3.5 h-3.5" /> Voice
+        </button>
+      </div>
+
+      {mode === "voice" ? (
+        <VoiceAssistant />
+      ) : (
+      <>
 
       {/* Ask box */}
       <div className="mt-6 bg-white border border-gray-200 rounded-2xl p-3 shadow-sm">
@@ -229,6 +254,8 @@ export default function AssistantClient() {
           </div>
         ))}
       </div>
+      </>
+      )}
     </div>
   );
 }
