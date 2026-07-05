@@ -117,6 +117,21 @@ async function main() {
     assert.equal(recs.anchor, "ai-recommendations");
   });
 
+  // --- The routing layer is channel-agnostic (voice, chat, future all share it) ---
+  await ok("the same utterance routes identically regardless of channel", () => {
+    // Voice (server) and chat (client) both call parseCommand + webNavigation — there
+    // is ONE routing layer, so a given utterance must resolve to one destination.
+    const utterances = ["open today's orders", "take me to orders", "show orders"];
+    const destinations = utterances.map((u) => {
+      const c = parseCommand(u)!;
+      return webNavigation(c.target, "grills").path;
+    });
+    assert.deepEqual(destinations, ["/admin/grills/orders", "/admin/grills/orders", "/admin/grills/orders"]);
+
+    // And it's tenant-parameterised, not hard-coded per page.
+    assert.equal(webNavigation(parseCommand("open the kitchen")!.target, "tricias").path, "/admin/tricias/kitchen");
+  });
+
   // --- End-to-end: a navigation command drives the voice turn ---
   {
     const db = seedDb();
