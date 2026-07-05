@@ -196,7 +196,28 @@ async function main() {
     assert.ok(/Peppered Turkey drove 62%/.test(ans), `insight: contribution — ${ans}`);
     assert.ok(/Average order value is ₦5,000/.test(ans), `insight: AOV — ${ans}`);
     assert.ok(/on track for about ₦/.test(ans), `prediction: projection — ${ans}`);
-    assert.ok(/Would you like recommendations/.test(ans), `action prompt — ${ans}`);
+    assert.ok(/Confidence:/.test(ans), `confidence beat — ${ans}`);
+    // Action is context-aware: revenue dropped → offer to explain WHY (not a generic prompt).
+    assert.ok(/explain why revenue dropped/i.test(ans), `context-aware action — ${ans}`);
+  });
+
+  await ok("confidence is Low with an honest basis when the trading day just started", () => {
+    const context = makeContext({
+      generatedAt: "2026-07-04T02:00:00Z", // ~2 hours into the day
+      range: { label: "today", from: "2026-07-04T00:00:00.000Z", to: "2026-07-04T23:59:59.999Z" },
+      sales: { summary: { totalOrders: 1, totalRevenue: 3000, paidOrders: 1, averageOrderValue: 3000, previous: { totalRevenue: 2000, totalOrders: 1, revenueChangePct: 50, ordersChangePct: 0 } }, byHour: null },
+    });
+    const ans = routeIntent("revenue", context, []);
+    assert.ok(/Confidence: Low/.test(ans), `expected Low confidence early in the day: ${ans}`);
+    assert.ok(/hour/.test(ans), `basis should reference hours of trading: ${ans}`);
+  });
+
+  await ok("actions are context-aware per intent (not a repeated generic prompt)", () => {
+    const invCtx = makeContext({ inventory: { quantitativeStockTracked: false, totalItems: 10, availableItems: 8, unavailableItems: 2, outOfStock: [{ name: "Suya", category: "Grill", source: "prepared" }], byCategory: {} } });
+    assert.ok(/open Smart Purchasing/i.test(routeIntent("inventory", invCtx, [])), "inventory → Smart Purchasing");
+
+    const ordCtx = makeContext({ orders: { total: 3, byStatus: { completed: 3 }, active: 1, revenueSoFar: 9000, latestOrders: [{ orderId: "o", orderNumber: 1, total: 3000, status: "preparing", createdAt: "x", serviceMode: "counter" }] } });
+    assert.ok(/open today's orders/i.test(routeIntent("orders", ordCtx, [])), "orders → open orders");
   });
 
   await ok("no-orders answer proactively offers to drive orders (Operations Manager)", () => {

@@ -569,20 +569,20 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
           </div>
         )}
 
-        {/* Daily AI Brief — cached, instant; owners/managers only */}
-        {role !== "staff" && <AiBriefCard role={role} />}
+        {/* Daily AI Brief — cached, instant; owners/managers only. id = voice nav anchor. */}
+        {role !== "staff" && <div id="ai-brief" className="scroll-mt-24"><AiBriefCard role={role} /></div>}
 
         {/* AI Recommendations — actionable next steps; owners/managers only */}
-        {role !== "staff" && <RecommendationsCard role={role} />}
+        {role !== "staff" && <div id="ai-recommendations" className="scroll-mt-24"><RecommendationsCard role={role} /></div>}
 
         {/* 7-Day Forecast — what's likely next + why; owners/managers only */}
-        {role !== "staff" && <ForecastCard role={role} />}
+        {role !== "staff" && <div id="ai-forecast" className="scroll-mt-24"><ForecastCard role={role} /></div>}
 
         {/* Smart Purchasing — forecast-driven prep & reorder plan; owners/managers only */}
-        {role !== "staff" && <PurchasingCard role={role} />}
+        {role !== "staff" && <div id="ai-purchasing" className="scroll-mt-24"><PurchasingCard role={role} /></div>}
 
         {/* AI Automation — approval-first execution of approved actions; owners/managers only */}
-        {role !== "staff" && <AutomationCard role={role} />}
+        {role !== "staff" && <div id="ai-automation" className="scroll-mt-24"><AutomationCard role={role} /></div>}
 
         {/* Stats grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

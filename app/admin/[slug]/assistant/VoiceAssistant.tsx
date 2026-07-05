@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Mic, Square, Volume2, VolumeX, Check, X, Loader2, Play, Bell, Bot, Sparkles } from "lucide-react";
 import { createSpeechProviders, type SpeechToTextProvider, type TextToSpeechProvider } from "./speech";
 
@@ -14,7 +15,8 @@ import { createSpeechProviders, type SpeechToTextProvider, type TextToSpeechProv
  */
 
 type PendingAction = { type: "execute_recommendation" | "execute_purchasing" | "read_recommendations"; recId?: string; items?: string[]; label: string };
-type VoiceResult = { intent: string; speech: string; display: string; pending: PendingAction | null; executed: boolean; degraded: boolean };
+type Navigation = { target: string; path: string; label: string; anchor?: string } | null;
+type VoiceResult = { intent: string; speech: string; display: string; pending: PendingAction | null; executed: boolean; degraded: boolean; navigation?: Navigation };
 type Msg = { id: number; role: "user" | "assistant"; text: string };
 type Turn = { question: string; answer: string };
 
@@ -46,6 +48,7 @@ export default function VoiceAssistant({
   autoGreet?: boolean;
   showHeader?: boolean;
 } = {}) {
+  const router = useRouter();
   const providers = useRef<{ stt: SpeechToTextProvider; tts: TextToSpeechProvider } | null>(null);
   const [greet, setGreet] = useState<VoiceGreetingProp | null>(greeting);
   const [sigs, setSigs] = useState<VoiceSignalProp[]>(signals);
@@ -130,13 +133,18 @@ export default function VoiceAssistant({
         addMsg("assistant", clean(body.display));
         setPending(body.pending);
         speak(clean(body.speech));
+        // Command layer: a navigation command drives the app for the owner.
+        if (body.navigation?.path) {
+          const href = body.navigation.anchor ? `${body.navigation.path}#${body.navigation.anchor}` : body.navigation.path;
+          router.push(href);
+        }
       } catch {
         setError("Network error.");
       } finally {
         setThinking(false);
       }
     },
-    [addMsg, buildTurns, speak]
+    [addMsg, buildTurns, speak, router]
   );
 
   const startListening = useCallback(() => {
