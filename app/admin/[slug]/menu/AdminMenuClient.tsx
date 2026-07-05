@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { db } from "@/lib/firebase";
 import {
   collection,
@@ -44,6 +44,10 @@ export default function AdminMenuClient({ restaurant, aiEnabled = false }: Props
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [imageId, setImageId] = useState(newImageId);
+
+  // Find-food UX: live search + one-tap category filtering over the menu.
+  const [search, setSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState("all");
 
   const [formData, setFormData] = useState({
     name: "",
@@ -178,6 +182,35 @@ export default function AdminMenuClient({ restaurant, aiEnabled = false }: Props
   const imageStoragePath = editingItem
     ? `restaurants/${restaurant.slug}/menu-items/${editingItem.id}`
     : `restaurants/${restaurant.slug}/menu-items/${imageId}`;
+
+  // Unique categories (with counts) for the filter chips.
+  const categories = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const it of items) {
+      const c = (it.category || "").trim();
+      if (c) counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([name, count]) => ({ name, count }));
+  }, [items]);
+
+  // Live filtering: category chip + free-text search across name, description, category.
+  const filteredItems = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return items.filter((it) => {
+      if (activeCategory !== "all" && (it.category || "").trim() !== activeCategory) return false;
+      if (!q) return true;
+      return (
+        it.name.toLowerCase().includes(q) ||
+        (it.description || "").toLowerCase().includes(q) ||
+        (it.category || "").toLowerCase().includes(q)
+      );
+    });
+  }, [items, search, activeCategory]);
+
+  const isFiltering = search.trim() !== "" || activeCategory !== "all";
+  const clearFilters = () => { setSearch(""); setActiveCategory("all"); };
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -356,15 +389,96 @@ export default function AdminMenuClient({ restaurant, aiEnabled = false }: Props
         </div>
       )}
 
+      {/* Find food — live search + category chips (only once there are items to filter) */}
+      {!showForm && !loading && items.length > 0 && (
+        <div className="mb-6 space-y-3">
+          <div className="relative">
+            <svg className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+            </svg>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search the menu by name, description, or category…"
+              className="w-full pl-11 pr-10 py-3.5 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-orange-500 outline-none transition-all text-sm font-medium bg-white shadow-sm"
+              aria-label="Search menu items"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none font-bold"
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            )}
+          </div>
+
+          {categories.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveCategory("all")}
+                className={`text-xs font-black px-3.5 py-1.5 rounded-xl border transition-all ${
+                  activeCategory === "all"
+                    ? "bg-orange-600 border-orange-600 text-white shadow-sm"
+                    : "bg-white border-gray-200 text-gray-600 hover:border-orange-300 hover:text-orange-700"
+                }`}
+              >
+                All <span className="opacity-70">({items.length})</span>
+              </button>
+              {categories.map((c) => (
+                <button
+                  key={c.name}
+                  type="button"
+                  onClick={() => setActiveCategory(c.name)}
+                  className={`text-xs font-black px-3.5 py-1.5 rounded-xl border transition-all capitalize ${
+                    activeCategory === c.name
+                      ? "bg-orange-600 border-orange-600 text-white shadow-sm"
+                      : "bg-white border-gray-200 text-gray-600 hover:border-orange-300 hover:text-orange-700"
+                  }`}
+                >
+                  {c.name} <span className="opacity-70">({c.count})</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {isFiltering && (
+            <p className="text-[11px] font-bold text-gray-400">
+              Showing {filteredItems.length} of {items.length} items
+            </p>
+          )}
+        </div>
+      )}
+
       {loading ? (
         <div className="py-20 text-center font-bold text-gray-400">Loading menu items...</div>
       ) : items.length === 0 ? (
         <div className="bg-white border text-center py-20 rounded-3xl border-dashed">
           <p className="text-gray-400">Your menu is empty. Start by adding your first item!</p>
         </div>
+      ) : filteredItems.length === 0 ? (
+        <div className="bg-white border border-dashed border-gray-200 text-center py-20 rounded-3xl px-8 flex flex-col items-center justify-center">
+          <svg className="w-12 h-12 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+          </svg>
+          <p className="text-gray-500 font-black text-base">No menu items match your search.</p>
+          <p className="text-gray-400 text-xs max-w-sm mt-1 mb-6">
+            {search.trim() ? <>Nothing found for &ldquo;{search.trim()}&rdquo;{activeCategory !== "all" ? <> in <span className="capitalize">{activeCategory}</span></> : null}.</> : <>No items in <span className="capitalize">{activeCategory}</span>.</>}
+          </p>
+          <button
+            onClick={clearFilters}
+            className="bg-gray-900 hover:bg-black text-white font-bold py-2.5 px-6 rounded-2xl transition-all transform active:scale-95 shadow-md text-sm"
+          >
+            Clear filters
+          </button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {items.map((item) => (
+          {filteredItems.map((item) => (
             <div key={item.id} className="bg-white border border-gray-100 rounded-3xl overflow-hidden shadow-sm flex flex-col group transition-all hover:shadow-md">
               <div className="h-48 relative overflow-hidden bg-gray-100">
                 {item.image ? (
