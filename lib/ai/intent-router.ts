@@ -114,26 +114,28 @@ export function answerByIntent(question: string, context: RestaurantContext, ins
 // ---------------------------------------------------------------------------
 // Analytical answer structure
 // ---------------------------------------------------------------------------
-// Every analytical handler builds the SAME five beats so answers feel consistent
-// and manager-grade — analysis, not just reporting:
+// Every analytical handler builds the SAME beats so answers feel consistent and
+// manager-grade — analysis, not just reporting:
 //   answer         — the direct response to the question
 //   insight        — what the number means / why it matters
 //   prediction     — what's likely next if the trend continues
+//   confidence     — how much to trust it, and on what basis ("Can I trust this?")
 //   recommendation — what the owner should consider doing
-//   actionPrompt   — offer to act ("Would you like …?")
+//   actionPrompt   — a CONTEXT-AWARE offer to act ("Would you like …?")
 // Empty beats are skipped, so a data-poor day still reads naturally.
 
 export interface AnalyticalAnswer {
   answer: string;
   insight?: string;
   prediction?: string;
+  confidence?: string;
   recommendation?: string;
   actionPrompt?: string;
 }
 
-/** Render the five beats into flowing manager prose (safe for both chat and TTS). */
+/** Render the beats into flowing manager prose (safe for both chat and TTS). */
 export function renderAnalytical(a: AnalyticalAnswer): string {
-  return [a.answer, a.insight, a.prediction, a.recommendation, a.actionPrompt].filter(Boolean).join(" ").trim();
+  return [a.answer, a.insight, a.prediction, a.confidence, a.recommendation, a.actionPrompt].filter(Boolean).join(" ").trim();
 }
 
 function naira(n: number): string {
@@ -158,16 +160,45 @@ function paceProject(context: RestaurantContext, runningTotal: number): number |
   return Math.round(runningTotal / frac / 100) * 100; // nearest ₦100
 }
 
-/** The recommendation + action beats, drawn from intent-relevant deterministic insights. */
-function recommendationBeat(intent: AssistantIntent, insights: Insight[], improveWhat: string): Pick<AnalyticalAnswer, "recommendation" | "actionPrompt"> {
+/** The recommendation beat — the single most-relevant deterministic insight for this intent. */
+function recommendationLine(intent: AssistantIntent, insights: Insight[]): string | undefined {
   const codes = new Set(INTENT_INSIGHT_CODES[intent]);
   const relevant = insights.filter((i) => codes.has(i.code) && i.suggestedAction).slice(0, 1);
-  const out: Pick<AnalyticalAnswer, "recommendation" | "actionPrompt"> = {};
-  if (relevant.length > 0) out.recommendation = `${relevant[0].title} — ${relevant[0].suggestedAction}.`;
-  // Offer the recommendation set whenever the engine surfaced anything actionable.
-  const anyActionable = insights.some((i) => i.suggestedAction && (i.type === "opportunity" || i.type === "warning" || i.type === "anomaly"));
-  if (anyActionable) out.actionPrompt = `Would you like recommendations to improve ${improveWhat}?`;
-  return out;
+  return relevant.length > 0 ? `${relevant[0].title} — ${relevant[0].suggestedAction}.` : undefined;
+}
+
+/** Does the engine (or the trend) show anything worth acting on for this intent? */
+function hasActionable(insights: Insight[]): boolean {
+  return insights.some((i) => i.suggestedAction && (i.type === "opportunity" || i.type === "warning" || i.type === "anomaly"));
+}
+
+/** Elapsed fraction of the window (now vs from→to), or null when not computable. */
+function elapsedFraction(context: RestaurantContext): number | null {
+  const from = Date.parse(context.range.from);
+  const to = Date.parse(context.range.to);
+  const now = Date.parse(context.generatedAt);
+  if (!Number.isFinite(from) || !Number.isFinite(to) || !Number.isFinite(now) || to <= from) return null;
+  return (now - from) / (to - from);
+}
+
+/**
+ * Deterministic confidence beat — answers the owner's real question, "can I trust
+ * this?". Grounded in data sufficiency, NOT invented:
+ *  - a current trading day that has barely started is explicitly Low (few hours in);
+ *  - otherwise confidence saturates with sample size (more orders → more trust),
+ *    with an honest ceiling so we never claim certainty.
+ */
+function confidenceBeat(context: RestaurantContext, sampleSize: number): string | undefined {
+  const frac = elapsedFraction(context);
+  if (context.range.label === "today" && frac != null && frac < 0.35) {
+    const hours = Math.max(1, Math.round(frac * 24));
+    return `Confidence: Low — only about ${hours} hour${hours === 1 ? "" : "s"} of today's trading ${hours === 1 ? "is" : "are"} in so far.`;
+  }
+  if (sampleSize <= 0) return undefined;
+  const pct = Math.min(97, Math.round((sampleSize / 25) * 100)); // saturating; honest ceiling
+  if (pct < 45) return `Confidence: Low — based on only ${sampleSize} order${sampleSize === 1 ? "" : "s"} so far.`;
+  const level = pct >= 75 ? "High" : "Medium";
+  return `Confidence: ${level} (${pct}%) — based on ${sampleSize} orders in this window.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -216,8 +247,17 @@ function answerRevenue(context: RestaurantContext, insights: Insight[]): string 
     a.prediction = `At the current pace, ${label} is on track for about ${naira(projected)}.`;
   }
 
-  // Recommendation + Action.
-  Object.assign(a, recommendationBeat("revenue", insights, "it"));
+  // Confidence — how much to trust it.
+  a.confidence = confidenceBeat(context, s.totalOrders);
+
+  // Recommendation.
+  a.recommendation = recommendationLine("revenue", insights);
+
+  // Action — context-aware, not a generic "want recommendations?".
+  const dropped = (s.previous.revenueChangePct != null && s.previous.revenueChangePct < 0) || insights.some((i) => i.code === "REVENUE_DROP");
+  if (dropped) a.actionPrompt = `Would you like me to explain why revenue dropped?`;
+  else if (hasActionable(insights)) a.actionPrompt = `Would you like recommendations to grow it further?`;
+  else a.actionPrompt = `Would you like to see which items are driving it?`;
   return renderAnalytical(a);
 }
 
@@ -249,7 +289,9 @@ function answerOrders(context: RestaurantContext, insights: Insight[]): string {
   const projected = paceProject(context, o.total);
   if (projected && projected > o.total) a.prediction = `At this pace you'll finish the day around ${projected} orders.`;
 
-  Object.assign(a, recommendationBeat("orders", insights, "today"));
+  a.confidence = confidenceBeat(context, o.total);
+  a.recommendation = recommendationLine("orders", insights);
+  a.actionPrompt = `Would you like me to open today's orders?`;
   return renderAnalytical(a);
 }
 
@@ -278,8 +320,8 @@ function answerInventory(context: RestaurantContext, insights: Insight[]): strin
     answer: `${inv.unavailableItems} of ${inv.totalItems} item${inv.totalItems === 1 ? "" : "s"} ${inv.unavailableItems === 1 ? "is" : "are"} currently marked unavailable${names ? `: ${names}` : ""}.`,
     insight: `Each unavailable item is a dish customers can't order right now. (RestoFlow tracks availability, not quantities.)`,
   };
-  Object.assign(a, recommendationBeat("inventory", insights, "availability"));
-  if (!a.actionPrompt) a.actionPrompt = `Would you like to review these on the Smart Purchasing card?`;
+  a.recommendation = recommendationLine("inventory", insights);
+  a.actionPrompt = `Would you like me to open Smart Purchasing?`;
   return renderAnalytical(a);
 }
 
@@ -325,7 +367,9 @@ function answerKitchen(context: RestaurantContext, insights: Insight[]): string 
   else if (k.avgPrepMinutes != null) a.answer = `The kitchen is averaging ${k.avgPrepMinutes} min to start prep across ${k.ordersMeasured} order${k.ordersMeasured === 1 ? "" : "s"}.`;
   else a.answer = `I have ${k.ordersMeasured} timed order${k.ordersMeasured === 1 ? "" : "s"} but no usable prep timings.`;
   if (k.slowestReadyMinutes != null) a.insight = `The slowest ticket took ${k.slowestReadyMinutes} min.`;
-  Object.assign(a, recommendationBeat("kitchen", insights, "kitchen speed"));
+  a.confidence = confidenceBeat(context, k.ordersMeasured);
+  a.recommendation = recommendationLine("kitchen", insights);
+  if (hasActionable(insights)) a.actionPrompt = `Would you like recommendations to speed up the kitchen?`;
   return renderAnalytical(a);
 }
 
@@ -353,7 +397,9 @@ function answerCustomers(context: RestaurantContext, insights: Insight[]): strin
     answer: `${c.totalCustomers} customer${c.totalCustomers === 1 ? "" : "s"} ordered in ${context.range.label} — ${c.newCustomers} new and ${c.returningCustomers} returning.`,
     insight: `Your repeat rate is ${repeatPct}%${c.loyalty?.enabled ? `, with ${c.loyalty.members} loyalty member${c.loyalty.members === 1 ? "" : "s"}` : ""}.`,
   };
-  Object.assign(a, recommendationBeat("customers", insights, "repeat orders"));
+  a.confidence = confidenceBeat(context, c.totalCustomers);
+  a.recommendation = recommendationLine("customers", insights);
+  a.actionPrompt = repeatPct < 30 ? `Would you like recommendations to boost repeat orders?` : `Would you like to see your most loyal customers?`;
   return renderAnalytical(a);
 }
 
@@ -365,7 +411,8 @@ function answerSubscription(context: RestaurantContext, insights: Insight[]): st
   if (sub.daysRemaining != null) bits.push(`It renews in ${sub.daysRemaining} day${sub.daysRemaining === 1 ? "" : "s"}.`);
   if (sub.graceDaysRemaining != null && sub.graceDaysRemaining > 0) bits.push(`You're in a grace period with ${sub.graceDaysRemaining} day${sub.graceDaysRemaining === 1 ? "" : "s"} left.`);
   if (bits.length) a.insight = bits.join(" ");
-  Object.assign(a, recommendationBeat("subscription", insights, "your account"));
+  a.recommendation = recommendationLine("subscription", insights);
+  if (sub.daysRemaining != null && sub.daysRemaining <= 7) a.actionPrompt = `Would you like to renew now to avoid interruption?`;
   return renderAnalytical(a);
 }
 
@@ -389,7 +436,8 @@ function answerMenu(context: RestaurantContext, insights: Insight[]): string {
   const neverSold = context.menu.slowItems?.neverSold ?? [];
   if (neverSold.length > 0) bits.push(`${neverSold.length} item${neverSold.length === 1 ? " has" : "s have"} had no sales in this window.`);
   if (bits.length) a.insight = bits.join(" ");
-  Object.assign(a, recommendationBeat("menu", insights, "your menu mix"));
+  a.recommendation = recommendationLine("menu", insights);
+  a.actionPrompt = neverSold.length > 0 ? `Would you like recommendations for your slow movers?` : `Would you like recommendations to promote your best seller?`;
   return renderAnalytical(a);
 }
 
@@ -411,6 +459,7 @@ function answerReports(context: RestaurantContext, insights: Insight[]): string 
     if (bits.length) a.insight = bits.join(" ");
     const projected = paceProject(context, s.totalRevenue);
     if (projected && projected > s.totalRevenue) a.prediction = `At the current pace, ${label} is on track for about ${naira(projected)}.`;
+    a.confidence = confidenceBeat(context, s.totalOrders);
     const notable = insights.filter((i) => i.type === "warning" || i.type === "anomaly").slice(0, 1)[0];
     if (notable) a.recommendation = `${notable.title}${notable.suggestedAction ? ` — ${notable.suggestedAction}.` : "."}`;
     a.actionPrompt = `What would you like to do first — recommendations, orders, or the forecast?`;
