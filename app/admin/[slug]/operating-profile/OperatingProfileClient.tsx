@@ -12,8 +12,20 @@ import { Sliders, Store, User, Bot, Brain, RotateCcw, Loader2, Check } from "luc
  */
 
 type Learned = { id: string; statement: string; type: string; active: boolean; source: string };
+const GOALS: { value: string; label: string }[] = [
+  { value: "", label: "Balanced (no specific goal)" },
+  { value: "maximize_profit", label: "Maximize profit" },
+  { value: "grow_revenue", label: "Grow revenue" },
+  { value: "increase_retention", label: "Increase customer retention" },
+  { value: "increase_repeat_orders", label: "Increase repeat orders" },
+  { value: "reduce_food_waste", label: "Reduce food waste" },
+  { value: "improve_kitchen_speed", label: "Improve kitchen speed" },
+  { value: "reduce_stockouts", label: "Reduce stockouts" },
+  { value: "launch_new_items", label: "Launch new menu items" },
+];
+
 type Profile = {
-  business: { pricingPhilosophy: string | null; maxPriceIncreaseNaira: number | null; preferPromotionsOverPriceIncrease: boolean; preferredSuppliers: string[]; openingHours: string | null; staffingPhilosophy: string | null; preparationStyle: string | null };
+  business: { primaryGoal: string | null; pricingPhilosophy: string | null; maxPriceIncreaseNaira: number | null; preferPromotionsOverPriceIncrease: boolean; preferredSuppliers: string[]; openingHours: string | null; staffingPhilosophy: string | null; preparationStyle: string | null };
   owner: { language: string; primaryInterface: string; responseStyle: string; notificationChannel: string };
   ai: { confidenceThreshold: number; automationLevel: string; escalationRules: string | null; reminderFrequency: string };
   learned: Learned[];
@@ -100,6 +112,13 @@ export default function OperatingProfileClient() {
 
       {/* Business Preferences */}
       <Section icon={<Store className="w-4 h-4 text-blue-600" />} title="Business Preferences" busy={savingSection === "business"} saved={<SavedBadge section="business" />}>
+        <Field label="Current objective — shapes which advice the AI surfaces first">
+          <select defaultValue={p.business.primaryGoal ?? ""} onChange={(e) => save("business", { primaryGoal: e.target.value || null })} className="input">
+            {GOALS.map((g) => (
+              <option key={g.value} value={g.value}>{g.label}</option>
+            ))}
+          </select>
+        </Field>
         <Field label="Max recommended price increase (₦)">
           <input
             type="number"

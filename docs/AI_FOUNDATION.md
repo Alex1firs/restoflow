@@ -993,3 +993,44 @@ Tests: `lib/ai/__tests__/profile.test.ts` (12) — default identity, versioned+a
 price-cap/threshold/prefer-promotions application, gradual learning, reset, tenant isolation,
 write-safety.
 Full suite: `npm run test:ai` = **152 checks**.
+
+## 21.3 Phase 7.3 — Explainability Layer + Business Goals
+
+Two separate concerns, deliberately split:
+
+### Explainability (changes OUTPUTS)
+Every AI output explains itself with the SAME three-field shape — **what? · why? · what
+happens if ignored?** — plus confidence. `lib/ai/explainability.ts` builds these PURELY and
+DETERMINISTICALLY from each artifact's EXISTING structured fields (a recommendation's
+rationale/impact, a forecast's drivers, a purchasing line's guidance/signal, an automation's
+source). It generates NO new reasoning.
+
+- `explainRecommendation` — `what`=title, `why`=rationale split into reasons, `ifIgnored`= the per-period gain reframed as a monthly missed figure (e.g. ₦8,400/week → "about ₦36,120 per month").
+- `explainForecast` — the forecast's drivers ARE the "why"; `ifIgnored` = the peak-window risk.
+- `explainPurchasingLine` — from demand + reorder signal.
+- `explainAutomation` — from its approved source.
+- `explanationToSpeech(exp, "why"|"ifIgnored"|"full")` — renders for Voice.
+
+Attached at the consumption boundary: recommendations / forecast / purchasing / automation
+routes return an `explanation`. **Voice** answers "Why?", "Explain", "What if I ignore it?"
+about a proposed recommendation straight from these fields (`explainPendingRecommendation`),
+preserving the pending confirmation so the owner can still say "yes". No engine changes.
+
+The `RecommendationsCard` gains a "Why?" toggle showing the why-reasons + the if-ignored
+consequence.
+
+### Business Goals (changes INPUTS — added to the Operating Profile)
+`business.primaryGoal` (maximize_profit · grow_revenue · increase_retention ·
+increase_repeat_orders · reduce_food_waste · improve_kitchen_speed · reduce_stockouts ·
+launch_new_items). `GOAL_BOOSTS` maps each goal to the recommendation types it prioritises;
+`applyProfileToRecommendations` re-orders so goal-serving advice surfaces first. Same data,
+different advice — e.g. *maximize profit* floats price increases; *increase retention* floats
+loyalty. Chosen in the Operating Profile editor ("Current objective"). Default (null) = balanced,
+so existing ordering is unchanged.
+
+### Safety
+Pure & deterministic · explanations derived only from existing fields (no new reasoning) ·
+goals re-order, never fabricate · no engine logic changed · no new writes (explanations are
+computed at read time; the goal is stored in the existing profile).
+Tests: `explainability.test.ts` (7) + profile goal re-ordering (2) + voice why/if-ignored (2).
+Full suite: `npm run test:ai` = **163 checks**.

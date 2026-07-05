@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getForecast, generateForecast } from "@/lib/ai/forecasting";
+import { explainForecast } from "@/lib/ai/explainability";
 
 /**
  * GET  /api/admin/ai/forecast  → today's cached forecast (no computation).
@@ -22,7 +23,7 @@ export async function GET() {
   if (user.role === "staff") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const forecast = await getForecast(user.restaurantSlug);
-  return NextResponse.json({ forecast }, { status: 200 });
+  return NextResponse.json({ forecast, explanation: forecast ? explainForecast(forecast) : null }, { status: 200 });
 }
 
 export async function POST(req: Request) {
@@ -48,7 +49,7 @@ export async function POST(req: Request) {
 
   try {
     const forecast = await generateForecast(user.restaurantSlug, { force });
-    return NextResponse.json({ forecast }, { status: 200 });
+    return NextResponse.json({ forecast, explanation: explainForecast(forecast) }, { status: 200 });
   } catch (err) {
     console.error("[ai-forecast] error:", err);
     return NextResponse.json({ error: "Failed to generate forecast. Please try again." }, { status: 500 });

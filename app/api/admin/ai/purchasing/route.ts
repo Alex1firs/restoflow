@@ -3,13 +3,18 @@ import { getAuthenticatedUser } from "@/lib/auth-server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getPurchasingPlan, generatePurchasingPlan } from "@/lib/ai/purchasing";
 import { getOperatingProfile, preferredSupplierFor } from "@/lib/ai/profile";
+import { explainPurchasingLine } from "@/lib/ai/explainability";
 import type { PurchasingPlan } from "@/lib/ai/types";
 
-/** Attach the owner's preferred supplier from the Operating Profile (non-mutating). */
-async function withProfile(slug: string, plan: PurchasingPlan | null): Promise<PurchasingPlan | null> {
+/** Attach the preferred supplier + per-line What/Why/If-ignored explanations. */
+async function withProfile(slug: string, plan: PurchasingPlan | null) {
   if (!plan) return plan;
   const profile = await getOperatingProfile(slug);
-  return { ...plan, preferredSupplier: preferredSupplierFor(profile) };
+  return {
+    ...plan,
+    preferredSupplier: preferredSupplierFor(profile),
+    menuDemand: plan.menuDemand.map((line) => ({ ...line, explanation: explainPurchasingLine(line) })),
+  };
 }
 
 /**

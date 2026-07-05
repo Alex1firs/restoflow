@@ -188,6 +188,27 @@ async function main() {
     assert.equal(r.executed, false);
   });
 
+  // ── Explainability follow-ups on a pending recommendation ─────────────────
+  await ok('"why?" on a proposed recommendation answers from its fields and keeps the offer', async () => {
+    const db = seedDb();
+    await generateRecommendations("grills", { db: asDb(db), now });
+    const proposal = await handleVoiceTurn("grills", "Approve recommendation one", base(db));
+    const r = await handleVoiceTurn("grills", "why?", { ...base(db), pending: proposal.pending });
+    assert.equal(r.intent, "confirm");
+    assert.ok(r.display.length > 0, "gives a reason");
+    assert.ok(r.pending && r.pending.type === "execute_recommendation", "confirmation is preserved");
+    assert.equal(r.executed, false);
+  });
+
+  await ok('"what if I ignore it?" answers the consequence, still awaiting yes', async () => {
+    const db = seedDb();
+    await generateRecommendations("grills", { db: asDb(db), now });
+    const proposal = await handleVoiceTurn("grills", "Approve recommendation one", base(db));
+    const r = await handleVoiceTurn("grills", "what if I ignore it?", { ...base(db), pending: proposal.pending });
+    assert.ok(/ignored|forgo|turning away|missed/i.test(r.display), "explains the downside");
+    assert.ok(r.pending, "confirmation preserved");
+  });
+
   // ── Tenant isolation ───────────────────────────────────────────────────────
   await ok("voice is tenant-scoped (other never hears grills' data)", async () => {
     const db = seedDb();

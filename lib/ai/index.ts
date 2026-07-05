@@ -114,10 +114,20 @@ export {
   applyProfileToRecommendations,
   profileNarrationDirective,
   preferredSupplierFor,
+  GOAL_BOOSTS,
   AI_OPERATING_PROFILE_COLLECTION,
   AI_OPERATING_PROFILE_AUDIT_COLLECTION,
   type ProfileUpdatePatch,
 } from "./profile";
+
+// Explainability Layer (What? / Why? / If ignored? — from existing structured fields)
+export {
+  explainRecommendation,
+  explainForecast,
+  explainPurchasingLine,
+  explainAutomation,
+  explanationToSpeech,
+} from "./explainability";
 
 // AI Automation (approval-first orchestration over approved recs/purchasing actions)
 export {

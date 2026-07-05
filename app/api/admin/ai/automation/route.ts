@@ -15,6 +15,7 @@ import {
   AutomationNotApprovedError,
   AutomationStateError,
 } from "@/lib/ai/automation";
+import { explainAutomation } from "@/lib/ai/explainability";
 import type { ActorRef } from "@/lib/ai/types";
 
 /**
@@ -49,7 +50,8 @@ export async function GET() {
     listAutomations(slug),
     listExecutions(slug),
   ]);
-  return NextResponse.json({ rules, automations, executions, handlerKinds: availableHandlerKinds() }, { status: 200 });
+  const withExplanations = automations.map((a) => ({ ...a, explanation: explainAutomation(a) }));
+  return NextResponse.json({ rules, automations: withExplanations, executions, handlerKinds: availableHandlerKinds() }, { status: 200 });
 }
 
 export async function POST(req: Request) {

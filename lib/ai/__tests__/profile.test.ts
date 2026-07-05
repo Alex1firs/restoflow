@@ -153,6 +153,23 @@ async function main() {
     assert.ok(/brief/i.test(profileNarrationDirective(p)));
   });
 
+  // ── Business goal re-orders which advice surfaces first ───────────────────
+  await ok("business goal 'maximize_profit' floats price increases to the top", async () => {
+    const db = new FakeFirestore();
+    await updateOperatingProfile("grills", { business: { primaryGoal: "maximize_profit" } }, owner, { db: asDb(db), now });
+    const p = await getOperatingProfile("grills", { db: asDb(db), now });
+    const recs = [rec({ id: "loyal", type: "loyalty" }), rec({ id: "price", type: "price_increase", action: { kind: "price_increase", delta: 100 } })];
+    assert.equal(applyProfileToRecommendations(recs, p)[0].id, "price");
+  });
+
+  await ok("business goal 'increase_retention' floats loyalty to the top instead", async () => {
+    const db = new FakeFirestore();
+    await updateOperatingProfile("grills", { business: { primaryGoal: "increase_retention" } }, owner, { db: asDb(db), now });
+    const p = await getOperatingProfile("grills", { db: asDb(db), now });
+    const recs = [rec({ id: "price", type: "price_increase", action: { kind: "price_increase", delta: 100 } }), rec({ id: "loyal", type: "loyalty" })];
+    assert.equal(applyProfileToRecommendations(recs, p)[0].id, "loyal", "same data, different advice");
+  });
+
   // ── Learned preferences: transparent, gradual, resettable ─────────────────
   await ok("gradual learning activates a pattern after enough decisions", async () => {
     const db = new FakeFirestore();

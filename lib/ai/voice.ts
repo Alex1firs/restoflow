@@ -3,6 +3,7 @@ import { askAssistant } from "./assistant";
 import { getBrief, generateBrief } from "./brief";
 import { listRecommendations, updateRecommendationStatus } from "./recommendations";
 import { getOperatingProfile, applyProfileToRecommendations } from "./profile";
+import { explainRecommendation, explanationToSpeech } from "./explainability";
 import { getPurchasingPlan, generatePurchasingPlan } from "./purchasing";
 import {
   createAutomationFromRecommendation,
@@ -68,6 +69,13 @@ export async function handleVoiceTurn(slug: string, transcript: string, opts: Vo
 
   // 1. Resolve an outstanding confirmation first.
   if (opts.pending) {
+    // Explainability: "why?" / "explain" / "what if I ignore it?" about a proposed
+    // recommendation are answered from its structured fields — not re-reasoned — and
+    // the pending confirmation is preserved so the owner can still say "yes".
+    if (opts.pending.type === "execute_recommendation" && opts.pending.recId) {
+      const part = explainIntent(lower);
+      if (part) return explainPendingRecommendation(slug, opts.pending, part, opts);
+    }
     if (isAffirmative(lower)) {
       if (opts.pending.type === "read_recommendations") return speakRecommendations(slug, opts);
       return executePending(slug, opts.pending, actor, opts);
@@ -198,6 +206,23 @@ async function proposePurchasing(slug: string, opts: VoiceTurnOptions): Promise<
   return { intent: "command", speech, display: speech, pending, executed: false, degraded: plan.degraded };
 }
 
+/** Answer why / explain / what-if-ignored about the pending recommendation, from its fields. */
+async function explainPendingRecommendation(
+  slug: string,
+  pending: VoicePendingAction,
+  part: "why" | "ifIgnored" | "full",
+  opts: VoiceTurnOptions
+): Promise<VoiceTurnResult> {
+  const recs = await listRecommendations(slug, { db: opts.db, now: opts.now, includeDismissed: true });
+  const rec = recs.find((r) => r.id === pending.recId);
+  if (!rec) return { ...say("I can't find that recommendation to explain.", "confirm"), pending };
+  const exp = explainRecommendation(rec);
+  const body = explanationToSpeech(exp, part);
+  const speech = `${body} Would you like me to go ahead?`;
+  // Keep the pending confirmation so the owner can still approve after hearing it.
+  return { intent: "confirm", speech: toSpeech(speech), display: `${body}`, pending, executed: false, degraded: false };
+}
+
 async function proposeRecommendation(slug: string, ref: RecRef, opts: VoiceTurnOptions): Promise<VoiceTurnResult> {
   const recs = await profiledRecommendations(slug, opts);
   const match = ref.kind === "ordinal" ? recs[ref.index] : ref.text ? recs.find((r) => matchesTarget(r, ref.text)) : recs[0];
@@ -286,6 +311,13 @@ function isNegative(t: string): boolean {
 }
 function isBriefIntent(t: string): boolean {
   return /(how are we doing|how'?re we doing|how are things|how'?s (it going|business|today)|good morning|morning brief|daily brief|the rundown|give me (a|the) (summary|brief|rundown)|what'?s (the )?(update|summary))/.test(t);
+}
+/** Detect an explainability follow-up about a pending recommendation. */
+function explainIntent(t: string): "why" | "ifIgnored" | "full" | null {
+  if (/(if i ignore|what if i ignore|what happens if|if i (don'?t|do not|skip)|ignore it|the (risk|consequence|downside))/.test(t)) return "ifIgnored";
+  if (/^\s*(why\b|why\?|how come|for what reason)/.test(t) || /\bwhy\b/.test(t)) return "why";
+  if (/^(explain|tell me more|elaborate|more detail|what do you mean|break it down)/.test(t)) return "full";
+  return null;
 }
 function isReadRecommendations(t: string): boolean {
   return /(read|list|tell me|what are|go through)\s+(me\s+)?(the\s+|my\s+|all\s+(the\s+)?)?recommendations|read them( to me)?|what'?s recommended/.test(t);

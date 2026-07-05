@@ -4,6 +4,7 @@ import { createIntelligenceContext } from "./tools/_shared";
 import type {
   ActorRef,
   AIPreferences,
+  BusinessGoal,
   BusinessPreferences,
   LearnedPreference,
   OwnerPreferences,
@@ -41,6 +42,7 @@ const PROFILE_LEARN_THRESHOLD = 2; // decisions before a learned pattern activat
 
 export function defaultBusinessPreferences(): BusinessPreferences {
   return {
+    primaryGoal: null,
     pricingPhilosophy: null,
     maxPriceIncreaseNaira: null,
     preferPromotionsOverPriceIncrease: false,
@@ -234,27 +236,54 @@ export async function listProfileAudit(slug: string, opts: BaseOpts = {}): Promi
 // ---------------------------------------------------------------------------
 
 /**
+ * Which recommendation types a declared business goal prioritises. The underlying
+ * data is unchanged — the goal only re-orders which advice surfaces first.
+ */
+export const GOAL_BOOSTS: Record<BusinessGoal, string[]> = {
+  maximize_profit: ["price_increase", "bundle"],
+  grow_revenue: ["price_increase", "bundle", "staffing"],
+  increase_retention: ["loyalty", "promote_item"],
+  increase_repeat_orders: ["loyalty", "promote_item"],
+  reduce_food_waste: ["promote_item", "bundle"],
+  improve_kitchen_speed: ["staffing"],
+  reduce_stockouts: ["reenable_item"],
+  launch_new_items: ["promote_item", "bundle"],
+};
+
+/**
  * Apply the profile to a deterministic recommendation set. Pure & deterministic:
  *  - hides recommendations below the owner's confidence threshold,
  *  - drops price-increase recs whose delta exceeds the owner's cap,
- *  - demotes price increases (and lifts promotions) when the owner prefers promotions.
+ *  - demotes price increases (and lifts promotions) when the owner prefers promotions,
+ *  - re-orders to surface the recommendations that serve the declared business goal.
  * Under the default profile this returns the input order unchanged.
  */
 export function applyProfileToRecommendations(recs: Recommendation[], profile: RestaurantOperatingProfile): Recommendation[] {
   const cap = profile.business.maxPriceIncreaseNaira;
   const preferPromos = profile.business.preferPromotionsOverPriceIncrease || profile.learned.some((l) => l.active && l.type === "prefers" && l.subject === "promotion_over_price");
   const threshold = profile.ai.confidenceThreshold;
+  const goal = profile.business.primaryGoal;
 
-  const kept = recs.filter((r) => {
+  let kept = recs.filter((r) => {
     if (r.confidence < threshold) return false;
     if (r.type === "price_increase" && cap != null && (r.action?.delta ?? 0) > cap) return false;
     return true;
   });
 
-  if (!preferPromos) return kept;
-  // Stable demotion: price increases sink below everything else, promotions rise.
-  const weight = (r: Recommendation) => (r.type === "promote_item" ? -1 : r.type === "price_increase" ? 1 : 0);
-  return [...kept].sort((a, b) => weight(a) - weight(b));
+  if (preferPromos) {
+    // Stable demotion: price increases sink below everything else, promotions rise.
+    const weight = (r: Recommendation) => (r.type === "promote_item" ? -1 : r.type === "price_increase" ? 1 : 0);
+    kept = [...kept].sort((a, b) => weight(a) - weight(b));
+  }
+
+  if (goal) {
+    // Stable boost: recommendation types serving the goal float to the top.
+    const boosted = new Set(GOAL_BOOSTS[goal]);
+    const rank = (r: Recommendation) => (boosted.has(r.type) ? 0 : 1);
+    kept = kept.map((r, i) => ({ r, i })).sort((a, b) => rank(a.r) - rank(b.r) || a.i - b.i).map((x) => x.r);
+  }
+
+  return kept;
 }
 
 /** A narration-style directive appended to the Assistant/Voice system prompt. "" for defaults. */

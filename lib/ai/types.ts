@@ -655,11 +655,40 @@ export interface AutomationExecution {
 }
 
 // ---------------------------------------------------------------------------
+// Explainability (Phase 7.3) — every AI output explains itself with the SAME shape.
+// Built deterministically from an artifact's existing structured fields (no new reasoning).
+// ---------------------------------------------------------------------------
+
+export interface Explanation {
+  /** What the AI is proposing / projecting. */
+  what: string;
+  /** Why — the evidence, as discrete reasons. */
+  why: string[];
+  /** What happens if this is ignored — the consequence / missed impact. */
+  ifIgnored: string;
+  confidence: number;
+  confidenceLevel: ConfidenceLevel;
+}
+
+// ---------------------------------------------------------------------------
 // Restaurant Operating Profile (Phase 7.2) — a restaurant-scoped input into every
 // AI decision. NOT conversation history, NOT LLM memory. Never mutates business data.
 // ---------------------------------------------------------------------------
 
+/** A declared business objective — every recommendation is filtered through it. */
+export type BusinessGoal =
+  | "maximize_profit"
+  | "grow_revenue"
+  | "increase_retention"
+  | "increase_repeat_orders"
+  | "reduce_food_waste"
+  | "improve_kitchen_speed"
+  | "reduce_stockouts"
+  | "launch_new_items";
+
 export interface BusinessPreferences {
+  /** The current objective the AI optimises advice toward. null = balanced. */
+  primaryGoal: BusinessGoal | null;
   pricingPhilosophy: "aggressive" | "moderate" | "conservative" | null;
   /** Hard cap on a recommended price-increase delta (₦). null = no cap. */
   maxPriceIncreaseNaira: number | null;
