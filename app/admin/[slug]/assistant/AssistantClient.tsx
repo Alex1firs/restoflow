@@ -9,8 +9,8 @@ import {
 import { QUICK_ACTIONS } from "@/lib/ai/quick-actions";
 import VoiceAssistant from "./VoiceAssistant";
 
-const ASSISTANT_NAME = "Restaurant Intelligence";
-const ASSISTANT_TAGLINE = "Ask about your restaurant's performance and get answers from your own data.";
+const ASSISTANT_NAME = "Your AI Operations Manager";
+const ASSISTANT_TAGLINE = "On top of your sales, kitchen, and inventory — ask anything or let it brief you.";
 
 // lucide icon names (from the QUICK_ACTIONS catalog) → components.
 const QA_ICONS: Record<string, LucideIcon> = {
@@ -128,7 +128,7 @@ export default function AssistantClient() {
       </div>
 
       {mode === "voice" ? (
-        <VoiceAssistant />
+        <VoiceAssistant showHeader={false} />
       ) : (
       <>
 

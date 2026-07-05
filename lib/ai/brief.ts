@@ -308,7 +308,6 @@ export function deterministicBriefSummary(context: RestaurantContext, insights: 
   const rec = insights.find((i) => (i.type === "opportunity" || i.type === "warning") && i.suggestedAction);
   if (rec) parts.push(`Focus today: ${rec.suggestedAction}`);
 
-  parts.push(`(AI narration unavailable — this is a direct summary of your data.)`);
   return parts.join(" ");
 }
 

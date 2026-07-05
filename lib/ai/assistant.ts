@@ -347,25 +347,32 @@ export function deterministicAnswer(context: RestaurantContext, insights: Insigh
 
   if (s && s.totalOrders > 0) {
     parts.push(
-      `For ${label}, you made ${naira(s.totalRevenue)} from ${s.paidOrders} paid order${s.paidOrders === 1 ? "" : "s"} (average ${naira(s.averageOrderValue)} per order).`
+      `For ${label}, you made ${naira(s.totalRevenue)} from ${s.paidOrders} paid order${s.paidOrders === 1 ? "" : "s"} — that's an average of ${naira(s.averageOrderValue)} per order.`
     );
     if (s.previous.revenueChangePct != null) {
       const dir = s.previous.revenueChangePct >= 0 ? "up" : "down";
       parts.push(`That's ${dir} ${Math.abs(s.previous.revenueChangePct)}% versus the previous period (${naira(s.previous.totalRevenue)}).`);
     }
+    const top = context.menu.topItems?.items?.[0];
+    if (top && top.quantity > 0) parts.push(`${top.name} is leading the way with ${top.quantity} sold.`);
   } else if (context.orders && context.orders.total > 0) {
-    parts.push(`For ${label}, you have ${context.orders.total} order(s), with ${naira(context.orders.revenueSoFar)} collected so far.`);
+    parts.push(`So far ${label} you've taken ${context.orders.total} order${context.orders.total === 1 ? "" : "s"}, with ${naira(context.orders.revenueSoFar)} collected.`);
   } else {
-    parts.push(`There is no order data for ${label} yet.`);
+    // Conversational, manager-style framing rather than a database read-out.
+    parts.push(`I couldn't find any completed sales for ${label}.`);
+    const b = context.business;
+    if (context.orders) {
+      parts.push(b?.isOpenNow ? `You're open today, but no orders have come in yet.` : `The restaurant isn't marked open today.`);
+    }
+    if (b && b.subscription.daysRemaining != null && b.subscription.daysRemaining <= 7) {
+      parts.push(`A heads-up: your subscription renews in ${b.subscription.daysRemaining} day${b.subscription.daysRemaining === 1 ? "" : "s"}.`);
+    }
+    parts.push(`Would you like to see how this week is doing instead?`);
   }
 
-  const top = context.menu.topItems?.items?.[0];
-  if (top && top.quantity > 0) parts.push(`Top seller: ${top.name} (${top.quantity} sold).`);
-
   const notable = insights.filter((i) => i.type === "warning" || i.type === "anomaly").slice(0, 2);
-  if (notable.length > 0) parts.push(`Worth attention: ${notable.map((i) => i.title).join("; ")}.`);
+  if (notable.length > 0) parts.push(`One thing worth a look: ${notable.map((i) => i.title).join("; ")}.`);
 
-  parts.push(`(AI narration is unavailable, so this is a direct summary of your data.)`);
   return parts.join(" ");
 }
 
