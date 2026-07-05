@@ -140,6 +140,9 @@ export async function buildVoiceGreeting(slug: string, opts: VoiceGreetingOption
   if (awaiting > 0) {
     parts.push(`You have ${awaiting} recommendation${awaiting === 1 ? "" : "s"} awaiting your approval. Would you like me to read ${awaiting === 1 ? "it" : "them"}?`);
     pending = { type: "read_recommendations", label: `read your ${awaiting} recommendation${awaiting === 1 ? "" : "s"}` };
+  } else {
+    // No pending question — close like a manager handing over the floor.
+    parts.push(`What would you like to do first?`);
   }
 
   const display = parts.join(" ");

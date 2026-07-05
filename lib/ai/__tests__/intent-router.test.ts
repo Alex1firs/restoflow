@@ -13,7 +13,7 @@
  */
 import assert from "node:assert";
 import { FakeFirestore } from "./fake-firestore";
-import { detectIntent, routeIntent, type AssistantIntent } from "../intent-router";
+import { detectIntent, routeIntent, renderAnalytical, type AssistantIntent } from "../intent-router";
 import { askAssistant } from "../assistant";
 import type { RestaurantContext } from "../context";
 import type { Insight } from "../types";
@@ -179,6 +179,39 @@ async function main() {
     assert.ok(!revenueAns.includes("Kitchen is slow"), "revenue answer must not include the kitchen insight");
     assert.ok(kitchenAns.includes("Kitchen is slow"), `kitchen answer should surface its insight: ${kitchenAns}`);
     assert.ok(!kitchenAns.includes("Revenue dropped 20%"), "kitchen answer must NOT include the revenue anomaly");
+  });
+
+  // --- Richer analytical answers: the 5-part Answer→Insight→Prediction→Rec→Action shape ---
+  await ok("revenue answer delivers analysis, not just a number", () => {
+    const context = makeContext({
+      generatedAt: "2026-07-04T12:00:00Z",
+      range: { label: "week", from: "2026-06-28T00:00:00.000Z", to: "2026-07-04T23:59:59.999Z" },
+      sales: { summary: { totalOrders: 2, totalRevenue: 10000, paidOrders: 2, averageOrderValue: 5000, previous: { totalRevenue: 11628, totalOrders: 2, revenueChangePct: -14, ordersChangePct: 0 } }, byHour: null },
+      menu: { analytics: null, topItems: { items: [{ name: "Peppered Turkey", quantity: 3, revenue: 6200, orders: 2 }], totalItemsSold: 3 }, slowItems: null },
+    });
+    const ans = routeIntent("revenue", context, [insight("REVENUE_DROP", "Revenue dropped 14%")]);
+
+    assert.ok(/made ₦10,000/.test(ans), `answer beat: ${ans}`);
+    assert.ok(/down 14%/.test(ans), `insight: trend — ${ans}`);
+    assert.ok(/Peppered Turkey drove 62%/.test(ans), `insight: contribution — ${ans}`);
+    assert.ok(/Average order value is ₦5,000/.test(ans), `insight: AOV — ${ans}`);
+    assert.ok(/on track for about ₦/.test(ans), `prediction: projection — ${ans}`);
+    assert.ok(/Would you like recommendations/.test(ans), `action prompt — ${ans}`);
+  });
+
+  await ok("no-orders answer proactively offers to drive orders (Operations Manager)", () => {
+    const context = makeContext({
+      orders: { total: 0, byStatus: {}, active: 0, revenueSoFar: 0, latestOrders: [] },
+      business: { isOpenNow: true, subscription: { planName: "Pro", status: "active", daysRemaining: 20, graceDaysRemaining: null, isOperational: true } },
+    });
+    const ans = routeIntent("orders", context, []);
+    assert.ok(/no new orders/i.test(ans), ans);
+    assert.ok(/promotion|drive orders/i.test(ans), `should propose an action: ${ans}`);
+  });
+
+  await ok("renderAnalytical skips empty beats and never leaves dangling gaps", () => {
+    assert.equal(renderAnalytical({ answer: "A", actionPrompt: "B?" }), "A B?");
+    assert.equal(renderAnalytical({ answer: "Only answer." }), "Only answer.");
   });
 
   // --- End-to-end through askAssistant (deterministic mode, no LLM) ---
