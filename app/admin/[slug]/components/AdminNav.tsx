@@ -29,6 +29,7 @@ import {
   Sliders,
   ChevronLeft,
   ChevronRight,
+  Sparkles,
 } from "lucide-react";
 
 type Role = "owner" | "manager" | "staff";
@@ -91,6 +92,12 @@ function buildGroups(slug: string): NavGroup[] {
           href: `/admin/${slug}/dashboard`,
           Icon: LayoutDashboard,
           roles: ["owner", "manager", "staff"],
+        },
+        {
+          name: "Intelligence",
+          href: `/admin/${slug}/assistant`,
+          Icon: Sparkles,
+          roles: ["owner", "manager"],
         },
         {
           name: "Orders",
