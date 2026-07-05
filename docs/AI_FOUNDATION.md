@@ -900,3 +900,47 @@ Tests: `lib/ai/__tests__/voice.test.ts` (11) — toSpeech shaping, question→sp
 spoken brief, command→proposal (no execution), confirm→gated execution, cancel, tenant
 isolation, and a full-session write-safety check (only `ai_*` written).
 Full suite: `npm run test:ai` = **133 checks**.
+
+## 21.1 Phase 7.1 — Voice-First UX
+
+Voice becomes the **primary** interaction; the dashboard stays available beneath it.
+No engine changes — this is purely the voice client evolving. (Restaurant memory is
+deliberately deferred to **Phase 7.2**.)
+
+### Voice-first home
+`GET /api/admin/ai/voice/greeting` → `buildVoiceGreeting()` composes a personalised,
+time-of-day greeting from the **cached Daily Brief** + the **Recommendation Engine** (no
+generation, no writes). When recommendations await approval it offers to read them (a
+`read_recommendations` confirmation). `VoiceHome.tsx` (a collapsible hero at the top of
+the dashboard, owner/manager) fetches the greeting + signals and renders the voice
+client; dashboard cards remain below. Autoplay is blocked by browsers, so the greeting
+shows immediately as text with a "Hear your brief" tap to speak.
+
+### Continuous conversation
+The voice client threads recent turns as history, so follow-ups ("Why?", "compare with
+last week", "which item caused it?") resolve against the Assistant's existing grounding —
+no duplicated analytics.
+
+### Richer approval flow
+Recommendations can be referenced by **ordinal** ("approve recommendation one") or target
+("increase Jollof Rice by ₦200"). The proposal now states the **expected impact** before
+asking "Do you approve?" — and execution still runs through the Automation engine, gated
+by an enabled rule (approval-first, unchanged). "Read the recommendations" lists them
+numbered so they can be approved by number.
+
+### Proactive signals (`lib/ai/signals.ts`)
+`detectProactiveSignals()` — deterministic, **read-only**, reuses today's Restaurant
+Context + cached Forecast + Recommendation Engine to surface: sales above/below forecast,
+kitchen queue growing, peak approaching, inventory low, recommendations unreviewed. Each
+carries a `followup` prompt that continues into conversation. `GET /api/admin/ai/voice/signals`
+(safe to poll — writes nothing). Shown as tappable chips in `VoiceHome`; tapping/saying one
+launches the conversation. (OS-level push delivery is a future add — this ships the in-app
+proactive layer.)
+
+### Safety
+Deterministic routing · tenant-scoped · approval-first · greeting + signals are pure reads
+(zero writes) · voice execution still routes through automation handlers (no core mutation).
+Tests: `voice.test.ts` (14) + `signals.test.ts` (4) — greeting personalisation & read-offer,
+numbered read-aloud, ordinal approval with expected impact, signal detection, read-only
+write-safety, tenant isolation.
+Full suite: `npm run test:ai` = **140 checks**.

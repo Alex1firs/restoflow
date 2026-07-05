@@ -10,12 +10,14 @@ import {
   getAutomationRule,
 } from "./automation";
 import { sanitizePrompt } from "./guardrails";
+import { lagosHour } from "./tools/_shared";
 import type { AiProvider } from "./provider";
 import type {
   ActorRef,
   ConversationTurn,
   DailyBrief,
   Recommendation,
+  VoiceGreeting,
   VoicePendingAction,
   VoiceTurnResult,
 } from "./types";
@@ -65,20 +67,26 @@ export async function handleVoiceTurn(slug: string, transcript: string, opts: Vo
 
   // 1. Resolve an outstanding confirmation first.
   if (opts.pending) {
-    if (isAffirmative(lower)) return executePending(slug, opts.pending, actor, opts);
-    if (isNegative(lower)) return say("Okay, I've cancelled that.", "cancelled");
+    if (isAffirmative(lower)) {
+      if (opts.pending.type === "read_recommendations") return speakRecommendations(slug, opts);
+      return executePending(slug, opts.pending, actor, opts);
+    }
+    if (isNegative(lower)) return say("Okay, no problem.", "cancelled");
     // Anything else → treat as a fresh turn (the pending action is dropped).
   }
 
   // 2. Spoken brief — "how are we doing?", "good morning", "give me the rundown".
   if (isBriefIntent(lower)) return speakBrief(slug, opts);
 
-  // 3. Action commands (propose → confirm; never execute outright).
-  if (isPurchasingCommand(lower)) return proposePurchasing(slug, opts);
-  const recTarget = matchRecommendationCommand(lower);
-  if (recTarget !== null) return proposeRecommendation(slug, recTarget, opts);
+  // 3. Read the recommendations aloud (numbered, so they can be approved by ordinal).
+  if (isReadRecommendations(lower)) return speakRecommendations(slug, opts);
 
-  // 4. Default: a question, answered by the grounded Assistant, optimized for speech.
+  // 4. Action commands (propose → confirm; never execute outright).
+  if (isPurchasingCommand(lower)) return proposePurchasing(slug, opts);
+  const recRef = matchRecommendationCommand(lower);
+  if (recRef !== null) return proposeRecommendation(slug, recRef, opts);
+
+  // 5. Default: a question, answered by the grounded Assistant, optimized for speech.
   const ans = await askAssistant(slug, clean, {
     history: opts.history,
     db: opts.db,
@@ -87,6 +95,55 @@ export async function handleVoiceTurn(slug: string, transcript: string, opts: Vo
     role: actor.type === "manager" ? "manager" : "owner",
   });
   return { intent: "question", speech: toSpeech(ans.answer), display: ans.answer, pending: null, executed: false, degraded: ans.degraded };
+}
+
+// ---------------------------------------------------------------------------
+// Voice-first greeting (spoken on app open) — read-only, no generation
+// ---------------------------------------------------------------------------
+
+export interface VoiceGreetingOptions {
+  userName?: string;
+  db?: FirebaseFirestore.Firestore;
+  now?: () => Date;
+}
+
+/**
+ * Build the greeting the owner hears on opening the app. Reuses the cached Daily Brief
+ * and the Recommendation Engine — no new analytics, no writes. If pending recommendations
+ * exist, it offers to read them (a `read_recommendations` confirmation).
+ */
+export async function buildVoiceGreeting(slug: string, opts: VoiceGreetingOptions = {}): Promise<VoiceGreeting> {
+  const nowDate = (opts.now ?? (() => new Date()))();
+  const brief = await getBrief(slug, { db: opts.db, now: opts.now });
+  const recs = await listRecommendations(slug, { db: opts.db, now: opts.now });
+  const awaiting = recs.filter((r) => r.status === "new").length;
+
+  const hour = lagosHour(nowDate);
+  const tod = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
+  const name = opts.userName?.trim();
+  const hello = `Good ${tod}${name ? `, ${name}` : ""}.`;
+
+  const parts: string[] = [hello];
+  if (brief) parts.push(brief.summary);
+  else parts.push("I'll have your full brief ready shortly.");
+
+  let pending: VoicePendingAction | null = null;
+  if (awaiting > 0) {
+    parts.push(`You have ${awaiting} recommendation${awaiting === 1 ? "" : "s"} awaiting your approval. Would you like me to read ${awaiting === 1 ? "it" : "them"}?`);
+    pending = { type: "read_recommendations", label: `read your ${awaiting} recommendation${awaiting === 1 ? "" : "s"}` };
+  }
+
+  const display = parts.join(" ");
+  return { greeting: hello, speech: toSpeech(display), display, pendingRecommendations: awaiting, hasBrief: !!brief, pending };
+}
+
+/** Read the active recommendations aloud, numbered so they can be approved by ordinal. */
+async function speakRecommendations(slug: string, opts: VoiceTurnOptions): Promise<VoiceTurnResult> {
+  const recs = await listRecommendations(slug, { db: opts.db, now: opts.now });
+  if (recs.length === 0) return say("You have no recommendations right now.", "question");
+  const lines = recs.slice(0, 5).map((r, i) => `${capitalize(ordinalWord(i + 1))}: ${r.title}. ${r.expectedImpact}`);
+  const display = `Here ${recs.length === 1 ? "is your recommendation" : `are your ${Math.min(recs.length, 5)} recommendations`}. ${lines.join(" ")} Say "approve recommendation one" to act on ${recs.length === 1 ? "it" : "any of them"}.`;
+  return { intent: "question", speech: toSpeech(display), display, pending: null, executed: false, degraded: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -131,17 +188,22 @@ async function proposePurchasing(slug: string, opts: VoiceTurnOptions): Promise<
   return { intent: "command", speech, display: speech, pending, executed: false, degraded: plan.degraded };
 }
 
-async function proposeRecommendation(slug: string, target: string, opts: VoiceTurnOptions): Promise<VoiceTurnResult> {
+async function proposeRecommendation(slug: string, ref: RecRef, opts: VoiceTurnOptions): Promise<VoiceTurnResult> {
   const recs = await listRecommendations(slug, { db: opts.db, now: opts.now });
-  const match = target ? recs.find((r) => matchesTarget(r, target)) : recs[0];
+  const match = ref.kind === "ordinal" ? recs[ref.index] : ref.text ? recs.find((r) => matchesTarget(r, ref.text)) : recs[0];
   if (!match) {
-    const speech = target
-      ? `I don't have a recommendation matching "${target}" right now.`
-      : "I don't have any recommendations to act on right now.";
+    const speech =
+      ref.kind === "ordinal"
+        ? `I only have ${recs.length} recommendation${recs.length === 1 ? "" : "s"} right now.`
+        : ref.text
+        ? `I don't have a recommendation matching "${ref.text}" right now.`
+        : "I don't have any recommendations to act on right now.";
     return say(speech, "command");
   }
   const pending: VoicePendingAction = { type: "execute_recommendation", recId: match.id, label: match.title };
-  const speech = `I found a recommendation: ${match.title}. Should I approve and run it?`;
+  const impact = match.expectedImpact ? ` Expected impact: ${match.expectedImpact}.` : "";
+  const lead = ref.kind === "ordinal" ? `Recommendation ${ordinalWord(ref.index + 1)} proposes: ${match.title}.` : `I found a recommendation: ${match.title}.`;
+  const speech = `${lead}${impact} Do you approve?`;
   return { intent: "command", speech, display: speech, pending, executed: false, degraded: false };
 }
 
@@ -215,20 +277,47 @@ function isNegative(t: string): boolean {
 function isBriefIntent(t: string): boolean {
   return /(how are we doing|how'?re we doing|how are things|how'?s (it going|business|today)|good morning|morning brief|daily brief|the rundown|give me (a|the) (summary|brief|rundown)|what'?s (the )?(update|summary))/.test(t);
 }
+function isReadRecommendations(t: string): boolean {
+  return /(read|list|tell me|what are|go through)\s+(me\s+)?(the\s+|my\s+|all\s+(the\s+)?)?recommendations|read them( to me)?|what'?s recommended/.test(t);
+}
 function isPurchasingCommand(t: string): boolean {
   return /(approve|execute|run|confirm|do|start).{0,20}(purchasing|purchase|buying|restock|reorder|order).{0,10}(plan|list|order|s)?/.test(t) || /(draft|create).{0,15}(restock|purchase|order)/.test(t);
 }
-/**
- * A recommendation action command → returns the target phrase ("jollof rice"), an
- * empty string for a generic "run the recommendation", or null if not a rec command.
- */
-function matchRecommendationCommand(t: string): string | null {
-  // "increase/raise <item> by ₦200", "approve/execute/apply the recommendation for <item>"
+
+/** A reference to a recommendation — by ordinal ("recommendation one") or by target ("jollof rice"). */
+type RecRef = { kind: "ordinal"; index: number } | { kind: "target"; text: string };
+
+const ORDINALS: Record<string, number> = {
+  one: 0, first: 0, "1": 0, two: 1, second: 1, "2": 1, three: 2, third: 2, "3": 2,
+  four: 3, fourth: 3, "4": 3, five: 4, fifth: 4, "5": 4,
+};
+
+function parseOrdinal(t: string): number | null {
+  const m = t.match(/recommendation\s+(?:number\s+)?(one|two|three|four|five|first|second|third|fourth|fifth|[1-5])/);
+  return m ? ORDINALS[m[1]] ?? null : null;
+}
+
+/** Classify a recommendation action command → a structured ref, or null if not one. */
+function matchRecommendationCommand(t: string): RecRef | null {
+  // "increase/raise <item> by ₦200" → target.
   const priceMatch = t.match(/(?:increase|raise|bump|change|adjust).*?(?:price of |for )?(.+?)\s+by\s+(?:₦|naira|n)?\s?\d/);
-  if (priceMatch) return priceMatch[1].trim();
-  const forMatch = t.match(/(?:approve|execute|apply|run|do).*?recommendation(?:\s+(?:for|on|about)\s+(.+))?/);
-  if (forMatch) return (forMatch[1] ?? "").trim();
+  if (priceMatch) return { kind: "target", text: priceMatch[1].trim() };
+  // "approve/execute/apply/accept ... recommendation [one | for <item>]"
+  if (/(approve|execute|apply|run|do|accept).*recommendation/.test(t)) {
+    const ord = parseOrdinal(t);
+    if (ord != null) return { kind: "ordinal", index: ord };
+    const forMatch = t.match(/recommendation\s+(?:for|on|about)\s+(.+)/);
+    if (forMatch) return { kind: "target", text: forMatch[1].trim() };
+    return { kind: "ordinal", index: 0 }; // "approve the recommendation" → the first one
+  }
   return null;
+}
+
+function ordinalWord(n: number): string {
+  return ["one", "two", "three", "four", "five"][n - 1] ?? String(n);
+}
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function matchesTarget(rec: Recommendation, target: string): boolean {

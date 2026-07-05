@@ -99,7 +99,10 @@ export {
 } from "./purchasing";
 
 // Voice AI Restaurant Manager (a client on top of the stack — reuses every engine)
-export { handleVoiceTurn, toSpeech, type VoiceTurnOptions } from "./voice";
+export { handleVoiceTurn, buildVoiceGreeting, toSpeech, type VoiceTurnOptions, type VoiceGreetingOptions } from "./voice";
+
+// Proactive voice signals (deterministic, read-only detection over existing engines)
+export { detectProactiveSignals, type DetectSignalsOptions } from "./signals";
 
 // AI Automation (approval-first orchestration over approved recs/purchasing actions)
 export {

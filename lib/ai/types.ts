@@ -660,10 +660,39 @@ export type VoiceIntent = "question" | "brief" | "command" | "confirm" | "cancel
 
 /** A voice action awaiting an explicit spoken "yes" before it executes (approval-first). */
 export interface VoicePendingAction {
-  type: "execute_recommendation" | "execute_purchasing";
+  type: "execute_recommendation" | "execute_purchasing" | "read_recommendations";
   recId?: string;
   items?: string[];
   label: string;
+}
+
+/** The voice-first greeting shown/spoken when the owner opens the app. */
+export interface VoiceGreeting {
+  greeting: string;
+  speech: string;
+  display: string;
+  pendingRecommendations: number;
+  hasBrief: boolean;
+  pending: VoicePendingAction | null;
+}
+
+/**
+ * A proactive, event-driven signal surfaced by voice. Deterministic — derived from the
+ * existing engines (decision insights, forecast, recommendations), not new analytics.
+ * `followup` is a natural prompt that, when spoken/tapped, continues into conversation.
+ */
+export interface ProactiveSignal {
+  id: string;
+  type:
+    | "sales_above_forecast"
+    | "sales_below_forecast"
+    | "kitchen_queue_growing"
+    | "peak_approaching"
+    | "recommendations_unreviewed"
+    | "inventory_low";
+  severity: InsightSeverity;
+  message: string;
+  followup: string;
 }
 
 /**
