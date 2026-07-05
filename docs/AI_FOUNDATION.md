@@ -944,3 +944,52 @@ Tests: `voice.test.ts` (14) + `signals.test.ts` (4) — greeting personalisation
 numbered read-aloud, ordinal approval with expected impact, signal detection, read-only
 write-safety, tenant isolation.
 Full suite: `npm run test:ai` = **140 checks**.
+
+## 21.2 Phase 7.2 — Restaurant Operating Profile
+
+A **restaurant-scoped operating profile** — NOT conversation history, NOT LLM memory —
+that becomes another **input** into every AI decision while the engines stay
+deterministic and unchanged.
+
+### The non-invasive principle
+- The profile is **injected during context building** (`context.profile`, loaded read-only).
+- Engine rule bodies are **untouched**. The profile is **applied as a pure post-pass at the
+  consumption boundary** (routes + voice), so under the default profile everything behaves
+  exactly as before (identity application). This is how "influence every decision" and "do
+  not modify any engine logic" are both satisfied.
+
+### Sections (`lib/ai/profile.ts`, collection `ai_operating_profiles`)
+- **Business** — pricing philosophy, max price-increase cap (₦), prefer-promotions flag, preferred suppliers, opening hours, staffing philosophy, prep style.
+- **Owner** — language, primary interface, concise/detailed responses, notification hours, channel.
+- **AI** — confidence threshold, automation level, escalation rules, reminder frequency.
+- **Learned** — transparent, editable, resettable, auditable patterns the AI folds in gradually (`learnFromDecision` activates a pattern after ≥2 consistent accept/dismiss decisions).
+
+### Application (pure, deterministic)
+- `applyProfileToRecommendations` — hides sub-threshold recs, drops price increases over the owner's cap, demotes price increases when the owner prefers promotions. Applied by the recommendations route + voice.
+- `profileNarrationDirective` — appends a concise/language directive to the Assistant/Voice system prompt (styling only; "" by default).
+- `preferredSupplierFor` — attaches the preferred supplier to purchasing responses.
+- Forecast reads the profile via context; its numeric projection stays purely data-driven.
+
+### Versioned + audited + safe
+Every edit bumps `version` and appends a `ProfileAuditEntry` to `ai_operating_profile_audit`.
+`resetLearnedPreferences` clears learned patterns (audited). Restaurant-scoped, owner-editable.
+Writes ONLY `ai_operating_profiles` + `ai_operating_profile_audit`; **never business data**.
+`firestore.rules`: both client-denied, server-only.
+
+### Route & UI
+- `GET/PATCH/POST /api/admin/ai/profile` — read (+ audit), edit a section, `reset_learned`.
+- `operating-profile/` page (nav: "Operating Profile", owner/manager) — editable sections + a transparent, resettable learned-preferences panel.
+
+### Wiring recap (all additive, no rule changes)
+Recommendations route + voice apply the profile · Assistant appends the narration directive ·
+Purchasing route attaches the preferred supplier · recommendation accept/dismiss feeds
+`learnFromDecision`. The deterministic RULES in every engine are byte-for-byte unchanged
+(proven: all prior suites still pass with the default profile as an identity input).
+
+### Safety
+Restaurant-scoped · owner-editable · versioned · audited · deterministic · never mutates
+business data · used only during AI reasoning.
+Tests: `lib/ai/__tests__/profile.test.ts` (12) — default identity, versioned+audited edits,
+price-cap/threshold/prefer-promotions application, gradual learning, reset, tenant isolation,
+write-safety.
+Full suite: `npm run test:ai` = **152 checks**.

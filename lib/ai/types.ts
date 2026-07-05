@@ -558,6 +558,8 @@ export interface PurchasingPlan {
   summary: string;
   /** false until recipes/bill-of-materials data exists; UI can prompt setup. */
   ingredientPlanningAvailable: boolean;
+  /** Owner's preferred supplier from the Operating Profile, attached at read time. */
+  preferredSupplier?: string | null;
   /** Provenance: which forecast this plan was derived from. */
   basedOnForecastAt: string;
   confidence: number;
@@ -650,6 +652,76 @@ export interface AutomationExecution {
   rollbackToken: string | null;
   /** Populated if this execution was later reversed. */
   rollback: { rolledBackAt: string; by: ActorRef; detail: string } | null;
+}
+
+// ---------------------------------------------------------------------------
+// Restaurant Operating Profile (Phase 7.2) — a restaurant-scoped input into every
+// AI decision. NOT conversation history, NOT LLM memory. Never mutates business data.
+// ---------------------------------------------------------------------------
+
+export interface BusinessPreferences {
+  pricingPhilosophy: "aggressive" | "moderate" | "conservative" | null;
+  /** Hard cap on a recommended price-increase delta (₦). null = no cap. */
+  maxPriceIncreaseNaira: number | null;
+  /** Owner prefers promotions to price increases → demote price_increase recs. */
+  preferPromotionsOverPriceIncrease: boolean;
+  preferredSuppliers: string[];
+  openingHours: string | null;
+  staffingPhilosophy: string | null;
+  preparationStyle: string | null;
+}
+
+export interface OwnerPreferences {
+  language: string; // ISO-ish, e.g. "en"
+  primaryInterface: "voice" | "dashboard";
+  responseStyle: "concise" | "detailed";
+  /** Preferred Lagos-hour window for notifications, or null for anytime. */
+  notificationHours: { from: number; to: number } | null;
+  notificationChannel: "whatsapp" | "push" | "in_app";
+}
+
+export interface AIPreferences {
+  /** Hide recommendations below this confidence (0..1). 0 = show all. */
+  confidenceThreshold: number;
+  automationLevel: "manual" | "assisted" | "auto";
+  escalationRules: string | null;
+  reminderFrequency: "off" | "daily" | "weekly";
+}
+
+/** A transparent, editable, resettable pattern the AI has learned (or the owner set). */
+export interface LearnedPreference {
+  id: string;
+  statement: string; // human-readable, always shown to the owner
+  type: "accepts" | "rejects" | "prefers";
+  subject: string; // e.g. "staffing", "price_increase"
+  params: Record<string, string | number | boolean | null>;
+  source: "learned" | "owner";
+  active: boolean; // learned patterns activate once evidence is sufficient
+  confidence: number; // 0..1
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RestaurantOperatingProfile {
+  restaurantId: string;
+  business: BusinessPreferences;
+  owner: OwnerPreferences;
+  ai: AIPreferences;
+  learned: LearnedPreference[];
+  version: number;
+  updatedAt: string;
+  updatedBy: ActorRef | null;
+}
+
+/** An append-only audit entry for a profile change (versioned history). */
+export interface ProfileAuditEntry {
+  id: string;
+  restaurantId: string;
+  version: number;
+  section: "business" | "owner" | "ai" | "learned" | "reset_learned";
+  changedKeys: string[];
+  actor: ActorRef;
+  at: string;
 }
 
 // ---------------------------------------------------------------------------

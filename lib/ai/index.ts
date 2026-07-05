@@ -104,6 +104,21 @@ export { handleVoiceTurn, buildVoiceGreeting, toSpeech, type VoiceTurnOptions, t
 // Proactive voice signals (deterministic, read-only detection over existing engines)
 export { detectProactiveSignals, type DetectSignalsOptions } from "./signals";
 
+// Restaurant Operating Profile (a restaurant-scoped input into every AI decision)
+export {
+  getOperatingProfile,
+  updateOperatingProfile,
+  resetLearnedPreferences,
+  learnFromDecision,
+  listProfileAudit,
+  applyProfileToRecommendations,
+  profileNarrationDirective,
+  preferredSupplierFor,
+  AI_OPERATING_PROFILE_COLLECTION,
+  AI_OPERATING_PROFILE_AUDIT_COLLECTION,
+  type ProfileUpdatePatch,
+} from "./profile";
+
 // AI Automation (approval-first orchestration over approved recs/purchasing actions)
 export {
   createAutomationFromRecommendation,

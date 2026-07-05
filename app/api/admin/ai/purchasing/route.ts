@@ -2,6 +2,15 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getPurchasingPlan, generatePurchasingPlan } from "@/lib/ai/purchasing";
+import { getOperatingProfile, preferredSupplierFor } from "@/lib/ai/profile";
+import type { PurchasingPlan } from "@/lib/ai/types";
+
+/** Attach the owner's preferred supplier from the Operating Profile (non-mutating). */
+async function withProfile(slug: string, plan: PurchasingPlan | null): Promise<PurchasingPlan | null> {
+  if (!plan) return plan;
+  const profile = await getOperatingProfile(slug);
+  return { ...plan, preferredSupplier: preferredSupplierFor(profile) };
+}
 
 /**
  * GET  /api/admin/ai/purchasing  → today's cached purchasing plan (no computation).
@@ -20,7 +29,7 @@ export async function GET() {
   }
   if (user.role === "staff") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const plan = await getPurchasingPlan(user.restaurantSlug);
+  const plan = await withProfile(user.restaurantSlug, await getPurchasingPlan(user.restaurantSlug));
   return NextResponse.json({ plan }, { status: 200 });
 }
 
@@ -45,7 +54,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const plan = await generatePurchasingPlan(user.restaurantSlug, { force });
+    const plan = await withProfile(user.restaurantSlug, await generatePurchasingPlan(user.restaurantSlug, { force }));
     return NextResponse.json({ plan }, { status: 200 });
   } catch (err) {
     console.error("[ai-purchasing] error:", err);

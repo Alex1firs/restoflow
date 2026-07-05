@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { listRecommendations, generateRecommendations } from "@/lib/ai/recommendations";
+import { getOperatingProfile, applyProfileToRecommendations } from "@/lib/ai/profile";
 
 /**
  * GET  /api/admin/ai/recommendations  → active recommendations (cached read).
@@ -20,8 +21,9 @@ export async function GET() {
   }
   if (user.role === "staff") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const recommendations = await listRecommendations(user.restaurantSlug);
-  return NextResponse.json({ recommendations }, { status: 200 });
+  // The Operating Profile is applied at this boundary — the engine output is unchanged.
+  const [recs, profile] = await Promise.all([listRecommendations(user.restaurantSlug), getOperatingProfile(user.restaurantSlug)]);
+  return NextResponse.json({ recommendations: applyProfileToRecommendations(recs, profile) }, { status: 200 });
 }
 
 export async function POST(req: Request) {
@@ -47,7 +49,8 @@ export async function POST(req: Request) {
 
   try {
     const recommendations = await generateRecommendations(user.restaurantSlug, { force });
-    return NextResponse.json({ recommendations }, { status: 200 });
+    const profile = await getOperatingProfile(user.restaurantSlug);
+    return NextResponse.json({ recommendations: applyProfileToRecommendations(recommendations, profile) }, { status: 200 });
   } catch (err) {
     console.error("[ai-recommendations] error:", err);
     return NextResponse.json({ error: "Failed to generate recommendations. Please try again." }, { status: 500 });

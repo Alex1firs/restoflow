@@ -148,5 +148,17 @@ service cloud.firestore {
       allow read:  if false;
       allow write: if false;
     }
+
+    // ─── Restaurant Operating Profile (ai_operating_profiles + audit) ────────────
+    // Restaurant-scoped operating preferences that influence AI reasoning. Written by
+    // the server (Admin SDK) and served via /api/admin/ai/profile — never client-direct.
+    match /ai_operating_profiles/{profileId} {
+      allow read:  if false;
+      allow write: if false;
+    }
+    match /ai_operating_profile_audit/{auditId} {
+      allow read:  if false;
+      allow write: if false;
+    }
   }
 }

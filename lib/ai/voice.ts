@@ -2,6 +2,7 @@ import "server-only";
 import { askAssistant } from "./assistant";
 import { getBrief, generateBrief } from "./brief";
 import { listRecommendations, updateRecommendationStatus } from "./recommendations";
+import { getOperatingProfile, applyProfileToRecommendations } from "./profile";
 import { getPurchasingPlan, generatePurchasingPlan } from "./purchasing";
 import {
   createAutomationFromRecommendation,
@@ -137,9 +138,18 @@ export async function buildVoiceGreeting(slug: string, opts: VoiceGreetingOption
   return { greeting: hello, speech: toSpeech(display), display, pendingRecommendations: awaiting, hasBrief: !!brief, pending };
 }
 
+/** Active recommendations with the Operating Profile applied at this boundary. */
+async function profiledRecommendations(slug: string, opts: VoiceTurnOptions): Promise<Recommendation[]> {
+  const [recs, profile] = await Promise.all([
+    listRecommendations(slug, { db: opts.db, now: opts.now }),
+    getOperatingProfile(slug, { db: opts.db, now: opts.now }),
+  ]);
+  return applyProfileToRecommendations(recs, profile);
+}
+
 /** Read the active recommendations aloud, numbered so they can be approved by ordinal. */
 async function speakRecommendations(slug: string, opts: VoiceTurnOptions): Promise<VoiceTurnResult> {
-  const recs = await listRecommendations(slug, { db: opts.db, now: opts.now });
+  const recs = await profiledRecommendations(slug, opts);
   if (recs.length === 0) return say("You have no recommendations right now.", "question");
   const lines = recs.slice(0, 5).map((r, i) => `${capitalize(ordinalWord(i + 1))}: ${r.title}. ${r.expectedImpact}`);
   const display = `Here ${recs.length === 1 ? "is your recommendation" : `are your ${Math.min(recs.length, 5)} recommendations`}. ${lines.join(" ")} Say "approve recommendation one" to act on ${recs.length === 1 ? "it" : "any of them"}.`;
@@ -189,7 +199,7 @@ async function proposePurchasing(slug: string, opts: VoiceTurnOptions): Promise<
 }
 
 async function proposeRecommendation(slug: string, ref: RecRef, opts: VoiceTurnOptions): Promise<VoiceTurnResult> {
-  const recs = await listRecommendations(slug, { db: opts.db, now: opts.now });
+  const recs = await profiledRecommendations(slug, opts);
   const match = ref.kind === "ordinal" ? recs[ref.index] : ref.text ? recs.find((r) => matchesTarget(r, ref.text)) : recs[0];
   if (!match) {
     const speech =

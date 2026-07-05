@@ -1,5 +1,6 @@
 import "server-only";
 import { redactPII } from "./guardrails";
+import { getOperatingProfile } from "./profile";
 import {
   IntelligenceContext,
   createIntelligenceContext,
@@ -29,6 +30,7 @@ import type {
   MenuAnalytics,
   RangeInput,
   RecentTransactions,
+  RestaurantOperatingProfile,
   RestaurantSettings,
   RevenueSummary,
   SalesByHour,
@@ -91,6 +93,9 @@ export interface RestaurantContext {
   staff: StaffPerformance | null;
   inventory: InventoryOverview | null;
 
+  /** The Restaurant Operating Profile — a restaurant-scoped input into AI decisions. */
+  profile: RestaurantOperatingProfile;
+
   reports: {
     kitchen: KitchenPerformance | null;
     recentTransactions: RecentTransactions | null;
@@ -107,6 +112,8 @@ export interface RestaurantContext {
 export interface BuildContextOptions extends IntelligenceContextOptions {
   /** Reporting window for windowed tools (revenue, top/slow, staff, etc.). */
   range?: RangeInput;
+  /** Inject a specific operating profile (tests); otherwise it is loaded read-only. */
+  profile?: RestaurantOperatingProfile;
 }
 
 /**
@@ -171,6 +178,9 @@ export async function buildRestaurantContext(
   // Determine the effective window label from any windowed tool that ran.
   const resolved = resolveEffectiveRange(ctx, range);
 
+  // Inject the Restaurant Operating Profile — a restaurant-scoped input (read-only).
+  const profile = options.profile ?? (await getOperatingProfile(ctx.scope.restaurantSlug, { db: ctx.db, now: ctx.now }));
+
   const context: RestaurantContext = {
     generatedAt: ctx.now().toISOString(),
     restaurantSlug: ctx.scope.restaurantSlug,
@@ -183,6 +193,7 @@ export async function buildRestaurantContext(
     customers,
     staff,
     inventory,
+    profile,
     reports: { kitchen, recentTransactions },
     meta: {
       toolsRun,
