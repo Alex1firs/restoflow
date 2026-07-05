@@ -59,6 +59,18 @@ export {
   type AssistantIntent,
 } from "./intent-router";
 
+// Command layer (Intent + Target model for navigation + actions)
+export {
+  parseCommand,
+  webNavigation,
+  describeCommand,
+  parseCommandOrdinal,
+  type Command,
+  type CommandIntent,
+  type CommandTarget,
+  type NavTarget,
+} from "./commands";
+
 // Shared narration helper
 export { narrate, type NarrationResult, type NarrateArgs } from "./narration";
 

@@ -809,6 +809,11 @@ export interface VoiceTurnResult {
   pending: VoicePendingAction | null;
   executed: boolean;
   degraded: boolean;
+  /**
+   * Set when a command resolves to navigation (e.g. "open today's orders"). The
+   * client performs the actual route change; the command layer stays UI-agnostic.
+   */
+  navigation?: { target: string; path: string; label: string; anchor?: string } | null;
 }
 
 // ---------------------------------------------------------------------------

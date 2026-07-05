@@ -12,6 +12,7 @@ import {
   getAutomationRule,
 } from "./automation";
 import { sanitizePrompt } from "./guardrails";
+import { parseCommand, webNavigation, type Command } from "./commands";
 import { lagosHour } from "./tools/_shared";
 import type { AiProvider } from "./provider";
 import type {
@@ -84,18 +85,26 @@ export async function handleVoiceTurn(slug: string, transcript: string, opts: Vo
     // Anything else → treat as a fresh turn (the pending action is dropped).
   }
 
-  // 2. Spoken brief — "how are we doing?", "good morning", "give me the rundown".
+  // 2. Command layer (Intent + Target) — navigation + actions, deterministic and
+  // shared with typed chat. Analysis questions parse to null and fall through.
+  const command = parseCommand(clean);
+  if (command) {
+    const handled = await runCommand(slug, command, actor, opts);
+    if (handled) return handled;
+  }
+
+  // 3. Spoken brief — "how are we doing?", "good morning", "give me the rundown".
   if (isBriefIntent(lower)) return speakBrief(slug, opts);
 
-  // 3. Read the recommendations aloud (numbered, so they can be approved by ordinal).
+  // 4. Read the recommendations aloud (numbered, so they can be approved by ordinal).
   if (isReadRecommendations(lower)) return speakRecommendations(slug, opts);
 
-  // 4. Action commands (propose → confirm; never execute outright).
+  // 5. Action commands (propose → confirm; never execute outright).
   if (isPurchasingCommand(lower)) return proposePurchasing(slug, opts);
   const recRef = matchRecommendationCommand(lower);
   if (recRef !== null) return proposeRecommendation(slug, recRef, opts);
 
-  // 5. Default: a question, answered by the grounded Assistant, optimized for speech.
+  // 6. Default: a question, answered by the grounded Assistant, optimized for speech.
   const ans = await askAssistant(slug, clean, {
     history: opts.history,
     db: opts.db,
@@ -104,6 +113,58 @@ export async function handleVoiceTurn(slug: string, transcript: string, opts: Vo
     role: actor.type === "manager" ? "manager" : "owner",
   });
   return { intent: "question", speech: toSpeech(ans.answer), display: ans.answer, pending: null, executed: false, degraded: ans.degraded };
+}
+
+// ---------------------------------------------------------------------------
+// Command dispatch (Intent + Target) — one place maps commands to behavior
+// ---------------------------------------------------------------------------
+
+/**
+ * Execute a parsed command. Returns a VoiceTurnResult, or null to let the caller
+ * fall through (e.g. a command whose intent this turn can't yet fulfil). Actions on
+ * recommendations stay APPROVAL-FIRST — "approve" proposes and waits for "yes".
+ */
+async function runCommand(slug: string, command: Command, actor: ActorRef, opts: VoiceTurnOptions): Promise<VoiceTurnResult | null> {
+  switch (command.intent) {
+    case "open": {
+      // Navigation is read-only: return where to go; the client changes route.
+      const nav = webNavigation(command.target, slug);
+      const speech = `Opening ${nav.label}.`;
+      return { intent: "command", speech: toSpeech(speech), display: speech, pending: null, executed: false, degraded: false, navigation: nav };
+    }
+    case "read": {
+      if (command.target === "brief") return speakBrief(slug, opts);
+      if (command.target === "recommendations") return speakRecommendations(slug, opts);
+      if (command.target === "purchasing") return proposePurchasing(slug, opts);
+      return null;
+    }
+    case "explain":
+      return explainRecommendationByOrdinal(slug, command.id ?? 1, opts);
+    case "approve":
+      // Reuse the approval-first proposal flow (states impact, waits for "yes").
+      return proposeRecommendation(slug, { kind: "ordinal", index: (command.id ?? 1) - 1 }, opts);
+    case "reject": {
+      // Recommendations are curated from the Recommendations card. Point the owner
+      // straight there rather than mutating silently — dismissal stays explicit.
+      const nav = webNavigation("recommendations", slug);
+      const which = command.id ? ` number ${command.id}` : "";
+      const speech = `Opening your recommendations so you can dismiss${which}.`;
+      return { intent: "command", speech: toSpeech(speech), display: speech, pending: null, executed: false, degraded: false, navigation: nav };
+    }
+  }
+}
+
+/** Read a specific recommendation's explanation aloud (read-only, by 1-based ordinal). */
+async function explainRecommendationByOrdinal(slug: string, ordinal: number, opts: VoiceTurnOptions): Promise<VoiceTurnResult> {
+  const recs = await profiledRecommendations(slug, opts);
+  const rec = recs[ordinal - 1];
+  if (!rec) {
+    return say(`I only have ${recs.length} recommendation${recs.length === 1 ? "" : "s"} right now.`, "command");
+  }
+  const exp = explainRecommendation(rec);
+  const body = explanationToSpeech(exp, "full");
+  const display = `Recommendation ${ordinal}: ${rec.title}. ${body}`;
+  return { intent: "question", speech: toSpeech(display), display, pending: null, executed: false, degraded: false };
 }
 
 // ---------------------------------------------------------------------------
