@@ -10,6 +10,7 @@ import RecommendationsCard from "./RecommendationsCard";
 import ForecastCard from "./ForecastCard";
 import PurchasingCard from "./PurchasingCard";
 import AutomationCard from "./AutomationCard";
+import VoiceHome from "./VoiceHome";
 
 type OrderStatus = "pending" | "preparing" | "ready" | "completed" | "rejected";
 
@@ -285,6 +286,9 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
             })}
           </p>
         </div>
+
+        {/* Voice-First Home — the primary interaction; dashboard cards remain below */}
+        {role !== "staff" && <VoiceHome />}
 
         {/* ── PENDING CANCELLATION ALERTS BANNER ──────────────────── */}
         {(role === "owner" || role === "manager") && allOrders.filter((o) => o.cancellationRequested === true).length > 0 && (

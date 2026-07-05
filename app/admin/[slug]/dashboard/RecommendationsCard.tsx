@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  Lightbulb, RefreshCw, Check, X, TrendingUp, Users, PackageCheck, Layers, Megaphone, Heart, type LucideIcon,
+  Lightbulb, RefreshCw, Check, X, TrendingUp, Users, PackageCheck, Layers, Megaphone, Heart, HelpCircle, AlertTriangle, type LucideIcon,
 } from "lucide-react";
 
 /**
@@ -13,6 +13,7 @@ import {
 
 type RecType = "price_increase" | "promote_item" | "staffing" | "bundle" | "reenable_item" | "loyalty";
 
+type Explanation = { what: string; why: string[]; ifIgnored: string; confidenceLevel: string };
 type Rec = {
   id: string;
   type: RecType;
@@ -21,6 +22,7 @@ type Rec = {
   expectedImpact: string;
   confidenceLevel: string;
   status: string;
+  explanation?: Explanation;
 };
 
 const ICONS: Record<RecType, LucideIcon> = {
@@ -38,7 +40,17 @@ export default function RecommendationsCard({ role }: { role?: string }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [actioning, setActioning] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
+
+  function toggleWhy(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   useEffect(() => {
     let active = true;
@@ -169,6 +181,34 @@ export default function RecommendationsCard({ role }: { role?: string }) {
                     <p className="text-[11px] text-gray-400 mt-1">
                       Expected impact: {r.expectedImpact} · Confidence: {r.confidenceLevel}
                     </p>
+
+                    {r.explanation && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => toggleWhy(r.id)}
+                          className="inline-flex items-center gap-1 text-[11px] font-black text-blue-600 hover:text-blue-700 mt-1.5"
+                        >
+                          <HelpCircle className="w-3 h-3" /> {expanded.has(r.id) ? "Hide details" : "Why?"}
+                        </button>
+                        {expanded.has(r.id) && (
+                          <div className="mt-1.5 rounded-lg bg-gray-50 border border-gray-100 p-2.5 space-y-1.5">
+                            <div>
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-wide">Why</p>
+                              <ul className="mt-0.5 space-y-0.5">
+                                {r.explanation.why.map((w, i) => (
+                                  <li key={i} className="text-[11px] text-gray-600 leading-snug">• {w}</li>
+                                ))}
+                              </ul>
+                            </div>
+                            <div className="flex items-start gap-1.5">
+                              <AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0 mt-0.5" />
+                              <p className="text-[11px] text-amber-700 font-bold leading-snug">{r.explanation.ifIgnored}</p>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
 
                     {canManage && (
                       <div className="flex items-center gap-2 mt-2">

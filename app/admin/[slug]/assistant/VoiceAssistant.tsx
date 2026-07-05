@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Mic, Square, Volume2, VolumeX, Sunrise, Check, X, Loader2 } from "lucide-react";
+import { Mic, Square, Volume2, VolumeX, Sunrise, Check, X, Loader2, Play, Bell } from "lucide-react";
 import { createSpeechProviders, type SpeechToTextProvider, type TextToSpeechProvider } from "./speech";
 
 /**
@@ -13,12 +13,21 @@ import { createSpeechProviders, type SpeechToTextProvider, type TextToSpeechProv
  * waits for a spoken (or tapped) "yes".
  */
 
-type PendingAction = { type: "execute_recommendation" | "execute_purchasing"; recId?: string; items?: string[]; label: string };
+type PendingAction = { type: "execute_recommendation" | "execute_purchasing" | "read_recommendations"; recId?: string; items?: string[]; label: string };
 type VoiceResult = { intent: string; speech: string; display: string; pending: PendingAction | null; executed: boolean; degraded: boolean };
 type Msg = { id: number; role: "user" | "assistant"; text: string };
 type Turn = { question: string; answer: string };
 
-export default function VoiceAssistant() {
+export type VoiceGreetingProp = { display: string; speech: string; pending: PendingAction | null };
+export type VoiceSignalProp = { id: string; message: string; followup: string; severity: string };
+
+export default function VoiceAssistant({
+  greeting = null,
+  signals = [],
+}: {
+  greeting?: VoiceGreetingProp | null;
+  signals?: VoiceSignalProp[];
+} = {}) {
   const providers = useRef<{ stt: SpeechToTextProvider; tts: TextToSpeechProvider } | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [interim, setInterim] = useState("");
@@ -52,6 +61,15 @@ export default function VoiceAssistant() {
     if (mutedRef.current || !providers.current) return;
     providers.current.tts.speak(text, { onStart: () => setSpeaking(true), onEnd: () => setSpeaking(false) });
   }, []);
+
+  // Seed the voice-first greeting once (spoken on first user gesture — autoplay is blocked).
+  const greetedRef = useRef(false);
+  useEffect(() => {
+    if (!greeting || greetedRef.current) return;
+    greetedRef.current = true;
+    setMessages((m) => (m.length ? m : [{ id: ++idRef.current, role: "assistant", text: greeting.display }]));
+    setPending(greeting.pending);
+  }, [greeting]);
 
   const addMsg = useCallback((role: Msg["role"], text: string) => {
     setMessages((m) => [...m, { id: ++idRef.current, role, text }]);
@@ -169,9 +187,40 @@ export default function VoiceAssistant() {
         </button>
       </div>
 
+      {/* Greeting play + proactive signals */}
+      {greeting && (
+        <button
+          type="button"
+          onClick={() => speak(greeting.speech)}
+          disabled={speaking}
+          className="mb-3 inline-flex items-center gap-1.5 text-xs font-black text-orange-700 bg-orange-50 hover:bg-orange-100 disabled:opacity-50 px-3 py-1.5 rounded-lg self-start"
+        >
+          <Play className="w-3.5 h-3.5" /> Hear your brief
+        </button>
+      )}
+      {signals.length > 0 && (
+        <div className="flex flex-col gap-2 mb-4">
+          {signals.slice(0, 3).map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => send(s.followup)}
+              className={`flex items-center gap-2 text-left text-xs font-bold rounded-xl px-3 py-2.5 border transition-colors ${
+                s.severity === "high" || s.severity === "critical"
+                  ? "border-red-200 bg-red-50/60 text-red-800 hover:bg-red-50"
+                  : "border-indigo-100 bg-indigo-50/50 text-indigo-800 hover:bg-indigo-50"
+              }`}
+            >
+              <Bell className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="min-w-0">{s.message}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Conversation */}
       <div className="flex-1 space-y-3 overflow-y-auto mb-4">
-        {messages.length === 0 && !interim && (
+        {messages.length === 0 && !interim && !greeting && (
           <button
             type="button"
             onClick={() => send("How are we doing today?")}

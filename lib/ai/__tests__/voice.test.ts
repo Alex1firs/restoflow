@@ -12,7 +12,7 @@
  */
 import assert from "node:assert";
 import { FakeFirestore } from "./fake-firestore";
-import { handleVoiceTurn, toSpeech } from "../voice";
+import { handleVoiceTurn, buildVoiceGreeting, toSpeech } from "../voice";
 import { generateRecommendations } from "../recommendations";
 import { setAutomationRule } from "../automation";
 import type { ActorRef } from "../types";
@@ -155,6 +155,58 @@ async function main() {
     const r = await handleVoiceTurn("grills", "no", { ...base(db), pending: proposal.pending });
     assert.equal(r.intent, "cancelled");
     assert.equal(r.executed, false);
+  });
+
+  // ── Voice-first greeting ────────────────────────────────────────────────────
+  await ok("greeting personalises and offers to read pending recommendations", async () => {
+    const db = seedDb();
+    await generateRecommendations("grills", { db: asDb(db), now }); // creates "new" recs awaiting approval
+    const g = await buildVoiceGreeting("grills", { userName: "Alex", db: asDb(db), now });
+    assert.ok(/^Good (morning|afternoon|evening), Alex\./.test(g.display), "personalised greeting");
+    assert.ok(g.pendingRecommendations > 0);
+    assert.ok(g.pending && g.pending.type === "read_recommendations", "offers to read them");
+    assert.ok(!/[#*`]/.test(g.speech));
+  });
+
+  await ok('confirming the greeting reads the numbered recommendations aloud', async () => {
+    const db = seedDb();
+    await generateRecommendations("grills", { db: asDb(db), now });
+    const g = await buildVoiceGreeting("grills", { userName: "Alex", db: asDb(db), now });
+    const r = await handleVoiceTurn("grills", "yes", { ...base(db), pending: g.pending });
+    assert.ok(/One:/.test(r.display), "recommendations are numbered");
+    assert.ok(/approve recommendation one/i.test(r.display), "explains how to act");
+  });
+
+  await ok('"approve recommendation one" proposes it with its expected impact', async () => {
+    const db = seedDb();
+    await generateRecommendations("grills", { db: asDb(db), now });
+    const r = await handleVoiceTurn("grills", "Approve recommendation one", base(db));
+    assert.equal(r.intent, "command");
+    assert.ok(r.pending && r.pending.type === "execute_recommendation");
+    assert.ok(/Recommendation one proposes/i.test(r.speech));
+    assert.ok(/Expected impact/i.test(r.speech), "states the expected impact before approval");
+    assert.equal(r.executed, false);
+  });
+
+  // ── Explainability follow-ups on a pending recommendation ─────────────────
+  await ok('"why?" on a proposed recommendation answers from its fields and keeps the offer', async () => {
+    const db = seedDb();
+    await generateRecommendations("grills", { db: asDb(db), now });
+    const proposal = await handleVoiceTurn("grills", "Approve recommendation one", base(db));
+    const r = await handleVoiceTurn("grills", "why?", { ...base(db), pending: proposal.pending });
+    assert.equal(r.intent, "confirm");
+    assert.ok(r.display.length > 0, "gives a reason");
+    assert.ok(r.pending && r.pending.type === "execute_recommendation", "confirmation is preserved");
+    assert.equal(r.executed, false);
+  });
+
+  await ok('"what if I ignore it?" answers the consequence, still awaiting yes', async () => {
+    const db = seedDb();
+    await generateRecommendations("grills", { db: asDb(db), now });
+    const proposal = await handleVoiceTurn("grills", "Approve recommendation one", base(db));
+    const r = await handleVoiceTurn("grills", "what if I ignore it?", { ...base(db), pending: proposal.pending });
+    assert.ok(/ignored|forgo|turning away|missed/i.test(r.display), "explains the downside");
+    assert.ok(r.pending, "confirmation preserved");
   });
 
   // ── Tenant isolation ───────────────────────────────────────────────────────

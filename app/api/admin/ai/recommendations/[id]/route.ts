@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { updateRecommendationStatus } from "@/lib/ai/recommendations";
-import type { RecommendationStatus } from "@/lib/ai/types";
+import { learnFromDecision } from "@/lib/ai/profile";
+import type { ActorRef, RecommendationStatus } from "@/lib/ai/types";
 
 /**
  * PATCH /api/admin/ai/recommendations/[id]
@@ -37,6 +38,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   try {
     const rec = await updateRecommendationStatus(user.restaurantSlug, id, status as RecommendationStatus);
     if (!rec) return NextResponse.json({ error: "Recommendation not found" }, { status: 404 });
+    // Gradual learning: fold accept/dismiss decisions into the Operating Profile (additive).
+    if (status === "accepted" || status === "dismissed") {
+      const actor: ActorRef = { type: user.role === "manager" ? "manager" : "owner", id: user.uid };
+      await learnFromDecision(user.restaurantSlug, rec.type, status, actor).catch(() => {});
+    }
     return NextResponse.json({ recommendation: rec }, { status: 200 });
   } catch (err) {
     console.error("[ai-recommendations] update error:", err);

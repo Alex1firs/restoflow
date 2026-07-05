@@ -99,7 +99,35 @@ export {
 } from "./purchasing";
 
 // Voice AI Restaurant Manager (a client on top of the stack — reuses every engine)
-export { handleVoiceTurn, toSpeech, type VoiceTurnOptions } from "./voice";
+export { handleVoiceTurn, buildVoiceGreeting, toSpeech, type VoiceTurnOptions, type VoiceGreetingOptions } from "./voice";
+
+// Proactive voice signals (deterministic, read-only detection over existing engines)
+export { detectProactiveSignals, type DetectSignalsOptions } from "./signals";
+
+// Restaurant Operating Profile (a restaurant-scoped input into every AI decision)
+export {
+  getOperatingProfile,
+  updateOperatingProfile,
+  resetLearnedPreferences,
+  learnFromDecision,
+  listProfileAudit,
+  applyProfileToRecommendations,
+  profileNarrationDirective,
+  preferredSupplierFor,
+  GOAL_BOOSTS,
+  AI_OPERATING_PROFILE_COLLECTION,
+  AI_OPERATING_PROFILE_AUDIT_COLLECTION,
+  type ProfileUpdatePatch,
+} from "./profile";
+
+// Explainability Layer (What? / Why? / If ignored? — from existing structured fields)
+export {
+  explainRecommendation,
+  explainForecast,
+  explainPurchasingLine,
+  explainAutomation,
+  explanationToSpeech,
+} from "./explainability";
 
 // AI Automation (approval-first orchestration over approved recs/purchasing actions)
 export {

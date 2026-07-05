@@ -100,6 +100,12 @@ function buildGroups(slug: string): NavGroup[] {
           roles: ["owner", "manager"],
         },
         {
+          name: "Operating Profile",
+          href: `/admin/${slug}/operating-profile`,
+          Icon: Sliders,
+          roles: ["owner", "manager"],
+        },
+        {
           name: "Orders",
           href: `/admin/${slug}/orders`,
           Icon: ClipboardList,

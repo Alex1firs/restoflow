@@ -558,6 +558,8 @@ export interface PurchasingPlan {
   summary: string;
   /** false until recipes/bill-of-materials data exists; UI can prompt setup. */
   ingredientPlanningAvailable: boolean;
+  /** Owner's preferred supplier from the Operating Profile, attached at read time. */
+  preferredSupplier?: string | null;
   /** Provenance: which forecast this plan was derived from. */
   basedOnForecastAt: string;
   confidence: number;
@@ -653,6 +655,105 @@ export interface AutomationExecution {
 }
 
 // ---------------------------------------------------------------------------
+// Explainability (Phase 7.3) — every AI output explains itself with the SAME shape.
+// Built deterministically from an artifact's existing structured fields (no new reasoning).
+// ---------------------------------------------------------------------------
+
+export interface Explanation {
+  /** What the AI is proposing / projecting. */
+  what: string;
+  /** Why — the evidence, as discrete reasons. */
+  why: string[];
+  /** What happens if this is ignored — the consequence / missed impact. */
+  ifIgnored: string;
+  confidence: number;
+  confidenceLevel: ConfidenceLevel;
+}
+
+// ---------------------------------------------------------------------------
+// Restaurant Operating Profile (Phase 7.2) — a restaurant-scoped input into every
+// AI decision. NOT conversation history, NOT LLM memory. Never mutates business data.
+// ---------------------------------------------------------------------------
+
+/** A declared business objective — every recommendation is filtered through it. */
+export type BusinessGoal =
+  | "maximize_profit"
+  | "grow_revenue"
+  | "increase_retention"
+  | "increase_repeat_orders"
+  | "reduce_food_waste"
+  | "improve_kitchen_speed"
+  | "reduce_stockouts"
+  | "launch_new_items";
+
+export interface BusinessPreferences {
+  /** The current objective the AI optimises advice toward. null = balanced. */
+  primaryGoal: BusinessGoal | null;
+  pricingPhilosophy: "aggressive" | "moderate" | "conservative" | null;
+  /** Hard cap on a recommended price-increase delta (₦). null = no cap. */
+  maxPriceIncreaseNaira: number | null;
+  /** Owner prefers promotions to price increases → demote price_increase recs. */
+  preferPromotionsOverPriceIncrease: boolean;
+  preferredSuppliers: string[];
+  openingHours: string | null;
+  staffingPhilosophy: string | null;
+  preparationStyle: string | null;
+}
+
+export interface OwnerPreferences {
+  language: string; // ISO-ish, e.g. "en"
+  primaryInterface: "voice" | "dashboard";
+  responseStyle: "concise" | "detailed";
+  /** Preferred Lagos-hour window for notifications, or null for anytime. */
+  notificationHours: { from: number; to: number } | null;
+  notificationChannel: "whatsapp" | "push" | "in_app";
+}
+
+export interface AIPreferences {
+  /** Hide recommendations below this confidence (0..1). 0 = show all. */
+  confidenceThreshold: number;
+  automationLevel: "manual" | "assisted" | "auto";
+  escalationRules: string | null;
+  reminderFrequency: "off" | "daily" | "weekly";
+}
+
+/** A transparent, editable, resettable pattern the AI has learned (or the owner set). */
+export interface LearnedPreference {
+  id: string;
+  statement: string; // human-readable, always shown to the owner
+  type: "accepts" | "rejects" | "prefers";
+  subject: string; // e.g. "staffing", "price_increase"
+  params: Record<string, string | number | boolean | null>;
+  source: "learned" | "owner";
+  active: boolean; // learned patterns activate once evidence is sufficient
+  confidence: number; // 0..1
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RestaurantOperatingProfile {
+  restaurantId: string;
+  business: BusinessPreferences;
+  owner: OwnerPreferences;
+  ai: AIPreferences;
+  learned: LearnedPreference[];
+  version: number;
+  updatedAt: string;
+  updatedBy: ActorRef | null;
+}
+
+/** An append-only audit entry for a profile change (versioned history). */
+export interface ProfileAuditEntry {
+  id: string;
+  restaurantId: string;
+  version: number;
+  section: "business" | "owner" | "ai" | "learned" | "reset_learned";
+  changedKeys: string[];
+  actor: ActorRef;
+  at: string;
+}
+
+// ---------------------------------------------------------------------------
 // Voice AI Restaurant Manager (Phase 7) — a client on top of the AI stack
 // ---------------------------------------------------------------------------
 
@@ -660,10 +761,39 @@ export type VoiceIntent = "question" | "brief" | "command" | "confirm" | "cancel
 
 /** A voice action awaiting an explicit spoken "yes" before it executes (approval-first). */
 export interface VoicePendingAction {
-  type: "execute_recommendation" | "execute_purchasing";
+  type: "execute_recommendation" | "execute_purchasing" | "read_recommendations";
   recId?: string;
   items?: string[];
   label: string;
+}
+
+/** The voice-first greeting shown/spoken when the owner opens the app. */
+export interface VoiceGreeting {
+  greeting: string;
+  speech: string;
+  display: string;
+  pendingRecommendations: number;
+  hasBrief: boolean;
+  pending: VoicePendingAction | null;
+}
+
+/**
+ * A proactive, event-driven signal surfaced by voice. Deterministic — derived from the
+ * existing engines (decision insights, forecast, recommendations), not new analytics.
+ * `followup` is a natural prompt that, when spoken/tapped, continues into conversation.
+ */
+export interface ProactiveSignal {
+  id: string;
+  type:
+    | "sales_above_forecast"
+    | "sales_below_forecast"
+    | "kitchen_queue_growing"
+    | "peak_approaching"
+    | "recommendations_unreviewed"
+    | "inventory_low";
+  severity: InsightSeverity;
+  message: string;
+  followup: string;
 }
 
 /**

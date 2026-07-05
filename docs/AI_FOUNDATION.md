@@ -900,3 +900,137 @@ Tests: `lib/ai/__tests__/voice.test.ts` (11) — toSpeech shaping, question→sp
 spoken brief, command→proposal (no execution), confirm→gated execution, cancel, tenant
 isolation, and a full-session write-safety check (only `ai_*` written).
 Full suite: `npm run test:ai` = **133 checks**.
+
+## 21.1 Phase 7.1 — Voice-First UX
+
+Voice becomes the **primary** interaction; the dashboard stays available beneath it.
+No engine changes — this is purely the voice client evolving. (Restaurant memory is
+deliberately deferred to **Phase 7.2**.)
+
+### Voice-first home
+`GET /api/admin/ai/voice/greeting` → `buildVoiceGreeting()` composes a personalised,
+time-of-day greeting from the **cached Daily Brief** + the **Recommendation Engine** (no
+generation, no writes). When recommendations await approval it offers to read them (a
+`read_recommendations` confirmation). `VoiceHome.tsx` (a collapsible hero at the top of
+the dashboard, owner/manager) fetches the greeting + signals and renders the voice
+client; dashboard cards remain below. Autoplay is blocked by browsers, so the greeting
+shows immediately as text with a "Hear your brief" tap to speak.
+
+### Continuous conversation
+The voice client threads recent turns as history, so follow-ups ("Why?", "compare with
+last week", "which item caused it?") resolve against the Assistant's existing grounding —
+no duplicated analytics.
+
+### Richer approval flow
+Recommendations can be referenced by **ordinal** ("approve recommendation one") or target
+("increase Jollof Rice by ₦200"). The proposal now states the **expected impact** before
+asking "Do you approve?" — and execution still runs through the Automation engine, gated
+by an enabled rule (approval-first, unchanged). "Read the recommendations" lists them
+numbered so they can be approved by number.
+
+### Proactive signals (`lib/ai/signals.ts`)
+`detectProactiveSignals()` — deterministic, **read-only**, reuses today's Restaurant
+Context + cached Forecast + Recommendation Engine to surface: sales above/below forecast,
+kitchen queue growing, peak approaching, inventory low, recommendations unreviewed. Each
+carries a `followup` prompt that continues into conversation. `GET /api/admin/ai/voice/signals`
+(safe to poll — writes nothing). Shown as tappable chips in `VoiceHome`; tapping/saying one
+launches the conversation. (OS-level push delivery is a future add — this ships the in-app
+proactive layer.)
+
+### Safety
+Deterministic routing · tenant-scoped · approval-first · greeting + signals are pure reads
+(zero writes) · voice execution still routes through automation handlers (no core mutation).
+Tests: `voice.test.ts` (14) + `signals.test.ts` (4) — greeting personalisation & read-offer,
+numbered read-aloud, ordinal approval with expected impact, signal detection, read-only
+write-safety, tenant isolation.
+Full suite: `npm run test:ai` = **140 checks**.
+
+## 21.2 Phase 7.2 — Restaurant Operating Profile
+
+A **restaurant-scoped operating profile** — NOT conversation history, NOT LLM memory —
+that becomes another **input** into every AI decision while the engines stay
+deterministic and unchanged.
+
+### The non-invasive principle
+- The profile is **injected during context building** (`context.profile`, loaded read-only).
+- Engine rule bodies are **untouched**. The profile is **applied as a pure post-pass at the
+  consumption boundary** (routes + voice), so under the default profile everything behaves
+  exactly as before (identity application). This is how "influence every decision" and "do
+  not modify any engine logic" are both satisfied.
+
+### Sections (`lib/ai/profile.ts`, collection `ai_operating_profiles`)
+- **Business** — pricing philosophy, max price-increase cap (₦), prefer-promotions flag, preferred suppliers, opening hours, staffing philosophy, prep style.
+- **Owner** — language, primary interface, concise/detailed responses, notification hours, channel.
+- **AI** — confidence threshold, automation level, escalation rules, reminder frequency.
+- **Learned** — transparent, editable, resettable, auditable patterns the AI folds in gradually (`learnFromDecision` activates a pattern after ≥2 consistent accept/dismiss decisions).
+
+### Application (pure, deterministic)
+- `applyProfileToRecommendations` — hides sub-threshold recs, drops price increases over the owner's cap, demotes price increases when the owner prefers promotions. Applied by the recommendations route + voice.
+- `profileNarrationDirective` — appends a concise/language directive to the Assistant/Voice system prompt (styling only; "" by default).
+- `preferredSupplierFor` — attaches the preferred supplier to purchasing responses.
+- Forecast reads the profile via context; its numeric projection stays purely data-driven.
+
+### Versioned + audited + safe
+Every edit bumps `version` and appends a `ProfileAuditEntry` to `ai_operating_profile_audit`.
+`resetLearnedPreferences` clears learned patterns (audited). Restaurant-scoped, owner-editable.
+Writes ONLY `ai_operating_profiles` + `ai_operating_profile_audit`; **never business data**.
+`firestore.rules`: both client-denied, server-only.
+
+### Route & UI
+- `GET/PATCH/POST /api/admin/ai/profile` — read (+ audit), edit a section, `reset_learned`.
+- `operating-profile/` page (nav: "Operating Profile", owner/manager) — editable sections + a transparent, resettable learned-preferences panel.
+
+### Wiring recap (all additive, no rule changes)
+Recommendations route + voice apply the profile · Assistant appends the narration directive ·
+Purchasing route attaches the preferred supplier · recommendation accept/dismiss feeds
+`learnFromDecision`. The deterministic RULES in every engine are byte-for-byte unchanged
+(proven: all prior suites still pass with the default profile as an identity input).
+
+### Safety
+Restaurant-scoped · owner-editable · versioned · audited · deterministic · never mutates
+business data · used only during AI reasoning.
+Tests: `lib/ai/__tests__/profile.test.ts` (12) — default identity, versioned+audited edits,
+price-cap/threshold/prefer-promotions application, gradual learning, reset, tenant isolation,
+write-safety.
+Full suite: `npm run test:ai` = **152 checks**.
+
+## 21.3 Phase 7.3 — Explainability Layer + Business Goals
+
+Two separate concerns, deliberately split:
+
+### Explainability (changes OUTPUTS)
+Every AI output explains itself with the SAME three-field shape — **what? · why? · what
+happens if ignored?** — plus confidence. `lib/ai/explainability.ts` builds these PURELY and
+DETERMINISTICALLY from each artifact's EXISTING structured fields (a recommendation's
+rationale/impact, a forecast's drivers, a purchasing line's guidance/signal, an automation's
+source). It generates NO new reasoning.
+
+- `explainRecommendation` — `what`=title, `why`=rationale split into reasons, `ifIgnored`= the per-period gain reframed as a monthly missed figure (e.g. ₦8,400/week → "about ₦36,120 per month").
+- `explainForecast` — the forecast's drivers ARE the "why"; `ifIgnored` = the peak-window risk.
+- `explainPurchasingLine` — from demand + reorder signal.
+- `explainAutomation` — from its approved source.
+- `explanationToSpeech(exp, "why"|"ifIgnored"|"full")` — renders for Voice.
+
+Attached at the consumption boundary: recommendations / forecast / purchasing / automation
+routes return an `explanation`. **Voice** answers "Why?", "Explain", "What if I ignore it?"
+about a proposed recommendation straight from these fields (`explainPendingRecommendation`),
+preserving the pending confirmation so the owner can still say "yes". No engine changes.
+
+The `RecommendationsCard` gains a "Why?" toggle showing the why-reasons + the if-ignored
+consequence.
+
+### Business Goals (changes INPUTS — added to the Operating Profile)
+`business.primaryGoal` (maximize_profit · grow_revenue · increase_retention ·
+increase_repeat_orders · reduce_food_waste · improve_kitchen_speed · reduce_stockouts ·
+launch_new_items). `GOAL_BOOSTS` maps each goal to the recommendation types it prioritises;
+`applyProfileToRecommendations` re-orders so goal-serving advice surfaces first. Same data,
+different advice — e.g. *maximize profit* floats price increases; *increase retention* floats
+loyalty. Chosen in the Operating Profile editor ("Current objective"). Default (null) = balanced,
+so existing ordering is unchanged.
+
+### Safety
+Pure & deterministic · explanations derived only from existing fields (no new reasoning) ·
+goals re-order, never fabricate · no engine logic changed · no new writes (explanations are
+computed at read time; the goal is stored in the existing profile).
+Tests: `explainability.test.ts` (7) + profile goal re-ordering (2) + voice why/if-ignored (2).
+Full suite: `npm run test:ai` = **163 checks**.

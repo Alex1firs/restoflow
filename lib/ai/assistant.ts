@@ -4,6 +4,7 @@ import { runDecisionEngine } from "./decision-engine";
 import { type AiProvider } from "./provider";
 import { sanitizePrompt } from "./guardrails";
 import { narrate } from "./narration";
+import { profileNarrationDirective } from "./profile";
 import { writeUsageRecord } from "./usage";
 import { matchEntities, suggestTools } from "./vocabulary";
 import { createIntelligenceContext, type IntelligenceContext } from "./tools/_shared";
@@ -94,8 +95,10 @@ export async function askAssistant(
 
   // 3. Narrate (AI or deterministic fallback), with conversation history for reference resolution.
   const grounding = compactGrounding(context, report.insights, intent.topics, intent.suggestedTools);
+  // The Operating Profile influences ONLY narration style here — never the grounding.
+  const directive = profileNarrationDirective(context.profile);
   const narration = await narrate(ctx, {
-    system: systemPrompt(),
+    system: directive ? `${systemPrompt()} ${directive}` : systemPrompt(),
     userPrompt: buildUserPrompt(question, context, grounding, history, intent.isFollowUp),
     deterministic: () => deterministicAnswer(context, report.insights),
     provider: opts.provider,
