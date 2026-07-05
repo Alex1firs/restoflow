@@ -90,5 +90,63 @@ service cloud.firestore {
       allow read:  if request.auth != null && request.auth.uid == userId;
       allow write: if false;
     }
+
+    // ─── AI Usage / Audit (ai_usage) ─────────────────────────────────────────────
+    // AI request audit + token/cost records. Written ONLY by the server (Admin SDK,
+    // which bypasses these rules); never read or written by clients.
+    match /ai_usage/{recordId} {
+      allow read:  if false;
+      allow write: if false;
+    }
+
+    // ─── AI Daily Briefs (ai_briefs) ─────────────────────────────────────────────
+    // Generated morning briefs. Written by the server (cron / manual refresh, Admin
+    // SDK) and served to clients via /api/admin/ai/brief — never read/written directly.
+    match /ai_briefs/{briefId} {
+      allow read:  if false;
+      allow write: if false;
+    }
+
+    // ─── AI Recommendations (ai_recommendations) ─────────────────────────────────
+    // Generated recommendations + owner accept/dismiss status. Written by the server
+    // (Admin SDK) and served via /api/admin/ai/recommendations — never client-direct.
+    match /ai_recommendations/{recId} {
+      allow read:  if false;
+      allow write: if false;
+    }
+
+    // ─── AI Forecasts (ai_forecasts) ─────────────────────────────────────────────
+    // Deterministic demand/revenue forecasts. Written by the server (Admin SDK) and
+    // served via /api/admin/ai/forecast — never client-direct.
+    match /ai_forecasts/{forecastId} {
+      allow read:  if false;
+      allow write: if false;
+    }
+
+    // ─── AI Purchasing Plans (ai_purchase_plans) ─────────────────────────────────
+    // Forecast-driven prep & purchasing plans. Written by the server (Admin SDK) and
+    // served via /api/admin/ai/purchasing — never client-direct.
+    match /ai_purchase_plans/{planId} {
+      allow read:  if false;
+      allow write: if false;
+    }
+
+    // ─── AI Automation (rules / automations / executions) ────────────────────────
+    // Approval-first automation config, instances, and the execution audit trail.
+    // Written by the server (Admin SDK) and served via /api/admin/ai/automation —
+    // never client-direct. The execution records are the ONLY writes automation makes;
+    // core business collections remain read-only.
+    match /ai_automation_rules/{ruleId} {
+      allow read:  if false;
+      allow write: if false;
+    }
+    match /ai_automations/{automationId} {
+      allow read:  if false;
+      allow write: if false;
+    }
+    match /ai_automation_executions/{executionId} {
+      allow read:  if false;
+      allow write: if false;
+    }
   }
 }

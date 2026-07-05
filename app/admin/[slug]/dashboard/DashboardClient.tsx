@@ -4,6 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, Timestamp } from "firebase/firestore";
 import type { SetupChecklist } from "@/lib/setup-checklist";
+import ExplainButton from "../components/ExplainButton";
+import AiBriefCard from "./AiBriefCard";
+import RecommendationsCard from "./RecommendationsCard";
+import ForecastCard from "./ForecastCard";
+import PurchasingCard from "./PurchasingCard";
+import AutomationCard from "./AutomationCard";
 
 type OrderStatus = "pending" | "preparing" | "ready" | "completed" | "rejected";
 
@@ -559,6 +565,21 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
           </div>
         )}
 
+        {/* Daily AI Brief — cached, instant; owners/managers only */}
+        {role !== "staff" && <AiBriefCard role={role} />}
+
+        {/* AI Recommendations — actionable next steps; owners/managers only */}
+        {role !== "staff" && <RecommendationsCard role={role} />}
+
+        {/* 7-Day Forecast — what's likely next + why; owners/managers only */}
+        {role !== "staff" && <ForecastCard role={role} />}
+
+        {/* Smart Purchasing — forecast-driven prep & reorder plan; owners/managers only */}
+        {role !== "staff" && <PurchasingCard role={role} />}
+
+        {/* AI Automation — approval-first execution of approved actions; owners/managers only */}
+        {role !== "staff" && <AutomationCard role={role} />}
+
         {/* Stats grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard
@@ -572,6 +593,11 @@ export default function DashboardClient({ slug, status = "draft", rejectionReaso
             value={formatCurrency(todayRevenue)}
             sub="excl. rejected"
             accent="green"
+            explain={
+              role !== "staff" ? (
+                <ExplainButton widget="revenue" range="today" data={{ todayRevenue }} />
+              ) : undefined
+            }
           />
           <StatCard
             label="Online Paid"
@@ -729,11 +755,14 @@ function StatCard({
   value,
   sub,
   accent,
+  explain,
 }: {
   label: string;
   value: string;
   sub?: string;
   accent: "orange" | "green" | "blue" | "gray";
+  /** Optional "Explain" action rendered in the card footer (e.g. <ExplainButton …/>). */
+  explain?: React.ReactNode;
 }) {
   const accentMap = {
     orange: "bg-orange-50 text-orange-600",
@@ -743,7 +772,10 @@ function StatCard({
   };
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5">
-      <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">{label}</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">{label}</p>
+        {explain}
+      </div>
       <p className={`text-2xl font-black tracking-tight ${accentMap[accent].split(" ")[1]}`}>
         {value}
       </p>
