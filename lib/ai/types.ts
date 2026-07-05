@@ -653,6 +653,35 @@ export interface AutomationExecution {
 }
 
 // ---------------------------------------------------------------------------
+// Voice AI Restaurant Manager (Phase 7) — a client on top of the AI stack
+// ---------------------------------------------------------------------------
+
+export type VoiceIntent = "question" | "brief" | "command" | "confirm" | "cancelled" | "unknown";
+
+/** A voice action awaiting an explicit spoken "yes" before it executes (approval-first). */
+export interface VoicePendingAction {
+  type: "execute_recommendation" | "execute_purchasing";
+  recId?: string;
+  items?: string[];
+  label: string;
+}
+
+/**
+ * The result of one voice turn. `speech` is spoken by the client's TTS provider;
+ * `display` is shown as fallback text. `pending` is set when the assistant needs a
+ * yes/no confirmation before doing anything. The server does NO audio — the client's
+ * SpeechProvider handles STT/TTS, keeping voice a pluggable interface, not an engine.
+ */
+export interface VoiceTurnResult {
+  intent: VoiceIntent;
+  speech: string;
+  display: string;
+  pending: VoicePendingAction | null;
+  executed: boolean;
+  degraded: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Tool registration metadata
 // ---------------------------------------------------------------------------
 

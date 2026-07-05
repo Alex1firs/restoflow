@@ -858,3 +858,45 @@ Brief (what happened) → Recommendations (what to do) → Forecasting (what's n
 Smart Purchasing (what to buy & prep) → **Automation (do it, with approval + audit)**.
 Future integrations snap into the `ActionHandler` and `RecipeResolver` seams without
 touching the engines.
+
+## 21. Phase 7 — Voice AI Restaurant Manager
+
+Voice is another **client** on top of the stack — not a new engine. Owners/managers
+talk to RestoFlow hands-free while walking the floor; it answers aloud and can execute
+approved actions by voice.
+
+```
+🎤 voice ─▶ Speech-to-Text ─▶ /api/admin/ai/voice ─▶ (Assistant | Brief |
+             Recommendations | Purchasing | Automation) ─▶ Text-to-Speech 🔊
+```
+
+### SpeechProvider abstraction (client, swappable)
+`app/admin/[slug]/assistant/speech.ts` defines two interfaces — `SpeechToTextProvider`
+and `TextToSpeechProvider` — with browser implementations (`SpeechRecognition` +
+`speechSynthesis`). The Voice Assistant depends only on these interfaces, so a cloud
+voice (OpenAI/ElevenLabs/Google/Azure) drops in via `createSpeechProviders()` with **no
+change to the Voice Assistant, AI Assistant, or Automation layers**. Zero cost, no keys today.
+
+### Server orchestration (`lib/ai/voice.ts`)
+`handleVoiceTurn(slug, transcript, opts)` — deterministic intent routing that REUSES the
+existing engines (no new judgement):
+- **Question** → `askAssistant` (grounded), then `toSpeech()` (strips markdown, ₦→"naira", %→"percent").
+- **"How are we doing?" / "good morning"** → the Daily Brief, read aloud, incl. pending-approval count.
+- **Action command** ("approve the purchasing plan", "increase Jollof Rice by ₦200") → **proposes** an action and returns a `pending` confirmation. **Nothing executes on the proposal.**
+- **Confirmation** ("yes") → routes through the **Automation engine**: approves the recommendation / drafts restocks — still gated by an **enabled rule** (approval-first, doubly). "no" cancels.
+
+The server does NO audio — it receives a transcript and returns text to speak, so it's
+provider-agnostic and stateless. No business data is mutated (execution goes through the
+automation handlers, which cannot write core collections).
+
+### Route & UI
+- `POST /api/admin/ai/voice` — `{ transcript, history?, pending? }` → `VoiceTurnResult { intent, speech, display, pending, executed, degraded }`. Owner/manager, rate-limited.
+- `VoiceAssistant.tsx` — one-tap mic, live transcript, spoken replies, tap-or-say yes/no confirmation, "Tap to hear your morning brief", mute. Added as a Chat/Voice toggle in the assistant page.
+
+### Safety
+Deterministic routing · tenant-scoped (session slug) · approval-first for every action ·
+reuses engines so writes stay within `ai_*` + `ai_usage` · no core mutation.
+Tests: `lib/ai/__tests__/voice.test.ts` (11) — toSpeech shaping, question→speech,
+spoken brief, command→proposal (no execution), confirm→gated execution, cancel, tenant
+isolation, and a full-session write-safety check (only `ai_*` written).
+Full suite: `npm run test:ai` = **133 checks**.
