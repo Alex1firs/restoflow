@@ -7,6 +7,7 @@ import { narrate } from "./narration";
 import { profileNarrationDirective } from "./profile";
 import { writeUsageRecord } from "./usage";
 import { matchEntities, suggestTools } from "./vocabulary";
+import { detectIntent, routeIntent, type AssistantIntent } from "./intent-router";
 import { createIntelligenceContext, type IntelligenceContext } from "./tools/_shared";
 import { ASSISTANT_NAME } from "./branding";
 import type { EntityKey } from "./vocabulary";
@@ -89,18 +90,25 @@ export async function askAssistant(
   const intent = resolveConversationalIntent(question, history);
   const range: RangeInput = opts.range ?? intent.range;
 
+  // 1b. Deterministic intent routing — decides WHICH question is being asked
+  // (revenue vs orders vs tax vs …). For a follow-up that omits its own subject
+  // ("why?"), inherit the routed intent from the prior turn that had one.
+  const routedIntent = resolveRoutedIntent(question, history, intent.isFollowUp);
+
   // 2. Grounding: assemble context from the tool layer + run the decision engine.
   const context = await buildRestaurantContext(ctx, { range });
   const report = runDecisionEngine(context);
 
   // 3. Narrate (AI or deterministic fallback), with conversation history for reference resolution.
-  const grounding = compactGrounding(context, report.insights, intent.topics, intent.suggestedTools);
+  const grounding = compactGrounding(context, report.insights, intent.topics, intent.suggestedTools, routedIntent);
   // The Operating Profile influences ONLY narration style here — never the grounding.
   const directive = profileNarrationDirective(context.profile);
   const narration = await narrate(ctx, {
     system: directive ? `${systemPrompt()} ${directive}` : systemPrompt(),
     userPrompt: buildUserPrompt(question, context, grounding, history, intent.isFollowUp),
-    deterministic: () => deterministicAnswer(context, report.insights),
+    // The deterministic fallback is routed to the intent's dedicated handler,
+    // never a blanket revenue summary.
+    deterministic: () => routeIntent(routedIntent, context, report.insights),
     provider: opts.provider,
     maxTokens: 700,
   });
@@ -223,6 +231,24 @@ export function resolveConversationalIntent(question: string, history: Conversat
   return { range: { range }, topics, suggestedTools, isFollowUp };
 }
 
+/**
+ * Resolve the routed intent for a question. A follow-up that carries no intent of
+ * its own ("why?", "and yesterday?") inherits the routed intent from the most
+ * recent prior turn that had a concrete one — so "why?" after an orders question
+ * stays on orders, not silently reverting to revenue.
+ */
+export function resolveRoutedIntent(question: string, history: ConversationTurn[], isFollowUp: boolean): AssistantIntent {
+  const own = detectIntent(question);
+  if (own !== "unknown") return own;
+  if (isFollowUp) {
+    for (let i = history.length - 1; i >= 0; i--) {
+      const prev = detectIntent(history[i].question);
+      if (prev !== "unknown") return prev;
+    }
+  }
+  return own; // "unknown" — handled by the unknown handler
+}
+
 // ---------------------------------------------------------------------------
 // Prompt construction
 // ---------------------------------------------------------------------------
@@ -279,9 +305,13 @@ function compactGrounding(
   context: RestaurantContext,
   insights: Insight[],
   topics: EntityKey[],
-  suggestedTools: string[]
+  suggestedTools: string[],
+  routedIntent: AssistantIntent
 ): Record<string, unknown> {
   return {
+    // The single routed intent — focuses the model on WHAT is being asked so it
+    // doesn't default to a revenue summary for an orders/tax/kitchen question.
+    detectedIntent: routedIntent,
     relevantTopics: topics,
     suggestedTools,
     business: context.business,
@@ -333,47 +363,10 @@ function compactGrounding(
 }
 
 // ---------------------------------------------------------------------------
-// Deterministic fallback answer (no LLM) — composed from trusted numbers only
+// Deterministic fallback answer (no LLM)
 // ---------------------------------------------------------------------------
-
-function naira(n: number): string {
-  return `₦${Math.round(n).toLocaleString("en-NG")}`;
-}
-
-export function deterministicAnswer(context: RestaurantContext, insights: Insight[]): string {
-  const parts: string[] = [];
-  const label = context.range.label;
-  const s = context.sales.summary;
-
-  if (s && s.totalOrders > 0) {
-    parts.push(
-      `For ${label}, you made ${naira(s.totalRevenue)} from ${s.paidOrders} paid order${s.paidOrders === 1 ? "" : "s"} — that's an average of ${naira(s.averageOrderValue)} per order.`
-    );
-    if (s.previous.revenueChangePct != null) {
-      const dir = s.previous.revenueChangePct >= 0 ? "up" : "down";
-      parts.push(`That's ${dir} ${Math.abs(s.previous.revenueChangePct)}% versus the previous period (${naira(s.previous.totalRevenue)}).`);
-    }
-    const top = context.menu.topItems?.items?.[0];
-    if (top && top.quantity > 0) parts.push(`${top.name} is leading the way with ${top.quantity} sold.`);
-  } else if (context.orders && context.orders.total > 0) {
-    parts.push(`So far ${label} you've taken ${context.orders.total} order${context.orders.total === 1 ? "" : "s"}, with ${naira(context.orders.revenueSoFar)} collected.`);
-  } else {
-    // Conversational, manager-style framing rather than a database read-out.
-    parts.push(`I couldn't find any completed sales for ${label}.`);
-    const b = context.business;
-    if (context.orders) {
-      parts.push(b?.isOpenNow ? `You're open today, but no orders have come in yet.` : `The restaurant isn't marked open today.`);
-    }
-    if (b && b.subscription.daysRemaining != null && b.subscription.daysRemaining <= 7) {
-      parts.push(`A heads-up: your subscription renews in ${b.subscription.daysRemaining} day${b.subscription.daysRemaining === 1 ? "" : "s"}.`);
-    }
-    parts.push(`Would you like to see how this week is doing instead?`);
-  }
-
-  const notable = insights.filter((i) => i.type === "warning" || i.type === "anomaly").slice(0, 2);
-  if (notable.length > 0) parts.push(`One thing worth a look: ${notable.map((i) => i.title).join("; ")}.`);
-
-  return parts.join(" ");
-}
+// The deterministic fallback is produced by the intent router (`intent-router.ts`),
+// which routes the question to a dedicated per-intent handler rather than always
+// returning a revenue summary. See `routeIntent` / `resolveRoutedIntent` above.
 
 export type { IntelligenceContext };

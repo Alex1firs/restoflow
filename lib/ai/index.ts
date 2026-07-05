@@ -45,11 +45,19 @@ export {
   parseRange,
   detectRange,
   resolveConversationalIntent,
-  deterministicAnswer,
+  resolveRoutedIntent,
   type AssistantAnswer,
   type AssistantMode,
   type AskAssistantOptions,
 } from "./assistant";
+
+// Deterministic intent router (question → dedicated handler)
+export {
+  detectIntent,
+  routeIntent,
+  answerByIntent,
+  type AssistantIntent,
+} from "./intent-router";
 
 // Shared narration helper
 export { narrate, type NarrationResult, type NarrateArgs } from "./narration";
