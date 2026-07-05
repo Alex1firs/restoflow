@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter, useParams } from "next/navigation";
 import {
   Sparkles, Send, Clock, Database, AlertTriangle, Info,
   Wallet, TrendingUp, Flame, PackageCheck, Timer, Repeat, Users, Mic, MessageSquare,
   type LucideIcon,
 } from "lucide-react";
 import { QUICK_ACTIONS } from "@/lib/ai/quick-actions";
+import { parseCommand, webNavigation } from "@/lib/ai/commands";
 import VoiceAssistant from "./VoiceAssistant";
 
 const ASSISTANT_NAME = "Your AI Operations Manager";
@@ -55,6 +57,9 @@ const TOOL_LABELS: Record<string, string> = {
 };
 
 export default function AssistantClient() {
+  const router = useRouter();
+  const params = useParams();
+  const slug = typeof params.slug === "string" ? params.slug : Array.isArray(params.slug) ? params.slug[0] : "";
   const [mode, setMode] = useState<"chat" | "voice">("chat");
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
@@ -65,6 +70,17 @@ export default function AssistantClient() {
   async function ask(q: string) {
     const trimmed = q.trim();
     if (!trimmed || loading) return;
+
+    // Shared command layer: typed commands route through the SAME Intent+Target
+    // parser as voice. A navigation command drives the app instead of answering.
+    const cmd = parseCommand(trimmed);
+    if (cmd && (cmd.intent === "open" || cmd.intent === "reject") && slug) {
+      const nav = webNavigation(cmd.intent === "reject" ? "recommendations" : cmd.target, slug);
+      setQuestion("");
+      router.push(nav.anchor ? `${nav.path}#${nav.anchor}` : nav.path);
+      return;
+    }
+
     setLoading(true);
     setError("");
     // Conversation memory: send recent turns (chronological, oldest→newest).
