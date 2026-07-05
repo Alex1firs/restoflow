@@ -37,6 +37,11 @@ function clean(text: string): string {
   return text.replace(/\s*\((?:AI narration[^)]*)\)\s*/gi, " ").replace(/\s{2,}/g, " ").trim();
 }
 
+// Conversation Mode tuning + spoken end-phrases (module scope → stable identities).
+const SILENCE_MS = 45_000; // end the session after this much continuous silence
+const RESTART_MS = 300; // brief gap before reopening the mic between turns
+const END_RE = /^(stop( listening| the conversation)?|end (the )?conversation|goodbye|bye|that'?s all|that is all|we'?re done|i'?m done|cancel|never ?mind|exit|quit)\b/i;
+
 export default function VoiceAssistant({
   greeting = null,
   signals = [],
@@ -61,10 +66,20 @@ export default function VoiceAssistant({
   const [pending, setPending] = useState<PendingAction | null>(greeting?.pending ?? null);
   const [error, setError] = useState("");
   const [supported, setSupported] = useState(true);
+  // Conversation Mode: one tap starts a hands-free session that auto-reopens the mic
+  // after each answer until the owner ends it (tap, "stop listening", or silence).
+  const [sessionActive, setSessionActive] = useState(false);
   const idRef = useRef(0);
   const mutedRef = useRef(false);
   const pendingRef = useRef<PendingAction | null>(null);
   const messagesRef = useRef<Msg[]>([]);
+  const sessionRef = useRef(false);           // mirror of sessionActive for async callbacks
+  const busyRef = useRef(false);              // true while an utterance is being processed/spoken
+  const lastSpeechAtRef = useRef(0);          // for the silence timeout
+  const restartTimerRef = useRef<number | null>(null);
+  const onFinalRef = useRef<(t: string) => void>(() => {});
+  const endSessionRef = useRef<(reason?: string) => void>(() => {});
+  const turnRef = useRef(0); // bumped on interrupt/end so a stale TTS onEnd can't reopen the mic
 
   useEffect(() => {
     providers.current = createSpeechProviders();
@@ -95,6 +110,9 @@ export default function VoiceAssistant({
     return () => { active = false; };
   }, [greeting, autoGreet]);
 
+  useEffect(() => { sessionRef.current = sessionActive; }, [sessionActive]);
+
+  /** One-shot speech (no mic reopen) — for the greeting button and session end note. */
   const speak = useCallback((text: string) => {
     if (mutedRef.current || !providers.current) return;
     providers.current.tts.speak(text, { onStart: () => setSpeaking(true), onEnd: () => setSpeaking(false) });
@@ -113,6 +131,59 @@ export default function VoiceAssistant({
     return turns.slice(-6);
   }, []);
 
+  /** Open the mic. In a session, keeps listening across turns until silence/end. */
+  const beginListening = useCallback(() => {
+    const p = providers.current;
+    if (!p) return;
+    p.tts.cancel();
+    setSpeaking(false);
+    setError("");
+    busyRef.current = false;
+    setListening(true);
+    p.stt.start({
+      onResult: (t, isFinal) => {
+        if (isFinal) { setListening(false); onFinalRef.current(t); }
+        else setInterim(t);
+      },
+      onError: (m) => {
+        setListening(false);
+        setInterim("");
+        if (/not-allowed|service-not-allowed|audio-capture/i.test(m)) {
+          setError("I need microphone access to listen.");
+          endSessionRef.current("error");
+        }
+        // no-speech / aborted are normal — onEnd decides whether to keep listening.
+      },
+      onEnd: () => {
+        setListening(false);
+        if (!sessionRef.current || busyRef.current) return; // a turn is being processed
+        if (Date.now() - lastSpeechAtRef.current > SILENCE_MS) { endSessionRef.current("silence"); return; }
+        // Hands-free: reopen the mic so the owner never taps between turns.
+        restartTimerRef.current = window.setTimeout(() => {
+          if (sessionRef.current && !busyRef.current) beginListening();
+        }, RESTART_MS);
+      },
+    });
+  }, []);
+
+  /** Speak the answer, then (in a session) automatically reopen the mic. */
+  const respondWith = useCallback((speechText: string | null) => {
+    const p = providers.current;
+    const myTurn = ++turnRef.current;
+    lastSpeechAtRef.current = Date.now();
+    const resume = () => {
+      if (myTurn !== turnRef.current) return; // an interrupt/end superseded this turn
+      busyRef.current = false;
+      if (sessionRef.current) beginListening();
+    };
+    if (speechText && !mutedRef.current && p) {
+      setSpeaking(true);
+      p.tts.speak(speechText, { onStart: () => setSpeaking(true), onEnd: () => { setSpeaking(false); resume(); } });
+    } else {
+      resume();
+    }
+  }, [beginListening]);
+
   const send = useCallback(
     async (transcript: string) => {
       const text = transcript.trim();
@@ -121,6 +192,8 @@ export default function VoiceAssistant({
       setInterim("");
       setThinking(true);
       setError("");
+      busyRef.current = true;
+      let speechText: string | null = null;
       try {
         const res = await fetch(`/api/admin/ai/voice`, {
           method: "POST",
@@ -132,7 +205,7 @@ export default function VoiceAssistant({
         const body = (await res.json()) as VoiceResult;
         addMsg("assistant", clean(body.display));
         setPending(body.pending);
-        speak(clean(body.speech));
+        speechText = clean(body.speech);
         // Command layer: a navigation command drives the app for the owner.
         if (body.navigation?.path) {
           const href = body.navigation.anchor ? `${body.navigation.path}#${body.navigation.anchor}` : body.navigation.path;
@@ -142,27 +215,70 @@ export default function VoiceAssistant({
         setError("Network error.");
       } finally {
         setThinking(false);
+        respondWith(speechText); // speak + reopen mic (or just reopen if muted/errored)
       }
     },
-    [addMsg, buildTurns, speak, router]
+    [addMsg, buildTurns, router, respondWith]
   );
 
-  const startListening = useCallback(() => {
-    if (!providers.current) return;
-    providers.current.tts.cancel();
-    setSpeaking(false);
-    setError("");
-    setListening(true);
-    providers.current.stt.start({
-      onResult: (t, isFinal) => { if (isFinal) { setListening(false); void send(t); } else setInterim(t); },
-      onError: (m) => { setListening(false); setInterim(""); if (!/no-speech|aborted/i.test(m)) setError(m); },
-      onEnd: () => setListening(false),
-    });
-  }, [send]);
+  useEffect(() => {
+    onFinalRef.current = (t: string) => {
+      const text = t.trim();
+      if (!text) { if (sessionRef.current) beginListening(); return; }
+      lastSpeechAtRef.current = Date.now();
+      if (sessionRef.current && END_RE.test(text)) { endSessionRef.current("goodbye"); return; }
+      busyRef.current = true; // claim the turn before the recognizer's onEnd fires
+      void send(text);
+    };
+  }, [send, beginListening]);
 
-  const stopListening = useCallback(() => { providers.current?.stt.stop(); setListening(false); }, []);
+  const endSession = useCallback((reason?: string) => {
+    sessionRef.current = false;
+    setSessionActive(false);
+    turnRef.current++; // invalidate any in-flight TTS onEnd resume
+    busyRef.current = false;
+    if (restartTimerRef.current) { clearTimeout(restartTimerRef.current); restartTimerRef.current = null; }
+    providers.current?.stt.stop();
+    providers.current?.tts.cancel();
+    setListening(false);
+    setSpeaking(false);
+    setInterim("");
+    if (reason === "goodbye") speak("Okay, ending our conversation.");
+    else if (reason === "silence") speak("I'll pause here — tap when you'd like to continue.");
+  }, [speak]);
+  useEffect(() => { endSessionRef.current = endSession; }, [endSession]);
+
+  const startSession = useCallback(() => {
+    sessionRef.current = true;
+    setSessionActive(true);
+    lastSpeechAtRef.current = Date.now();
+    setError("");
+    beginListening();
+  }, [beginListening]);
+
+  /** Barge-in: cut the manager off mid-sentence and start listening immediately. */
+  const interrupt = useCallback(() => {
+    turnRef.current++; // the cancelled utterance's onEnd must NOT reopen the mic
+    providers.current?.tts.cancel();
+    setSpeaking(false);
+    busyRef.current = false;
+    lastSpeechAtRef.current = Date.now();
+    if (sessionRef.current) beginListening();
+  }, [beginListening]);
+
   const toggleMute = useCallback(() => { setMuted((m) => { if (!m) providers.current?.tts.cancel(); return !m; }); }, []);
   const confirm = useCallback((answer: "yes" | "no") => void send(answer), [send]);
+
+  // Tidy up STT/TTS and timers when the component unmounts.
+  useEffect(() => {
+    const p = providers.current;
+    return () => {
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+      sessionRef.current = false;
+      p?.stt.stop();
+      p?.tts.cancel();
+    };
+  }, []);
 
   if (!supported) {
     return (
@@ -262,8 +378,8 @@ export default function VoiceAssistant({
         </div>
       )}
 
-      {/* Suggested next questions */}
-      {!thinking && !listening && (
+      {/* Suggested next questions — only when idle (a session is hands-free) */}
+      {!sessionActive && !thinking && (
         <div className="flex flex-wrap gap-2 mb-3">
           {SUGGESTIONS.map((s) => (
             <button key={s.label} type="button" onClick={() => send(s.prompt)} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-700 bg-white border border-gray-200 hover:border-orange-300 hover:text-orange-700 rounded-full px-3 py-1.5 transition-colors">
@@ -275,28 +391,63 @@ export default function VoiceAssistant({
 
       {error && <p className="text-xs text-red-500 font-bold mb-2 text-center">{error}</p>}
 
-      {/* Mic with a live listening state */}
+      {/* Conversation-mode control: one tap starts a hands-free session */}
       <div className="flex flex-col items-center gap-2 pt-1">
+        {sessionActive && (
+          <div className="inline-flex items-center gap-1.5 text-[11px] font-black text-green-700 bg-green-50 border border-green-200 rounded-full px-3 py-1 mb-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Conversation active
+          </div>
+        )}
+
         <div className="relative flex items-center justify-center">
           {listening && (
             <>
-              <span className="absolute w-16 h-16 rounded-full bg-red-400/30 animate-ping" />
-              <span className="absolute w-20 h-20 rounded-full bg-red-400/20 animate-ping" style={{ animationDelay: "0.3s" }} />
+              <span className="absolute w-16 h-16 rounded-full bg-green-400/30 animate-ping" />
+              <span className="absolute w-20 h-20 rounded-full bg-green-400/20 animate-ping" style={{ animationDelay: "0.3s" }} />
             </>
           )}
           <button
             type="button"
-            onClick={listening ? stopListening : startListening}
-            disabled={thinking}
-            className={`relative w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all disabled:opacity-40 ${listening ? "bg-red-500 scale-105" : speaking ? "bg-orange-400" : "bg-orange-600 hover:bg-orange-700"}`}
-            aria-label={listening ? "Stop" : "Start talking"}
+            onClick={!sessionActive ? startSession : speaking ? interrupt : () => endSession()}
+            className={`relative w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all ${
+              listening ? "bg-green-500 scale-105" : speaking ? "bg-orange-400" : sessionActive ? "bg-gray-800 hover:bg-gray-900" : "bg-orange-600 hover:bg-orange-700"
+            }`}
+            aria-label={!sessionActive ? "Start conversation" : speaking ? "Interrupt" : "End conversation"}
           >
-            {listening ? <Square className="w-6 h-6 text-white" /> : <Mic className="w-7 h-7 text-white" />}
+            {!sessionActive ? (
+              <Mic className="w-7 h-7 text-white" />
+            ) : speaking ? (
+              // Waveform while the manager speaks — tap to interrupt.
+              <span className="flex items-end gap-0.5 h-6">
+                {[0, 1, 2, 3].map((i) => (
+                  <span key={i} className="w-1 bg-white rounded-full animate-pulse" style={{ height: `${[10, 20, 14, 22][i]}px`, animationDelay: `${i * 0.12}s` }} />
+                ))}
+              </span>
+            ) : (
+              <Square className="w-6 h-6 text-white" />
+            )}
           </button>
         </div>
-        <span className="text-[11px] text-gray-400 inline-flex items-center gap-1">
-          {listening ? "Listening…" : speaking ? <><Sparkles className="w-3 h-3" /> Speaking…</> : "Tap to talk"}
+
+        <span className="text-[11px] font-bold text-gray-500 inline-flex items-center gap-1 text-center">
+          {!sessionActive ? (
+            "🎤 Tap to start a conversation"
+          ) : thinking ? (
+            <><Loader2 className="w-3 h-3 animate-spin" /> Thinking…</>
+          ) : speaking ? (
+            <><Sparkles className="w-3 h-3" /> Restaurant Manager speaking… · tap to interrupt</>
+          ) : listening ? (
+            "🟢 Operations Manager is listening…"
+          ) : (
+            "One moment…"
+          )}
         </span>
+        {!sessionActive && (
+          <span className="text-[10px] text-gray-400">Ask anything about your restaurant — I&apos;ll keep listening.</span>
+        )}
+        {sessionActive && !speaking && !thinking && (
+          <span className="text-[10px] text-gray-400">Say “stop listening” or tap to end.</span>
+        )}
       </div>
     </div>
   );
