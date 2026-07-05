@@ -67,7 +67,7 @@ export default function VoiceHome() {
 
       {open && ready && (
         <div className="px-1 pb-1">
-          <VoiceAssistant greeting={greeting} signals={signals} />
+          <VoiceAssistant greeting={greeting} signals={signals} showHeader={false} />
         </div>
       )}
     </div>
