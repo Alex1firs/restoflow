@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Phone } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -28,7 +28,7 @@ export default function Footer() {
             <h4 className="font-bold text-white mb-4 uppercase tracking-wider text-sm">Company</h4>
             <ul className="space-y-3 text-sm text-white/50">
               <li><Link href="#" className="hover:text-orange-500 transition-colors">About Us</Link></li>
-              <li><Link href="#" className="hover:text-orange-500 transition-colors">Contact</Link></li>
+              <li><a href="mailto:hello@braintuneltd.com.ng" className="hover:text-orange-500 transition-colors">Contact</a></li>
               <li><Link href="/privacy-policy" className="hover:text-orange-500 transition-colors">Privacy Policy</Link></li>
               <li><Link href="/refund-policy" className="hover:text-orange-500 transition-colors">Refund Policy</Link></li>
             </ul>
@@ -37,6 +37,12 @@ export default function Footer() {
           <div>
             <h4 className="font-bold text-white mb-4 uppercase tracking-wider text-sm">Support</h4>
             <ul className="space-y-3 text-sm text-white/50">
+              <li>
+                <a href="tel:07067609816" className="hover:text-orange-500 transition-colors flex items-center gap-2">
+                  <Phone size={14} className="text-orange-500" />
+                  070 6760 9816
+                </a>
+              </li>
               <li><a href="#" className="hover:text-orange-500 transition-colors flex items-center gap-2">WhatsApp <ArrowRight size={12}/></a></li>
               <li><a href="mailto:hello@braintuneltd.com.ng" className="hover:text-orange-500 transition-colors">Email Us</a></li>
             </ul>
