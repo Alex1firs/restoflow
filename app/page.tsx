@@ -42,34 +42,26 @@ const TESTIMONIALS = [
   {
     quote:
       "RestoFlow replaced our entire WhatsApp ordering mess overnight. Orders now land straight on the kitchen screen, payments hit our account instantly, and we haven't lost a single ticket since.",
-    name: "Adaeze Okonkwo",
-    designation: "Owner, Grills Capitol",
+    name: "FOOD & GRILLS KAPITOL",
+    designation: "Restaurant Partner",
     src:
-      "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=1368&auto=format&fit=crop&ixlib=rb-4.0.3",
+      "https://firebasestorage.googleapis.com/v0/b/restaurant-saas-64235.firebasestorage.app/o/restaurants%2Ffood-kapitol%2Flogo?alt=media&token=b3f4c4d6-7069-40c5-94ca-313a193d83df",
   },
   {
     quote:
       "We stopped paying 25% commission to delivery apps and our margins jumped immediately. Customers scan, order, and pay in seconds. Setup took less than a day.",
-    name: "Tunde Bakare",
-    designation: "Founder, Smokeyard",
+    name: "TASTY MENU",
+    designation: "Restaurant Partner",
     src:
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=1368&auto=format&fit=crop&ixlib=rb-4.0.3",
+      "https://firebasestorage.googleapis.com/v0/b/restaurant-saas-64235.firebasestorage.app/o/restaurants%2Ftasty-menu-3%2Flogo?alt=media&token=9e29fe05-673e-4d4d-a0db-c2834e818a87",
   },
   {
     quote:
       "The live kitchen dashboard changed how we run service. No more shouting orders or chasing DMs. Everything is organized, fast, and completely under our own brand.",
-    name: "Chioma Eze",
-    designation: "Manager, Bargs",
+    name: "Tricia's Kitchen",
+    designation: "Restaurant Partner",
     src:
-      "https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=1368&auto=format&fit=crop&ixlib=rb-4.0.3",
-  },
-  {
-    quote:
-      "Repeat customers are up and manual work is down. RestoFlow feels like having an extra staff member who never sleeps. Honestly the best decision we made this year.",
-    name: "Emeka Nwosu",
-    designation: "Owner, Lagos Kitchen",
-    src:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1368&auto=format&fit=crop&ixlib=rb-4.0.3",
+      "https://firebasestorage.googleapis.com/v0/b/restaurant-saas-64235.firebasestorage.app/o/restaurants%2Ftricias-kitchen%2Flogo?alt=media&token=6d223c1c-9027-49dc-ab40-fd4695e05d24",
   },
 ];
 
