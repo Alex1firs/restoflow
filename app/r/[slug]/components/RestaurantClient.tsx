@@ -195,7 +195,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   // blocked (client + server); pre-orders are allowed only when the restaurant
   // exposes the scheduling CTA (hs.showSecondaryCta).
   const closed = !restaurant.isOpen;
-  const preorderEnabled = !!hs.showSecondaryCta;
+  const preorderEnabled = closed ? true : !!hs.showSecondaryCta;
   const nextOpen = nextOpenTime(restaurant.openingHours);
   const nextOpenLabel = nextOpen.kind === "opens" ? nextOpen.label : null;
   const closedNote = `Closed now${nextOpenLabel ? ` • Opens ${nextOpenLabel}` : ""}`;
