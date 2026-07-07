@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useCart } from "./CartContext";
+import { loadCheckoutDetails, saveCheckoutDetails, clearCheckoutDetails, type SavedFulfillment, type SavedPayment } from "./checkout-details-storage";
+import { groupCategories, filterMenuItems } from "@/lib/menu-utils";
 import { configureAnalytics, track, trackVisitOnce, trackItemViewOnce } from "@/lib/analytics/client";
 import { nextOpenTime, type OpeningHours } from "@/lib/restaurant-utils";
 import SEOSections from "./SEOSections";
@@ -110,7 +112,8 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   const [scheduleTime, setScheduleTime] = useState("");
   const [isScheduledOrder, setIsScheduledOrder] = useState(false);
   const [scrollY, setScrollY] = useState(0);
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null); // normalized category key
+  const [menuSearch, setMenuSearch] = useState("");
   const [deliveryType, setDeliveryType] = useState<DeliveryType>(() => {
     if (initialTable && restaurant.dineInEnabled) return "dine_in";
     if (restaurant.deliveryEnabled) return "delivery";
@@ -118,39 +121,13 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   });
   const [selectedDeliveryZoneId, setSelectedDeliveryZoneId] = useState<string>("");
   const [payMethod, setPayMethod] = useState<PayMethod | null>(null);
-  const [formData, setFormData] = useState({ customerName: "", phone: "", address: "", note: "", tableNumber: initialTable ?? "" });
+  // Save-my-details convenience (device-local, consent-gated). `saveDetails` is
+  // the checkbox; `hasSavedDetails` gates the "Clear saved details" action.
   const [saveDetails, setSaveDetails] = useState(false);
+  const [hasSavedDetails, setHasSavedDetails] = useState(false);
+  const [formData, setFormData] = useState({ customerName: "", phone: "", address: "", note: "", tableNumber: initialTable ?? "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("restoflow_saved_details");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setFormData(prev => ({
-          ...prev,
-          customerName: parsed.customerName || "",
-          phone: parsed.phone || "",
-          address: parsed.address || ""
-        }));
-        setSaveDetails(true);
-      }
-    } catch (e) {
-      // ignore
-    }
-  }, []);
-
-  const persistDetailsIfChecked = () => {
-    if (saveDetails) {
-      localStorage.setItem("restoflow_saved_details", JSON.stringify({
-        customerName: formData.customerName.trim(),
-        phone: formData.phone.trim(),
-        address: formData.address.trim()
-      }));
-    } else {
-      localStorage.removeItem("restoflow_saved_details");
-    }
-  };
   const [orderError, setOrderError] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [trackingToken, setTrackingToken] = useState<string | null>(null);
@@ -230,6 +207,91 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   const selectedMethod: PayMethod | null =
     payMethod && availableMethods.includes(payMethod) ? payMethod : availableMethods[0] ?? null;
 
+  // ─── Prefill saved checkout details (device-local convenience) ───────────────
+  // One-time hydration on mount: if this device previously consented + saved
+  // details for THIS restaurant slug, prefill the fields. A preferred
+  // fulfillment/payment that is no longer offered is dropped by
+  // loadCheckoutDetails; a fresh table scan (initialTable) wins over a saved
+  // fulfillment. Pure localStorage read — no accounts, no network, per-slug only.
+  const detailsHydrated = useRef(false);
+  useEffect(() => {
+    if (detailsHydrated.current) return;
+    detailsHydrated.current = true;
+    // Purge the legacy GLOBAL (non-slug-scoped) blob — it leaked details across
+    // restaurants. Replaced by the per-slug store below.
+    try { window.localStorage.removeItem("restoflow_saved_details"); } catch { /* ignore */ }
+    if (isPreview || !restaurant.slug) return;
+
+    const allowedFulfillment: SavedFulfillment[] = [
+      ...(restaurant.deliveryEnabled ? (["delivery"] as SavedFulfillment[]) : []),
+      ...(restaurant.pickupEnabled ? (["pickup"] as SavedFulfillment[]) : []),
+      ...(restaurant.dineInEnabled ? (["dine_in"] as SavedFulfillment[]) : []),
+    ];
+    const cashOffered =
+      !!restaurant.pickupEnabled || !!restaurant.dineInEnabled ||
+      (!!restaurant.deliveryEnabled && restaurant.payOnDeliveryEnabled !== false);
+    const allowedPayment: SavedPayment[] = restaurant.hidePrices
+      ? (cashOffered ? (["cash"] as SavedPayment[]) : [])
+      : [
+          ...(restaurant.onlinePaymentEnabled ? (["online"] as SavedPayment[]) : []),
+          ...(cashOffered ? (["cash"] as SavedPayment[]) : []),
+          ...(restaurant.whatsappCheckoutEnabled ? (["whatsapp"] as SavedPayment[]) : []),
+        ];
+
+    const saved = loadCheckoutDetails(restaurant.slug, { allowedFulfillment, allowedPayment });
+    if (!saved) return;
+
+    setHasSavedDetails(true);
+    setSaveDetails(true); // returning customer — keep consent so re-ordering refreshes the cache
+    setFormData((f) => ({
+      ...f,
+      customerName: saved.fullName ?? f.customerName,
+      phone: saved.phone ?? f.phone,
+      address: saved.address ?? f.address,
+      note: saved.instructions ?? f.note,
+    }));
+    // Only restore a delivery zone that still exists (it may have been removed).
+    if (saved.area && restaurant.deliveryZones?.some((z) => z.id === saved.area)) {
+      setSelectedDeliveryZoneId((z) => z || saved.area!);
+    }
+    if (saved.fulfillment && !initialTable) setDeliveryType(saved.fulfillment);
+    if (saved.payment) setPayMethod(saved.payment);
+    // Mount-once hydration; inputs are read imperatively, so deps stay empty.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleClearSavedDetails = () => {
+    clearCheckoutDetails(restaurant.slug);
+    setHasSavedDetails(false);
+    setSaveDetails(false);
+    // Reset the visible contact fields so "clear" is immediately apparent.
+    // (tableNumber is left alone — it comes from a QR scan, not saved details.)
+    setFormData((f) => ({ ...f, customerName: "", phone: "", address: "", note: "" }));
+    setSelectedDeliveryZoneId("");
+  };
+
+  // Called by the order handlers right after validation passes. Consent-gated,
+  // slug-scoped, allowlisted (no card/reference/token data ever). Best-effort —
+  // never blocks the order. Unchecking + submitting clears the saved cache.
+  const persistDetailsIfChecked = () => {
+    if (isPreview) return;
+    if (saveDetails) {
+      saveCheckoutDetails(restaurant.slug, {
+        fullName: formData.customerName,
+        phone: formData.phone,
+        address: deliveryType === "delivery" ? formData.address : undefined,
+        area: deliveryType === "delivery" ? selectedDeliveryZoneId : undefined,
+        instructions: formData.note,
+        fulfillment: deliveryType,
+        payment: selectedMethod ?? undefined,
+      });
+      setHasSavedDetails(true);
+    } else {
+      clearCheckoutDetails(restaurant.slug);
+      setHasSavedDetails(false);
+    }
+  };
+
   // Dynamic Brand Theme Variables
   const primary = restaurant.primaryColor || "#F26E21"; // premium warm orange accent
   const accent = restaurant.accentColor || primary;
@@ -237,8 +299,12 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   const ordersToday = restaurant.ordersToday;
   const deliveryTime = restaurant.deliveryTime || "20–35 min";
 
-  const categories = [...new Set(menuItems.map((i) => i.category))].filter(Boolean);
-  const filteredItems = activeCategory ? menuItems.filter((i) => i.category === activeCategory) : menuItems;
+  // Display-layer category normalization: merge case/whitespace duplicate tabs
+  // (grills/Grills/GRILLS → one "Grills" tab) without touching stored data.
+  // `activeCategory` holds a NORMALIZED KEY. `menuSearch` filters by name /
+  // description / normalized category. Neither can drop an item destructively.
+  const categoryGroups = groupCategories(menuItems);
+  const filteredItems = filterMenuItems(menuItems, activeCategory, menuSearch);
 
   // ─── Storefront funnel analytics — top of funnel only, fire-and-forget. ───────
   // Every emit is a no-op unless enabled; nothing here can block or break the UI.
@@ -275,7 +341,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
     );
     document.querySelectorAll("[data-analytics-item-id]").forEach((el) => io.observe(el));
     return () => io.disconnect();
-  }, [analyticsOn, activeCategory, filteredItems.length]);
+  }, [analyticsOn, activeCategory, menuSearch, filteredItems.length]);
 
   const subtotal = totalPrice;
   const activeDeliveryZone = restaurant.deliveryZones?.find(z => z.id === selectedDeliveryZoneId);
@@ -1412,45 +1478,91 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                     : undefined
                   : undefined,
             }}
-            className="sticky top-[58px] z-20 bg-[#FAF9F5]/95 dark:bg-[#0D0C0B]/95 backdrop-blur-md py-3.5 border-b border-[#EFECE6] dark:border-[#1F1F1C] -mx-6 px-6 overflow-x-auto scrollbar-hide transition-all duration-300"
+            className="sticky top-[58px] z-20 bg-[#FAF9F5]/95 dark:bg-[#0D0C0B]/95 backdrop-blur-md py-3.5 border-b border-[#EFECE6] dark:border-[#1F1F1C] -mx-6 px-6 transition-all duration-300"
           >
-            <div ref={categoryTabsRef} className="flex gap-2">
-              <button
-                onClick={() => { setActiveCategory(null); scrollTo("menu"); }}
-                style={activeCategory === null ? { backgroundColor: primary } : {}}
-                className={`flex-shrink-0 px-4.5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all duration-200 ${
-                  activeCategory === null
-                    ? "text-white shadow-md shadow-[var(--brand-primary-20)] scale-105"
-                    : "text-[#7A7368] hover:text-neutral-900 dark:text-[#A19B91] dark:hover:text-white bg-white dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] hover:border-[var(--brand-primary)]"
-                }`}
-              >
-                All Specialties
-              </button>
-              {categories.map((cat) => (
+            <div className="flex flex-col gap-2.5">
+              {/* Menu search — mobile-friendly, sits directly above the category pills */}
+              <div className="relative">
+                <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A19B91] pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+                </svg>
+                <input
+                  type="text"
+                  value={menuSearch}
+                  onChange={(e) => setMenuSearch(e.target.value)}
+                  placeholder="Search dishes, e.g. jollof, grills…"
+                  aria-label="Search the menu"
+                  className="w-full pl-10 pr-9 py-2.5 rounded-2xl text-sm bg-white dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] outline-none focus:ring-2 focus:ring-[var(--brand-primary-20)] text-neutral-900 dark:text-neutral-100 placeholder-[#A19B91] transition-all"
+                  onFocus={(e) => { e.currentTarget.style.borderColor = primary; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = ""; }}
+                />
+                {menuSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setMenuSearch("")}
+                    aria-label="Clear search"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full text-[#7A7368] hover:text-neutral-900 hover:bg-stone-100 dark:hover:bg-[#1E1E1C] transition-colors"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              <div ref={categoryTabsRef} className="flex gap-2 overflow-x-auto scrollbar-hide">
                 <button
-                  key={cat}
-                  onClick={() => { setActiveCategory(cat); scrollTo("menu"); }}
-                  style={activeCategory === cat ? { backgroundColor: primary } : {}}
+                  onClick={() => { setActiveCategory(null); scrollTo("menu"); }}
+                  style={activeCategory === null ? { backgroundColor: primary } : {}}
                   className={`flex-shrink-0 px-4.5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all duration-200 ${
-                    activeCategory === cat
+                    activeCategory === null
                       ? "text-white shadow-md shadow-[var(--brand-primary-20)] scale-105"
                       : "text-[#7A7368] hover:text-neutral-900 dark:text-[#A19B91] dark:hover:text-white bg-white dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] hover:border-[var(--brand-primary)]"
                   }`}
                 >
-                  {cat}
+                  All Specialties
                 </button>
-              ))}
+                {categoryGroups.map((cat) => (
+                  <button
+                    key={cat.key}
+                    onClick={() => { setActiveCategory(cat.key); scrollTo("menu"); }}
+                    style={activeCategory === cat.key ? { backgroundColor: primary } : {}}
+                    className={`flex-shrink-0 px-4.5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all duration-200 ${
+                      activeCategory === cat.key
+                        ? "text-white shadow-md shadow-[var(--brand-primary-20)] scale-105"
+                        : "text-[#7A7368] hover:text-neutral-900 dark:text-[#A19B91] dark:hover:text-white bg-white dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] hover:border-[var(--brand-primary)]"
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Menu grid */}
           <div className="py-8">
             {filteredItems.length === 0 ? (
-              <div className="text-center py-20 bg-white dark:bg-[#141412] rounded-3xl border border-[#EFECE6] dark:border-[#1F1F1C] p-8 shadow-sm">
-                <span className="text-4xl">🍽️</span>
-                <p className="text-neutral-900 dark:text-neutral-50 text-base font-extrabold mt-3 tracking-tight">Menu is currently empty</p>
-                <p className="text-[#7A7368] dark:text-[#A19B91] text-xs mt-1">Our kitchen is preparing fresh lists. Check back shortly!</p>
-              </div>
+              menuSearch.trim() || activeCategory ? (
+                <div className="text-center py-20 bg-white dark:bg-[#141412] rounded-3xl border border-[#EFECE6] dark:border-[#1F1F1C] p-8 shadow-sm">
+                  <span className="text-4xl">🔍</span>
+                  <p className="text-neutral-900 dark:text-neutral-50 text-base font-extrabold mt-3 tracking-tight">
+                    No items found{menuSearch.trim() ? ` for “${menuSearch.trim()}”` : ""}.
+                  </p>
+                  <p className="text-[#7A7368] dark:text-[#A19B91] text-xs mt-1">Try another search.</p>
+                  <button
+                    type="button"
+                    onClick={() => { setMenuSearch(""); setActiveCategory(null); }}
+                    style={{ color: primary }}
+                    className="mt-4 text-xs font-black uppercase tracking-wider hover:underline underline-offset-2"
+                  >
+                    Clear search &amp; filters
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center py-20 bg-white dark:bg-[#141412] rounded-3xl border border-[#EFECE6] dark:border-[#1F1F1C] p-8 shadow-sm">
+                  <span className="text-4xl">🍽️</span>
+                  <p className="text-neutral-900 dark:text-neutral-50 text-base font-extrabold mt-3 tracking-tight">Menu is currently empty</p>
+                  <p className="text-[#7A7368] dark:text-[#A19B91] text-xs mt-1">Our kitchen is preparing fresh lists. Check back shortly!</p>
+                </div>
+              )
             ) : (
               <div
                 data-fade="menu-grid"
@@ -2372,22 +2484,32 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                 </div>
               )}
 
-              {/* Save Details Checkbox */}
-              <label className="flex items-center gap-3 p-1 cursor-pointer w-fit group mb-4 animate-fadeIn">
-                <div className="relative flex items-center justify-center">
-                  <input
-                    type="checkbox"
-                    checked={saveDetails}
-                    onChange={(e) => setSaveDetails(e.target.checked)}
-                    className="w-5 h-5 appearance-none border-2 border-[#EFECE6] dark:border-[#1F1F1C] rounded-md transition-all checked:bg-[var(--brand-primary)] checked:border-[var(--brand-primary)] cursor-pointer"
-                    style={saveDetails ? { backgroundColor: primary, borderColor: primary } : {}}
-                  />
-                  {saveDetails && (
-                    <svg className="absolute w-3 h-3 text-white pointer-events-none" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
-                  )}
-                </div>
-                <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200 select-none group-hover:text-neutral-900 transition-colors">Save my details for next time</span>
-              </label>
+              {/* Save Details — device-local, consent-gated, per-restaurant */}
+              <div className="space-y-1.5">
+                <label className="flex items-start gap-3 p-1 cursor-pointer w-fit group animate-fadeIn">
+                  <div className="relative flex items-center justify-center mt-0.5">
+                    <input
+                      type="checkbox"
+                      checked={saveDetails}
+                      onChange={(e) => setSaveDetails(e.target.checked)}
+                      className="w-5 h-5 appearance-none border-2 border-[#EFECE6] dark:border-[#1F1F1C] rounded-md transition-all checked:bg-[var(--brand-primary)] checked:border-[var(--brand-primary)] cursor-pointer"
+                      style={saveDetails ? { backgroundColor: primary, borderColor: primary } : {}}
+                    />
+                    {saveDetails && (
+                      <svg className="absolute w-3 h-3 text-white pointer-events-none" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                    )}
+                  </div>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold text-neutral-800 dark:text-neutral-200 select-none group-hover:text-neutral-900 transition-colors">Save my details on this device for next time</span>
+                    <span className="block text-[11px] text-[#A19B91] font-medium">Saved only on this device. No account is created.</span>
+                  </span>
+                </label>
+                {hasSavedDetails && (
+                  <button type="button" onClick={handleClearSavedDetails} className="ml-9 text-[11px] font-bold text-[#7A7368] hover:text-rose-600 underline underline-offset-2 transition-colors">
+                    Clear saved details
+                  </button>
+                )}
+              </div>
 
               {/* Special Note */}
               <div className="space-y-1.5">
@@ -2744,22 +2866,32 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                     </div>
                   )}
 
-                  {/* Save Details Checkbox */}
-                  <label className="flex items-center gap-3 p-1 cursor-pointer w-fit group mb-4 animate-fadeIn">
-                    <div className="relative flex items-center justify-center">
-                      <input
-                        type="checkbox"
-                        checked={saveDetails}
-                        onChange={(e) => setSaveDetails(e.target.checked)}
-                        className="w-5 h-5 appearance-none border-2 border-[#EFECE6] dark:border-[#1F1F1C] rounded-md transition-all checked:bg-[var(--brand-primary)] checked:border-[var(--brand-primary)] cursor-pointer"
-                        style={saveDetails ? { backgroundColor: primary, borderColor: primary } : {}}
-                      />
-                      {saveDetails && (
-                        <svg className="absolute w-3 h-3 text-white pointer-events-none" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
-                      )}
-                    </div>
-                    <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200 select-none group-hover:text-neutral-900 transition-colors">Save my details for next time</span>
-                  </label>
+                  {/* Save Details — device-local, consent-gated, per-restaurant */}
+                  <div className="space-y-1.5">
+                    <label className="flex items-start gap-3 p-1 cursor-pointer w-fit group animate-fadeIn">
+                      <div className="relative flex items-center justify-center mt-0.5">
+                        <input
+                          type="checkbox"
+                          checked={saveDetails}
+                          onChange={(e) => setSaveDetails(e.target.checked)}
+                          className="w-5 h-5 appearance-none border-2 border-[#EFECE6] dark:border-[#1F1F1C] rounded-md transition-all checked:bg-[var(--brand-primary)] checked:border-[var(--brand-primary)] cursor-pointer"
+                          style={saveDetails ? { backgroundColor: primary, borderColor: primary } : {}}
+                        />
+                        {saveDetails && (
+                          <svg className="absolute w-3 h-3 text-white pointer-events-none" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                        )}
+                      </div>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-bold text-neutral-800 dark:text-neutral-200 select-none group-hover:text-neutral-900 transition-colors">Save my details on this device for next time</span>
+                        <span className="block text-[11px] text-[#A19B91] font-medium">Saved only on this device. No account is created.</span>
+                      </span>
+                    </label>
+                    {hasSavedDetails && (
+                      <button type="button" onClick={handleClearSavedDetails} className="ml-9 text-[11px] font-bold text-[#7A7368] hover:text-rose-600 underline underline-offset-2 transition-colors">
+                        Clear saved details
+                      </button>
+                    )}
+                  </div>
 
                   {/* Special Instruction Note */}
                   <div className="space-y-1.5">
