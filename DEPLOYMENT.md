@@ -84,6 +84,13 @@ If `RESEND_API_KEY` is not set the app still works — reset links fall back to 
 |---|---|
 | `GEMINI_API_KEY` | [aistudio.google.com](https://aistudio.google.com) → Get API Key. Free tier available — no credit card required. Powers "Generate with AI" / "Improve with AI" buttons in the admin (restaurant description, menu descriptions, category suggestions, welcome text). If not set, all AI helper buttons are hidden and setup works normally without them. Uses `gemini-1.5-flash`. |
 
+### Storefront funnel analytics (optional)
+| Variable | Value |
+|---|---|
+| `STOREFRONT_ANALYTICS_ENABLED` | Set to the exact string `"true"` to enable storefront funnel analytics (visits, add-to-cart, checkout, payment funnel). Anything else (or unset) keeps it fully inert — no writes, no reads, zero effect on ordering. Safe to toggle off at any time. |
+
+> **Storage & indexes:** analytics writes to a single server-only collection `storefront_stats_daily` (doc id `{slug}__{YYYY-MM-DD}`, Lagos day). Rules deny all client access (server Admin SDK only) — deploy them with `firebase deploy --only firestore:rules`. No composite index is required: the per-restaurant dashboard reads by computed doc id (`getAll`), and the platform view uses a single-field range on `date` (auto-indexed). Docs are small and cumulative — no TTL needed. Revenue/completed-order figures are **not** taken from these events; they come from the `orders` collection (source of truth).
+
 ### Optional integrations
 | Variable | Value |
 |---|---|

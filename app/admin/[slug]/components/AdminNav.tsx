@@ -12,6 +12,7 @@ import {
   Utensils,
   ChefHat,
   BarChart2,
+  TrendingUp,
   CreditCard,
   Store,
   Heart,
@@ -144,6 +145,12 @@ function buildGroups(slug: string): NavGroup[] {
           name: "Reports",
           href: `/admin/${slug}/reports`,
           Icon: BarChart2,
+          roles: ["owner", "manager"],
+        },
+        {
+          name: "Analytics",
+          href: `/admin/${slug}/analytics`,
+          Icon: TrendingUp,
           roles: ["owner", "manager"],
         },
         {

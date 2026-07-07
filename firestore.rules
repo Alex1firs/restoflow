@@ -160,5 +160,16 @@ service cloud.firestore {
       allow read:  if false;
       allow write: if false;
     }
+
+    // ─── Storefront Funnel Analytics (storefront_stats_daily) ────────────────────
+    // Per-restaurant, per-day funnel rollups. Written ONLY by the server (Admin
+    // SDK, which bypasses these rules) via /api/storefront/events and server-side
+    // money-truth emits. Served to dashboards via /api/admin/analytics (own
+    // restaurant only) and /api/super-admin/analytics (platform-wide). Never
+    // read or written directly by any client.
+    match /storefront_stats_daily/{docId} {
+      allow read:  if false;
+      allow write: if false;
+    }
   }
 }

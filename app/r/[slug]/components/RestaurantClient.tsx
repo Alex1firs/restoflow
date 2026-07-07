@@ -2,11 +2,14 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useCart } from "./CartContext";
+import { configureAnalytics, track, trackVisitOnce, trackItemViewOnce } from "@/lib/analytics/client";
+import { nextOpenTime, type OpeningHours } from "@/lib/restaurant-utils";
 import SEOSections from "./SEOSections";
 import LoyaltyCard from "@/app/components/LoyaltyCard";
 import { DEFAULT_HERO_SETTINGS, type HeroSettings } from "@/lib/hero-settings";
 
 type DeliveryType = "delivery" | "pickup" | "dine_in";
+type PayMethod = "online" | "cash" | "whatsapp";
 
 interface MenuItemData {
   id: string;
@@ -51,6 +54,7 @@ interface RestaurantClientProps {
     phone?: string;
     payOnDeliveryEnabled?: boolean;
     whatsappCheckoutEnabled?: boolean;
+    openingHours?: OpeningHours | null;
   };
   menuItems: MenuItemData[];
   seo?: {
@@ -64,6 +68,7 @@ interface RestaurantClientProps {
   };
   isPreview?: boolean;
   initialTable?: string;
+  analyticsEnabled?: boolean;
 }
 
 function fmt(n: number) {
@@ -95,7 +100,7 @@ function formatWhatsAppNumber(phone: string): string {
   return digits;
 }
 
-export default function RestaurantClient({ restaurant, menuItems, seo, isPreview, initialTable }: RestaurantClientProps) {
+export default function RestaurantClient({ restaurant, menuItems, seo, isPreview, initialTable, analyticsEnabled }: RestaurantClientProps) {
   const { items, addToCart, updateQuantity, clearCart, totalPrice, totalItems } = useCart();
 
   const [cartOpen, setCartOpen] = useState(false);
@@ -112,8 +117,40 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
     return "pickup";
   });
   const [selectedDeliveryZoneId, setSelectedDeliveryZoneId] = useState<string>("");
+  const [payMethod, setPayMethod] = useState<PayMethod | null>(null);
   const [formData, setFormData] = useState({ customerName: "", phone: "", address: "", note: "", tableNumber: initialTable ?? "" });
+  const [saveDetails, setSaveDetails] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("restoflow_saved_details");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setFormData(prev => ({
+          ...prev,
+          customerName: parsed.customerName || "",
+          phone: parsed.phone || "",
+          address: parsed.address || ""
+        }));
+        setSaveDetails(true);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, []);
+
+  const persistDetailsIfChecked = () => {
+    if (saveDetails) {
+      localStorage.setItem("restoflow_saved_details", JSON.stringify({
+        customerName: formData.customerName.trim(),
+        phone: formData.phone.trim(),
+        address: formData.address.trim()
+      }));
+    } else {
+      localStorage.removeItem("restoflow_saved_details");
+    }
+  };
   const [orderError, setOrderError] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [trackingToken, setTrackingToken] = useState<string | null>(null);
@@ -153,6 +190,46 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
 
   const hs = restaurant.heroSettings ?? DEFAULT_HERO_SETTINGS;
 
+  // ─── Closed-store handling ───────────────────────────────────────────────────
+  // Customers can still browse + build a cart while closed. Immediate orders are
+  // blocked (client + server); pre-orders are allowed only when the restaurant
+  // exposes the scheduling CTA (hs.showSecondaryCta).
+  const closed = !restaurant.isOpen;
+  const preorderEnabled = !!hs.showSecondaryCta;
+  const nextOpen = nextOpenTime(restaurant.openingHours);
+  const nextOpenLabel = nextOpen.kind === "opens" ? nextOpen.label : null;
+  const closedNote = `Closed now${nextOpenLabel ? ` • Opens ${nextOpenLabel}` : ""}`;
+
+  const openSchedule = () => {
+    if (nextOpen.kind === "opens") {
+      const { date, time } = nextOpen;
+      setScheduleDate((d) => d || date);
+      setScheduleTime((t) => t || time);
+    }
+    setCartOpen(false);
+    setScheduleOpen(true);
+  };
+
+  // ─── Payment method selection (checkout) ─────────────────────────────────────
+  // Present the enabled payment options as a single selectable list, then one
+  // final CTA that dispatches to the existing handler. `cash` is unavailable for
+  // delivery when pay-on-delivery is disabled. hidePrices (catalog) mode offers
+  // cash only. Order = online (primary) → cash → whatsapp.
+  const cashAvailable = !(deliveryType === "delivery" && restaurant.payOnDeliveryEnabled === false);
+  const availableMethods: PayMethod[] = restaurant.hidePrices
+    ? cashAvailable
+      ? ["cash"]
+      : []
+    : [
+        ...(restaurant.onlinePaymentEnabled ? (["online"] as PayMethod[]) : []),
+        ...(cashAvailable ? (["cash"] as PayMethod[]) : []),
+        ...(restaurant.whatsappCheckoutEnabled ? (["whatsapp"] as PayMethod[]) : []),
+      ];
+  // Derived "effective" selection — falls back to the first available method when
+  // the user hasn't picked one, or when a fulfillment change invalidated their pick.
+  const selectedMethod: PayMethod | null =
+    payMethod && availableMethods.includes(payMethod) ? payMethod : availableMethods[0] ?? null;
+
   // Dynamic Brand Theme Variables
   const primary = restaurant.primaryColor || "#F26E21"; // premium warm orange accent
   const accent = restaurant.accentColor || primary;
@@ -162,6 +239,44 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
 
   const categories = [...new Set(menuItems.map((i) => i.category))].filter(Boolean);
   const filteredItems = activeCategory ? menuItems.filter((i) => i.category === activeCategory) : menuItems;
+
+  // ─── Storefront funnel analytics — top of funnel only, fire-and-forget. ───────
+  // Every emit is a no-op unless enabled; nothing here can block or break the UI.
+  const analyticsOn = !!analyticsEnabled && !isPreview;
+
+  useEffect(() => {
+    configureAnalytics(restaurant.slug, analyticsOn);
+    if (analyticsOn) trackVisitOnce();
+  }, [analyticsOn, restaurant.slug]);
+
+  // Cart drawer opened / checkout modal opened (fires on the false→true edge).
+  useEffect(() => { if (cartOpen) track("cart_opened"); }, [cartOpen]);
+  useEffect(() => { if (checkoutOpen) track("checkout_started"); }, [checkoutOpen]);
+
+  // Fulfillment method chosen — skip the initial mount value, only user changes.
+  const fulfillmentFirst = useRef(true);
+  useEffect(() => {
+    if (fulfillmentFirst.current) { fulfillmentFirst.current = false; return; }
+    track("fulfillment_selected", { fulfillment: deliveryType });
+  }, [deliveryType]);
+
+  // menu_item_view — one per item per page load when its card enters view.
+  useEffect(() => {
+    if (!analyticsOn || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          const id = (e.target as HTMLElement).dataset.analyticsItemId;
+          if (id) trackItemViewOnce(id);
+        }
+      },
+      { threshold: 0.5 }
+    );
+    document.querySelectorAll("[data-analytics-item-id]").forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, [analyticsOn, activeCategory, filteredItems.length]);
+
   const subtotal = totalPrice;
   const activeDeliveryZone = restaurant.deliveryZones?.find(z => z.id === selectedDeliveryZoneId);
   const effectiveDeliveryFee = (deliveryType === "pickup" || deliveryType === "dine_in") ? 0 : (activeDeliveryZone ? activeDeliveryZone.fee : restaurant.deliveryFee);
@@ -399,6 +514,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
     if (isSubmitting) return;
     setIsSubmitting(true);
     setOrderError(null);
+    persistDetailsIfChecked();
 
     const payload = {
       ...buildPayload(),
@@ -434,11 +550,16 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
       setOrderError("Orders cannot be placed in Preview Mode.");
       return;
     }
+    if (closed) {
+      setOrderError("The restaurant is closed right now. Please schedule a pre-order for when they reopen.");
+      return;
+    }
     const err = validateForm();
     if (err) { setOrderError(err); return; }
     if (isSubmitting) return;
     setIsSubmitting(true);
     setOrderError(null);
+    persistDetailsIfChecked();
     try {
       const res = await fetch("/api/orders", {
         method: "POST",
@@ -465,11 +586,16 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
       setOrderError("Orders cannot be placed in Preview Mode.");
       return;
     }
+    if (closed) {
+      setOrderError("The restaurant is closed right now. Please schedule a pre-order for when they reopen.");
+      return;
+    }
     const err = validateForm();
     if (err) { setOrderError(err); return; }
     if (isSubmitting) return;
     setIsSubmitting(true);
     setOrderError(null);
+    persistDetailsIfChecked();
     try {
       const res = await fetch("/api/orders/initialize", {
         method: "POST",
@@ -490,11 +616,16 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
       setOrderError("Orders cannot be placed in Preview Mode.");
       return;
     }
+    if (closed) {
+      setOrderError("The restaurant is closed right now. Please schedule a pre-order for when they reopen.");
+      return;
+    }
     const err = validateForm();
     if (err) { setOrderError(err); return; }
     if (isSubmitting) return;
     setIsSubmitting(true);
     setOrderError(null);
+    persistDetailsIfChecked();
     try {
       const payload = { ...buildPayload(), paymentMethod: "whatsapp" };
       const res = await fetch("/api/orders", {
@@ -1045,7 +1176,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
 
                   {hs.showSecondaryCta && (
                     <button
-                      onClick={() => setScheduleOpen(true)}
+                      onClick={openSchedule}
                       className={`text-white text-xs font-black uppercase tracking-wider py-3.5 px-6 bg-white/15 border border-white/15 backdrop-blur-md active:scale-[0.97] transition-all hover:bg-white/20 ${btnStyleCls}`}
                     >
                       {hs.secondaryCtaText || "Schedule Preorder"}
@@ -1221,6 +1352,33 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
             }}
             className="w-full transition-all duration-300"
           >
+        {closed && (
+          <div className="max-w-6xl mx-auto px-6 pt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/30 rounded-2xl px-5 py-4">
+              <div className="flex items-center gap-3">
+                <span className="text-xl">🌙</span>
+                <div>
+                  <p className="font-black text-amber-900 dark:text-amber-300 text-sm">{closedNote}</p>
+                  <p className="text-xs text-amber-700/90 dark:text-amber-400/80 font-medium mt-0.5">
+                    {preorderEnabled
+                      ? "You can still browse and add items — schedule a pre-order for when we reopen."
+                      : "You can browse the menu now. Ordering will resume when the restaurant opens."}
+                  </p>
+                </div>
+              </div>
+              {preorderEnabled && (
+                <button
+                  onClick={openSchedule}
+                  style={{ backgroundColor: primary }}
+                  className="shrink-0 text-white text-xs font-black uppercase tracking-wider py-2.5 px-5 rounded-xl active:scale-[0.97] transition-all hover:opacity-95"
+                >
+                  Pre-order
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         <section id="menu" ref={menuSectionRef} className="scroll-mt-24 max-w-6xl mx-auto px-6 pt-12 pb-12">
           <div className="mb-8">
             {hs.menuShowHeaderLabel !== false && (
@@ -1352,6 +1510,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                   return (
                     <div
                       key={item.id}
+                      data-analytics-item-id={item.id}
                       style={{
                         borderRadius: `${hs.menuCardBorderRadius ?? 16}px`,
                         backgroundColor:
@@ -1364,9 +1523,9 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                       className={`group flex flex-col transition-all duration-300 shadow-[0_4px_25px_rgba(0,0,0,0.01)] border ${
                         hs.menuCardBgStyle === "transparent" ? "bg-transparent border-transparent shadow-none" : "bg-white dark:bg-[#141412] border-[#EFECE6] dark:border-[#1F1F1C]"
                       } ${
-                        item.available
-                          ? "hover:border-[var(--brand-primary)] dark:hover:border-[var(--brand-primary)] hover:shadow-xl hover:-translate-y-1.5"
-                          : "opacity-65"
+                        (!item.available || (closed && !preorderEnabled))
+                          ? "opacity-90"
+                          : "hover:border-[var(--brand-primary)] dark:hover:border-[var(--brand-primary)] hover:shadow-xl hover:-translate-y-1.5"
                       }`}
                     >
                       <div
@@ -1401,7 +1560,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                           loading="lazy"
                         />
                         {!item.available && (
-                          <div className="absolute inset-0 bg-[#0D0C0B]/75 backdrop-blur-xs flex items-center justify-center">
+                          <div className="absolute inset-0 bg-[#0D0C0B]/10 flex items-center justify-center">
                             <span className="bg-[#141412] text-rose-500 text-xs font-black uppercase tracking-wider px-3.5 py-2 rounded-xl border border-rose-950/20 shadow-lg">
                               Sold Out
                             </span>
@@ -1437,16 +1596,16 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                       <div className="mt-auto pt-2 border-t border-[#FAF9F5] dark:border-[#1F1F1C]">
                         {qty === 0 ? (
                           <button
-                            disabled={!item.available || !restaurant.isOpen}
+                            disabled={!item.available || (closed && !preorderEnabled)}
                             onClick={() => addToCart({ id: item.id, name: item.name, price: item.price })}
-                            style={item.available && restaurant.isOpen ? { backgroundColor: primary } : {}}
+                            style={(!item.available || (closed && !preorderEnabled)) ? {} : { backgroundColor: primary }}
                             className={`w-full py-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all ${
-                              item.available && restaurant.isOpen
-                                ? "text-white hover:opacity-95 active:scale-95 shadow-sm"
-                                : "bg-stone-50 dark:bg-[#1C1C1A] text-[#7A7368] dark:text-[#5C574F] cursor-not-allowed border border-[#EFECE6] dark:border-[#1F1F1C]"
+                              (!item.available || (closed && !preorderEnabled))
+                                ? "bg-[#FAF9F5] dark:bg-[#1C1C1A] text-[#A19B91] dark:text-[#5C574F] cursor-not-allowed border border-[#EFECE6] dark:border-[#1F1F1C]"
+                                : "text-white hover:opacity-95 active:scale-95 shadow-sm"
                             }`}
                           >
-                            {!restaurant.isOpen ? "Closed" : !item.available ? "Sold Out" : "Add to Cart"}
+                            {!item.available ? "Unavailable" : (closed && !preorderEnabled) ? "Closed" : (closed && preorderEnabled) ? "Pre-order" : "Add to Cart"}
                           </button>
                         ) : (
                           <div className="flex items-center justify-between bg-stone-50 dark:bg-[#1E1E1C] rounded-2xl p-1 border border-[#EFECE6] dark:border-[#1F1F1C] animate-scaleUp">
@@ -1497,7 +1656,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                   const cartItem = items.find((i) => i.id === item.id);
                   const qty = cartItem?.quantity ?? 0;
                   return (
-                    <div key={item.id} className="group bg-[#FAF9F5] dark:bg-[#0D0C0B] rounded-3xl border border-[#EFECE6] dark:border-[#1F1F1C] overflow-hidden hover:border-[var(--brand-primary)] hover:shadow-lg transition-all duration-300 flex flex-col">
+                    <div key={item.id} data-analytics-item-id={item.id} className={`group bg-[#FAF9F5] dark:bg-[#0D0C0B] rounded-3xl border border-[#EFECE6] dark:border-[#1F1F1C] overflow-hidden transition-all duration-300 flex flex-col ${(!item.available || (closed && !preorderEnabled)) ? "opacity-90" : "hover:border-[var(--brand-primary)] hover:shadow-lg"}`}>
                       <div className="relative h-40 overflow-hidden bg-stone-100 dark:bg-stone-900">
                         <div
                           style={{ backgroundColor: primary }}
@@ -1522,16 +1681,16 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                         <div className="mt-4">
                           {qty === 0 ? (
                             <button
-                              disabled={!restaurant.isOpen}
+                              disabled={!item.available || (closed && !preorderEnabled)}
                               onClick={() => addToCart({ id: item.id, name: item.name, price: item.price })}
-                              style={restaurant.isOpen ? { backgroundColor: primary } : {}}
+                              style={(!item.available || (closed && !preorderEnabled)) ? {} : { backgroundColor: primary }}
                               className={`w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
-                                restaurant.isOpen
-                                  ? "text-white hover:opacity-95 active:scale-95 shadow-xs"
-                                  : "bg-stone-100 dark:bg-stone-900 text-[#7A7368] cursor-not-allowed border border-[#EFECE6] dark:border-[#1F1F1C]"
+                                (!item.available || (closed && !preorderEnabled))
+                                  ? "bg-[#FAF9F5] dark:bg-[#1C1C1A] text-[#A19B91] dark:text-[#5C574F] cursor-not-allowed border border-[#EFECE6] dark:border-[#1F1F1C]"
+                                  : "text-white hover:opacity-95 active:scale-95 shadow-xs"
                               }`}
                             >
-                              {restaurant.isOpen ? "Add" : "Closed"}
+                              {!item.available ? "Unavailable" : (closed && !preorderEnabled) ? "Closed" : (closed && preorderEnabled) ? "Pre-order" : "Add"}
                             </button>
                           ) : (
                             <div className="flex items-center justify-between bg-white dark:bg-[#1E1E1C] border border-[#EFECE6] dark:border-[#1F1F1C] rounded-xl px-1 py-0.5">
@@ -1922,18 +2081,41 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                 </div>
               )}
 
-              <button
-                disabled={!restaurant.isOpen || !meetsMinimum}
-                onClick={openCheckout}
-                style={restaurant.isOpen && meetsMinimum ? { backgroundColor: primary } : {}}
-                className="w-full text-white font-bold py-4 rounded-2xl transition-all hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-stone-200 dark:disabled:bg-stone-800 disabled:text-stone-400 dark:disabled:text-stone-600 active:scale-[0.99] text-sm uppercase tracking-widest shadow-md shadow-[var(--brand-primary-20)]"
-              >
-                {!restaurant.isOpen
-                  ? "Restaurant is Offline"
-                  : !meetsMinimum
-                  ? "Browse More Selections"
-                  : "Proceed to Secure Checkout"}
-              </button>
+              {closed && (
+                <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/30 rounded-2xl px-4 py-3 mb-4 font-medium leading-relaxed shadow-sm">
+                  🌙 {closedNote}.{" "}
+                  {preorderEnabled
+                    ? "You can schedule a pre-order for when we reopen."
+                    : "Ordering will resume when the restaurant opens."}
+                </div>
+              )}
+
+              {closed && preorderEnabled ? (
+                <button
+                  disabled={!meetsMinimum}
+                  onClick={openSchedule}
+                  style={meetsMinimum ? { backgroundColor: primary } : {}}
+                  className="w-full text-white font-bold py-4 rounded-2xl transition-all hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-stone-200 dark:disabled:bg-stone-800 disabled:text-stone-400 dark:disabled:text-stone-600 active:scale-[0.99] text-sm uppercase tracking-widest shadow-md shadow-[var(--brand-primary-20)]"
+                >
+                  {!meetsMinimum ? "Browse More Selections" : "Schedule Pre-order"}
+                </button>
+              ) : closed ? (
+                <button
+                  disabled
+                  className="w-full font-bold py-4 rounded-2xl text-sm uppercase tracking-widest bg-stone-200 dark:bg-stone-800 text-stone-500 dark:text-stone-500 cursor-not-allowed"
+                >
+                  {nextOpenLabel ? `Opens ${nextOpenLabel}` : "Currently Closed"}
+                </button>
+              ) : (
+                <button
+                  disabled={!meetsMinimum}
+                  onClick={openCheckout}
+                  style={meetsMinimum ? { backgroundColor: primary } : {}}
+                  className="w-full text-white font-bold py-4 rounded-2xl transition-all hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-stone-200 dark:disabled:bg-stone-800 disabled:text-stone-400 dark:disabled:text-stone-600 active:scale-[0.99] text-sm uppercase tracking-widest shadow-md shadow-[var(--brand-primary-20)]"
+                >
+                  {!meetsMinimum ? "Browse More Selections" : "Proceed to Secure Checkout"}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1987,6 +2169,55 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                   </div>
                 </div>
               )}
+              {/* Order review — items + running total (step 1 of the checkout flow) */}
+              <div className="bg-stone-50 dark:bg-[#0D0C0B] border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl p-5">
+                <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider mb-3.5">Order review</p>
+                <div className="space-y-2.5 mb-4 max-h-[140px] overflow-y-auto scrollbar-hide">
+                  {items.map((item) => (
+                    <div key={item.id} className="flex justify-between text-xs font-medium">
+                      <span className="text-[#7A7368] dark:text-[#A19B91] font-semibold">{item.quantity}× {item.name}</span>
+                      {!restaurant.hidePrices && (
+                        <span className="font-extrabold text-neutral-900 dark:text-neutral-100">{fmt(item.quantity * item.price)}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {restaurant.hidePrices ? (
+                  <div className="border-t border-[#EFECE6] dark:border-[#1F1F1C] pt-3.5">
+                    <div className="bg-stone-100/50 dark:bg-stone-900/50 border border-dashed border-stone-200 dark:border-stone-800 rounded-xl p-3 text-center">
+                      <p className="text-xs font-black text-neutral-700 dark:text-neutral-300">📖 Catalog Order Mode</p>
+                      <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1 leading-relaxed">
+                        {deliveryType === "delivery"
+                          ? "Please pay cash or card upon delivery dispatch."
+                          : "Please pay table-side or at the counter upon order collection."}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border-t border-[#EFECE6] dark:border-[#1F1F1C] pt-3.5 space-y-2">
+                    <div className="flex justify-between text-xs text-[#7A7368] dark:text-[#A19B91]">
+                      <span>Selections Subtotal</span>
+                      <span className="font-bold text-neutral-900 dark:text-neutral-200">{fmt(subtotal)}</span>
+                    </div>
+                    {deliveryType === "delivery" && restaurant.deliveryFee > 0 && (
+                      <div className="flex justify-between text-xs text-[#7A7368] dark:text-[#A19B91]">
+                        <span>Fulfillment Dispatch Fee</span>
+                        <span className="font-bold text-neutral-900 dark:text-neutral-200">{fmt(restaurant.deliveryFee)}</span>
+                      </div>
+                    )}
+                    {(deliveryType === "pickup" || deliveryType === "dine_in") && (
+                      <div className="flex justify-between text-xs text-emerald-600 dark:text-emerald-500 font-extrabold">
+                        <span>{deliveryType === "dine_in" ? "No delivery fee" : "Pickup Savings"}</span>
+                        <span>Free</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-black text-base pt-3 border-t border-[#EFECE6] dark:border-[#1F1F1C]">
+                      <span className="text-neutral-900 dark:text-neutral-200 font-extrabold">Total Amount Due</span>
+                      <span style={{ color: primary }} className="font-black text-lg tracking-tight">{fmt(orderTotal)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
               {/* Fulfillment mode selector */}
               {(restaurant.deliveryEnabled || restaurant.pickupEnabled || restaurant.dineInEnabled) && (
                 <div className="space-y-1.5">
@@ -2179,6 +2410,23 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                 </div>
               )}
 
+              {/* Save Details Checkbox */}
+              <label className="flex items-center gap-3 p-1 cursor-pointer w-fit group mb-4 animate-fadeIn">
+                <div className="relative flex items-center justify-center">
+                  <input
+                    type="checkbox"
+                    checked={saveDetails}
+                    onChange={(e) => setSaveDetails(e.target.checked)}
+                    className="w-5 h-5 appearance-none border-2 border-[#EFECE6] dark:border-[#1F1F1C] rounded-md transition-all checked:bg-[var(--brand-primary)] checked:border-[var(--brand-primary)] cursor-pointer"
+                    style={saveDetails ? { backgroundColor: primary, borderColor: primary } : {}}
+                  />
+                  {saveDetails && (
+                    <svg className="absolute w-3 h-3 text-white pointer-events-none" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                  )}
+                </div>
+                <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200 select-none group-hover:text-neutral-900 transition-colors">Save my details for next time</span>
+              </label>
+
               {/* Special Note */}
               <div className="space-y-1.5">
                 <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">Dietary instructions / Note (Optional)</p>
@@ -2193,132 +2441,128 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                 />
               </div>
 
-              {/* Secure Order Summary Details */}
-              <div className="bg-stone-50 dark:bg-[#0D0C0B] border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl p-5">
-                <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider mb-3.5">Fulfillment summary</p>
-                <div className="space-y-2.5 mb-4 max-h-[140px] overflow-y-auto scrollbar-hide">
-                  {items.map((item) => (
-                    <div key={item.id} className="flex justify-between text-xs font-medium">
-                      <span className="text-[#7A7368] dark:text-[#A19B91] font-semibold">{item.quantity}× {item.name}</span>
-                      {!restaurant.hidePrices && (
-                        <span className="font-extrabold text-neutral-900 dark:text-neutral-100">{fmt(item.quantity * item.price)}</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                {restaurant.hidePrices ? (
-                  <div className="border-t border-[#EFECE6] dark:border-[#1F1F1C] pt-3.5">
-                    <div className="bg-stone-100/50 dark:bg-stone-900/50 border border-dashed border-stone-200 dark:border-stone-800 rounded-xl p-3 text-center">
-                      <p className="text-xs font-black text-neutral-700 dark:text-neutral-300">📖 Catalog Order Mode</p>
-                      <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1 leading-relaxed">
-                        {deliveryType === "delivery"
-                          ? "Please pay cash or card upon delivery dispatch."
-                          : "Please pay table-side or at the counter upon order collection."}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="border-t border-[#EFECE6] dark:border-[#1F1F1C] pt-3.5 space-y-2">
-                    <div className="flex justify-between text-xs text-[#7A7368] dark:text-[#A19B91]">
-                      <span>Selections Subtotal</span>
-                      <span className="font-bold text-neutral-900 dark:text-neutral-200">{fmt(subtotal)}</span>
-                    </div>
-                    {deliveryType === "delivery" && restaurant.deliveryFee > 0 && (
-                      <div className="flex justify-between text-xs text-[#7A7368] dark:text-[#A19B91]">
-                        <span>Fulfillment Dispatch Fee</span>
-                        <span className="font-bold text-neutral-900 dark:text-neutral-200">{fmt(restaurant.deliveryFee)}</span>
-                      </div>
-                    )}
-                    {(deliveryType === "pickup" || deliveryType === "dine_in") && (
-                      <div className="flex justify-between text-xs text-emerald-600 dark:text-emerald-500 font-extrabold">
-                        <span>{deliveryType === "dine_in" ? "No delivery fee" : "Pickup Savings"}</span>
-                        <span>Free</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between font-black text-base pt-3 border-t border-[#EFECE6] dark:border-[#1F1F1C]">
-                      <span className="text-neutral-900 dark:text-neutral-200 font-extrabold">Total Amount Due</span>
-                      <span style={{ color: primary }} className="font-black text-lg tracking-tight">{fmt(orderTotal)}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {orderError && (
                 <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-200/50 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 text-xs md:text-sm font-bold px-4.5 py-4 rounded-2xl leading-relaxed">
                   ⚠️ {orderError}
+                  <span className="block mt-1.5 font-medium text-rose-500/90 dark:text-rose-400/80">
+                    Don’t worry — your cart is still saved. You can try again.
+                  </span>
                 </div>
               )}
 
-              {/* Secure payment actions (Phase 10C) */}
-              <div className="space-y-2.5 pb-2">
-                {restaurant.hidePrices ? (
-                  !(deliveryType === "delivery" && restaurant.payOnDeliveryEnabled === false) ? (
-                    <button
-                      onClick={handleCashOrder}
-                      disabled={isSubmitting}
-                      style={{ backgroundColor: primary }}
-                      className="w-full text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2.5 transition-opacity hover:opacity-95 disabled:opacity-60 active:scale-[0.99] text-sm uppercase tracking-widest shadow-md shadow-[var(--brand-primary-20)]"
-                    >
-                      <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7m0 0l-7 7m7-7H3" />
-                      </svg>
-                      {isSubmitting
-                        ? "Placing Order safely…"
-                        : "Confirm & Place Order"}
-                    </button>
-                  ) : (
-                    <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-200/50 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 text-xs md:text-sm font-bold px-4.5 py-4 rounded-2xl leading-relaxed text-center">
-                      ⚠️ Delivery orders are not available with cash. Please select Pickup or Dine-in.
-                    </div>
-                  )
-                ) : (
+              {/* Payment method selection + single final CTA (step-flow simplification) */}
+              <div className="space-y-3 pb-2">
+                {availableMethods.length > 0 ? (
                   <>
-                    {restaurant.onlinePaymentEnabled && (
-                      <button
-                        onClick={handleOnlinePayment}
-                        disabled={isSubmitting}
-                        style={{ backgroundColor: primary }}
-                        className="w-full text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2.5 transition-opacity hover:opacity-95 disabled:opacity-60 active:scale-[0.99] text-sm uppercase tracking-widest shadow-md shadow-[var(--brand-primary-20)]"
-                      >
+                    <p className="text-[10px] font-black text-[#7A7368] uppercase tracking-wider">
+                      {availableMethods.length > 1 ? "Preferred payment method" : "Payment"}
+                    </p>
+                    <div className="space-y-1.5" role="radiogroup" aria-label="Payment method">
+                      {availableMethods.map((m) => {
+                        const active = selectedMethod === m;
+                        const meta = {
+                          online: {
+                            label: "Pay Online",
+                            help: "Card or bank transfer via Paystack — secure.",
+                            icon: (
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                            ),
+                          },
+                          cash: {
+                            label:
+                              deliveryType === "pickup"
+                                ? "Pay on Pickup"
+                                : deliveryType === "dine_in"
+                                ? "Pay at Table"
+                                : "Pay on Delivery",
+                            help: "Cash when your order is fulfilled — no card needed.",
+                            icon: (
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                            ),
+                          },
+                          whatsapp: {
+                            label: "Order via WhatsApp",
+                            help: "Send your order to the restaurant to confirm on WhatsApp.",
+                            icon: null,
+                          },
+                        }[m];
+                        return (
+                          <button
+                            key={m}
+                            type="button"
+                            role="radio"
+                            aria-checked={active}
+                            onClick={() => setPayMethod(m)}
+                            className={`w-full flex items-center gap-3 text-left px-4.5 py-3.5 rounded-2xl border transition-all ${
+                              active
+                                ? "bg-white dark:bg-[#141412] shadow-sm"
+                                : "bg-[#FAF9F5] dark:bg-[#0D0C0B] border-[#EFECE6] dark:border-[#1F1F1C]"
+                            }`}
+                            style={active ? { borderColor: primary } : undefined}
+                          >
+                            <span className="shrink-0" style={{ color: active ? primary : "#7A7368" }}>
+                              {m === "whatsapp" ? (
+                                <svg className="w-5 h-5" fill="#25D366" viewBox="0 0 24 24"><path d="M12.031 0C5.389 0 0 5.39 0 12.031c0 2.128.552 4.195 1.6 6.02L.153 24l6.096-1.597A11.967 11.967 0 0012.031 24c6.643 0 12.031-5.39 12.031-12.031S18.674 0 12.031 0zM12.031 22A9.97 9.97 0 016.924 20.6l-.366-.217-4.52 1.184 1.2-4.407-.238-.378A9.957 9.957 0 012.062 12.03C2.062 6.53 6.53 2.06 12.031 2.06s9.969 4.47 9.969 9.97-4.468 9.97-9.969 9.97zm5.46-7.466c-.299-.15-1.77-.874-2.045-.975-.274-.1-.475-.15-.674.15-.2.3-.77 1-.945 1.201-.174.202-.349.227-.648.077-.299-.15-1.264-.466-2.408-1.488-.89-.795-1.492-1.778-1.667-2.078-.175-.3 0-.46.149-.611.135-.135.3-.35.45-.525.149-.175.2-.299.299-.5.1-.2.05-.375-.025-.525-.075-.15-.674-1.625-.923-2.225-.244-.588-.493-.508-.674-.518-.175-.01-.375-.01-.574-.01-.2 0-.524.075-.799.375-.275.3-1.048 1.025-1.048 2.5 0 1.475 1.073 2.9 1.223 3.1.15.2 2.115 3.225 5.123 4.525.717.31 1.277.495 1.713.633.72.23 1.375.198 1.892.12.578-.088 1.77-.725 2.02-1.425.25-.7.25-1.3.175-1.425-.075-.125-.275-.2-.575-.35z"/></svg>
+                              ) : (
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">{meta.icon}</svg>
+                              )}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-sm font-black text-neutral-900 dark:text-neutral-100" style={active ? { color: primary } : undefined}>{meta.label}</span>
+                              <span className="block text-xs text-[#A19B91] font-medium leading-snug">{meta.help}</span>
+                            </span>
+                            <span
+                              className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0"
+                              style={{ borderColor: active ? primary : "#CFC9C0" }}
+                            >
+                              {active && <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: primary }} />}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Single final CTA — dispatches to the existing handler for the chosen method */}
+                    <button
+                      onClick={() => {
+                        if (!selectedMethod) return;
+                        track("payment_method_selected", { method: selectedMethod });
+                        if (selectedMethod === "online") handleOnlinePayment();
+                        else if (selectedMethod === "whatsapp") handleWhatsappPayment();
+                        else handleCashOrder();
+                      }}
+                      disabled={isSubmitting || !selectedMethod}
+                      style={selectedMethod === "whatsapp" ? { backgroundColor: "#25D366" } : { backgroundColor: primary }}
+                      className={`w-full text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2.5 transition-opacity hover:opacity-95 disabled:opacity-60 active:scale-[0.99] text-sm uppercase tracking-widest shadow-md ${
+                        selectedMethod === "whatsapp" ? "shadow-[#25D366]/30" : "shadow-[var(--brand-primary-20)]"
+                      }`}
+                    >
+                      {selectedMethod === "whatsapp" ? (
+                        <svg className="w-4.5 h-4.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 0C5.389 0 0 5.39 0 12.031c0 2.128.552 4.195 1.6 6.02L.153 24l6.096-1.597A11.967 11.967 0 0012.031 24c6.643 0 12.031-5.39 12.031-12.031S18.674 0 12.031 0zM12.031 22A9.97 9.97 0 016.924 20.6l-.366-.217-4.52 1.184 1.2-4.407-.238-.378A9.957 9.957 0 012.062 12.03C2.062 6.53 6.53 2.06 12.031 2.06s9.969 4.47 9.969 9.97-4.468 9.97-9.969 9.97z"/></svg>
+                      ) : (
                         <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7m0 0l-7 7m7-7H3" />
                         </svg>
-                        {isSubmitting ? "Redirecting safely…" : "Authorize Pay Online (Paystack)"}
-                      </button>
-                    )}
-                    {restaurant.whatsappCheckoutEnabled && (
-                      <button
-                        onClick={handleWhatsappPayment}
-                        disabled={isSubmitting}
-                        className="w-full bg-[#25D366] hover:bg-[#20b958] text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2.5 transition-opacity disabled:opacity-60 active:scale-[0.99] text-sm uppercase tracking-widest shadow-md shadow-[#25D366]/30"
-                      >
-                        <svg className="w-4.5 h-4.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 0C5.389 0 0 5.39 0 12.031c0 2.128.552 4.195 1.6 6.02L.153 24l6.096-1.597A11.967 11.967 0 0012.031 24c6.643 0 12.031-5.39 12.031-12.031S18.674 0 12.031 0zM12.031 22A9.97 9.97 0 016.924 20.6l-.366-.217-4.52 1.184 1.2-4.407-.238-.378A9.957 9.957 0 012.062 12.03C2.062 6.53 6.53 2.06 12.031 2.06s9.969 4.47 9.969 9.97-4.468 9.97-9.969 9.97zm5.46-7.466c-.299-.15-1.77-.874-2.045-.975-.274-.1-.475-.15-.674.15-.2.3-.77 1-.945 1.201-.174.202-.349.227-.648.077-.299-.15-1.264-.466-2.408-1.488-.89-.795-1.492-1.778-1.667-2.078-.175-.3 0-.46.149-.611.135-.135.3-.35.45-.525.149-.175.2-.299.299-.5.1-.2.05-.375-.025-.525-.075-.15-.674-1.625-.923-2.225-.244-.588-.493-.508-.674-.518-.175-.01-.375-.01-.574-.01-.2 0-.524.075-.799.375-.275.3-1.048 1.025-1.048 2.5 0 1.475 1.073 2.9 1.223 3.1.15.2 2.115 3.225 5.123 4.525.717.31 1.277.495 1.713.633.72.23 1.375.198 1.892.12.578-.088 1.77-.725 2.02-1.425.25-.7.25-1.3.175-1.425-.075-.125-.275-.2-.575-.35z"/></svg>
-                        {isSubmitting ? "Redirecting safely…" : "Place Order via WhatsApp"}
-                      </button>
-                    )}
-                    {!(deliveryType === "delivery" && restaurant.payOnDeliveryEnabled === false) ? (
-                      <button
-                        onClick={handleCashOrder}
-                        disabled={isSubmitting}
-                        className="w-full bg-stone-50 hover:bg-stone-100 dark:bg-[#1E1E1C] dark:hover:bg-[#2A2A27] text-neutral-800 dark:text-neutral-200 font-bold py-4 rounded-2xl flex items-center justify-center gap-2.5 transition-all border border-[#EFECE6] dark:border-[#1F1F1C] disabled:opacity-60 active:scale-[0.99] text-sm uppercase tracking-widest shadow-xs"
-                      >
-                        <svg className="w-4.5 h-4.5 text-[#7A7368]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                        {isSubmitting
+                      )}
+                      {isSubmitting
+                        ? selectedMethod === "cash"
                           ? "Placing Order safely…"
-                          : deliveryType === "pickup"
-                          ? "Confirm Pay on Pickup"
-                          : deliveryType === "dine_in"
-                          ? "Confirm Pay at Table"
-                          : "Confirm Pay on Delivery"}
-                      </button>
-                    ) : !restaurant.onlinePaymentEnabled && !restaurant.whatsappCheckoutEnabled ? (
-                      <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-200/50 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 text-xs md:text-sm font-bold px-4.5 py-4 rounded-2xl leading-relaxed text-center">
-                        ⚠️ Delivery orders are not available with cash. Please select Pickup or Dine-in.
-                      </div>
-                    ) : null}
+                          : "Redirecting safely…"
+                        : selectedMethod === "online"
+                        ? `Pay ${fmt(orderTotal)} Securely`
+                        : selectedMethod === "whatsapp"
+                        ? "Send Order on WhatsApp"
+                        : "Place Order"}
+                    </button>
+
+                    <p className="text-[11px] text-center text-[#7A7368] dark:text-[#5C574F] font-medium leading-snug">
+                      🔒 Your cart is saved on this device — you won’t lose it if payment doesn’t go through.
+                    </p>
                   </>
+                ) : (
+                  <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-200/50 dark:border-rose-900/30 text-rose-600 dark:text-rose-400 text-xs md:text-sm font-bold px-4.5 py-4 rounded-2xl leading-relaxed text-center">
+                    ⚠️ Delivery orders are not available with cash. Please select Pickup or Dine-in.
+                  </div>
                 )}
               </div>
 
@@ -2537,6 +2781,23 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                       </div>
                     </div>
                   )}
+
+                  {/* Save Details Checkbox */}
+                  <label className="flex items-center gap-3 p-1 cursor-pointer w-fit group mb-4 animate-fadeIn">
+                    <div className="relative flex items-center justify-center">
+                      <input
+                        type="checkbox"
+                        checked={saveDetails}
+                        onChange={(e) => setSaveDetails(e.target.checked)}
+                        className="w-5 h-5 appearance-none border-2 border-[#EFECE6] dark:border-[#1F1F1C] rounded-md transition-all checked:bg-[var(--brand-primary)] checked:border-[var(--brand-primary)] cursor-pointer"
+                        style={saveDetails ? { backgroundColor: primary, borderColor: primary } : {}}
+                      />
+                      {saveDetails && (
+                        <svg className="absolute w-3 h-3 text-white pointer-events-none" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                      )}
+                    </div>
+                    <span className="text-sm font-bold text-neutral-800 dark:text-neutral-200 select-none group-hover:text-neutral-900 transition-colors">Save my details for next time</span>
+                  </label>
 
                   {/* Special Instruction Note */}
                   <div className="space-y-1.5">

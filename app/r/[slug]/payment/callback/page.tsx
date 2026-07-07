@@ -1,4 +1,6 @@
 import Link from "next/link";
+import ClearCartOnSuccess from "../../components/ClearCartOnSuccess";
+import { recordServerEvent } from "@/lib/analytics/rollup";
 import { createOrderFromPaymentReference, getOrderByReference } from "@/lib/order-payments";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { awardLoyaltyTick } from "@/lib/loyalty";
@@ -42,12 +44,16 @@ export default async function PaymentCallbackPage({ params, searchParams }: Prop
 
       if (txData.status !== "success") {
         message = `Payment was not completed (status: ${txData.status}). No charge was made.`;
+        await recordServerEvent(slug, "payment_failed", { method: "online" });
       } else {
         // createOrderFromPaymentReference runs a Firestore transaction that deletes
         // pending_payments/{reference} atomically — only the first concurrent caller
         // gets a non-null return. Use that as the idempotency signal.
         const result = await createOrderFromPaymentReference(reference);
         const isCreator = result !== null;
+        // Funnel analytics — emitted only when this render is the order's creator,
+        // so payment_successful counts exactly once across verify/webhook/callback.
+        if (isCreator) await recordServerEvent(slug, "payment_successful", { method: "online" });
         const resolved = result ?? await getOrderByReference(reference);
         if (resolved) {
           orderId = resolved.orderId;
@@ -128,6 +134,7 @@ function ResultPage({
       <div className="max-w-md w-full">
         {success ? (
           <>
+            <ClearCartOnSuccess slug={slug} />
             <div className="text-center mb-8">
               <div className="w-20 h-20 bg-orange-600 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-2xl">
                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">

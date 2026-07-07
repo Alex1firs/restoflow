@@ -37,6 +37,7 @@ export default async function TrackPage({ params, searchParams }: Props) {
     <TrackOrderClient
       orderId={orderId}
       token={token}
+      analyticsEnabled={process.env.STOREFRONT_ANALYTICS_ENABLED === "true"}
       initial={{
         restaurantId: d.restaurantId as string,
         items: (d.items as { id: string; name: string; quantity: number; price: number }[]) ?? [],

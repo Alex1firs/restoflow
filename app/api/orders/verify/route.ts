@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createOrderFromPaymentReference, getOrderByReference } from "@/lib/order-payments";
 import { sendNewOrderAlert } from "@/lib/notifications";
 import { sendCustomerNotification } from "@/lib/customer-notifications";
+import { recordServerEvent } from "@/lib/analytics/rollup";
 import { getAdminDb } from "@/lib/firebase-admin";
 
 export async function POST(req: NextRequest) {
@@ -53,6 +54,10 @@ export async function POST(req: NextRequest) {
         const itemsSummary = (d.items as { name: string; quantity: number }[])
           .map((i) => `${i.quantity}× ${i.name}`)
           .join(", ");
+
+        // Funnel analytics — emitted only on first creation (isNew), so it counts
+        // exactly once across verify/webhook/callback. Non-blocking, never throws.
+        await recordServerEvent(d.restaurantId as string, "payment_successful", { method: "online" });
 
         // Alert restaurant owner
         sendNewOrderAlert({

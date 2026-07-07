@@ -10,6 +10,7 @@ import {
   Building2,
   CreditCard,
   BarChart2,
+  TrendingUp,
   Layers,
   Wrench,
   HelpCircle,
@@ -35,6 +36,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Platform",
     items: [
       { label: "Overview",      href: "/super-admin/overview",      Icon: LayoutDashboard },
+      { label: "Analytics",     href: "/super-admin/analytics",     Icon: TrendingUp },
       { label: "Restaurants",   href: "/super-admin/restaurants",   Icon: Building2 },
       { label: "Subscriptions", href: "/super-admin/subscriptions", Icon: CreditCard },
       { label: "Payments",      href: "/super-admin/payments",      Icon: BarChart2 },
