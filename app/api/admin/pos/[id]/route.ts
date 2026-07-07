@@ -165,6 +165,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
 
       validatedItems.push({
         id: dbItem.id,
+        menuItemId: dbItem.menuItemId ?? null,
         name: dbItem.name,
         price: unitPrice,
         basePrice: dbItem.price ?? dbItem.basePrice ?? 0,

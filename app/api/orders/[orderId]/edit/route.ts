@@ -100,7 +100,7 @@ export async function PATCH(
       });
     }
 
-    const validatedItems: { id: string; name: string; price: number; quantity: number }[] = [];
+    const validatedItems: { id: string; menuItemId: string; name: string; price: number; quantity: number }[] = [];
     let itemsTotal = 0;
 
     for (const item of items) {
@@ -119,6 +119,7 @@ export async function PATCH(
       }
       validatedItems.push({
         id: item.id,
+        menuItemId: item.id,
         name: menuItem.name,
         price: menuItem.price,
         quantity: item.quantity,

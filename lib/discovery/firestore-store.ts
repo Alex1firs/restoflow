@@ -33,6 +33,24 @@ function parseCsv(v: unknown): string[] {
   return [];
 }
 
+/**
+ * Resolve an order line item to its discovery dishId for popularity.
+ * Prefers the explicit `menuItemId` seam (2.5b) so orders that carry it map to
+ * the menu_items-backed discovery dish; falls back to `id` for online orders
+ * (where id already IS the menu_items id) and legacy/POS orders (unchanged
+ * behavior — a POS `prepared_items` id or a null menuItemId still resolves to
+ * the raw id, which won't match discovery, keeping those restaurant-level only).
+ */
+export function orderLineToDishId(it: unknown): { dishId: string; quantity: number } {
+  const line = (it ?? {}) as { id?: unknown; menuItemId?: unknown; quantity?: unknown };
+  const menuItemId = typeof line.menuItemId === "string" && line.menuItemId ? line.menuItemId : null;
+  const id = typeof line.id === "string" ? line.id : "";
+  return {
+    dishId: String(menuItemId ?? id),
+    quantity: typeof line.quantity === "number" ? line.quantity : 0,
+  };
+}
+
 /** Map a raw `restaurants` doc into the normalized SourceRestaurant the projector expects. */
 function normalizeRestaurant(slug: string, d: Doc): SourceRestaurant {
   return {
@@ -154,10 +172,7 @@ export function createFirestoreStore(db: Firestore): DiscoveryStore {
       for (const d of snap.docs) {
         const x = d.data() as Doc;
         if (x.paymentStatus !== "paid" || x.status === "rejected") continue;
-        const lines = (Array.isArray(x.items) ? x.items : []).map((it) => {
-          const line = it as { id?: string; quantity?: number };
-          return { dishId: String(line.id ?? ""), quantity: typeof line.quantity === "number" ? line.quantity : 0 };
-        });
+        const lines = (Array.isArray(x.items) ? x.items : []).map(orderLineToDishId);
         out.push({
           restaurantSlug: String(x.restaurantId ?? ""),
           createdAtMs: toMillis(x.createdAt) ?? 0,

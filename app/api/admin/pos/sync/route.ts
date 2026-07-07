@@ -131,6 +131,7 @@ export async function POST(request: NextRequest) {
 
       validatedItems.push({
         id: item.id,
+        menuItemId: dbItem.menuItemId ?? null,
         name: dbItem.name,
         price: offlineUnitPrice, // We respect the transaction amount but flag the warning
         basePrice: dbItem.price ?? dbItem.basePrice ?? 0,

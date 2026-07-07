@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const validatedItems: { id: string; name: string; price: number; quantity: number }[] = [];
+    const validatedItems: { id: string; menuItemId: string; name: string; price: number; quantity: number }[] = [];
     let itemsTotal = 0;
 
     for (const item of items as { id: string; quantity: number }[]) {
@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
       if (!menuItem.available) {
         return NextResponse.json({ error: `"${menuItem.name}" is currently unavailable` }, { status: 400 });
       }
-      validatedItems.push({ id: item.id, name: menuItem.name, price: menuItem.price, quantity: item.quantity });
+      validatedItems.push({ id: item.id, menuItemId: item.id, name: menuItem.name, price: menuItem.price, quantity: item.quantity });
       itemsTotal += menuItem.price * item.quantity;
     }
 

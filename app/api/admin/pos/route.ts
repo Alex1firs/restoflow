@@ -137,6 +137,7 @@ export async function POST(request: NextRequest) {
 
       validatedItems.push({
         id: item.id,
+        menuItemId: dbItem.menuItemId ?? null,
         name: dbItem.name,
         price: unitPrice,
         basePrice: dbItem.price ?? dbItem.basePrice ?? 0,
