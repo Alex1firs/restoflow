@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:storefront": "tsx lib/__tests__/restaurant-utils.test.ts && tsx lib/__tests__/menu-utils.test.ts && tsx lib/__tests__/logistics-summary.test.ts && tsx \"app/r/[slug]/components/__tests__/cart-storage.test.ts\" && tsx \"app/r/[slug]/components/__tests__/checkout-details-storage.test.ts\"",
+    "test:storefront": "tsx lib/__tests__/restaurant-utils.test.ts && tsx lib/__tests__/menu-utils.test.ts && tsx lib/__tests__/logistics-summary.test.ts && tsx \"app/r/[slug]/components/__tests__/cart-storage.test.ts\" && tsx \"app/r/[slug]/components/__tests__/checkout-details-storage.test.ts\" && tsx app/discover/__tests__/lib.test.ts",
     "test:analytics": "tsx lib/analytics/__tests__/analytics.test.ts && tsx lib/analytics/__tests__/client.test.ts && tsx lib/analytics/__tests__/insights.test.ts && tsx lib/analytics/__tests__/platform.test.ts",
     "test:discovery": "tsx lib/discovery/__tests__/taxonomy.test.ts && tsx lib/discovery/__tests__/project.test.ts && tsx lib/discovery/__tests__/indexer.test.ts && tsx lib/discovery/__tests__/popularity.test.ts && tsx lib/discovery/__tests__/popularity-job.test.ts && tsx lib/discovery/__tests__/geo.test.ts && tsx lib/discovery/__tests__/geocode-job.test.ts && tsx lib/discovery/__tests__/near-search.test.ts && tsx lib/discovery/__tests__/ranking.test.ts && tsx lib/discovery/__tests__/api-handlers.test.ts && tsx lib/discovery/__tests__/order-line-dishid.test.ts",
     "discovery:geocode": "tsx scripts/discovery-geocode.ts",
