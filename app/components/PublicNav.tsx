@@ -14,10 +14,13 @@ export default function PublicNav() {
           <Link href="/" className="text-white font-black text-lg tracking-tight italic">
             RestoFlow
           </Link>
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 sm:gap-6">
+            <Link href="/discover" className="text-gray-400 text-sm font-medium hover:text-white transition">
+              Find Food
+            </Link>
             <button
               onClick={() => setIsContactModalOpen(true)}
-              className="text-gray-400 text-sm font-medium hover:text-white transition"
+              className="hidden sm:inline text-gray-400 text-sm font-medium hover:text-white transition"
             >
               Contact
             </button>

@@ -125,6 +125,14 @@ export default function LandingPage() {
                 Watch Demo
               </button>
             </div>
+            <Link
+              href="/discover"
+              className="mt-4 inline-flex items-center gap-2 text-white/60 hover:text-orange-400 text-sm font-medium transition-colors"
+            >
+              <Store size={16} />
+              Hungry? Explore Restaurants
+              <ArrowRight size={14} />
+            </Link>
           </motion.div>
 
           <div className="relative w-full">
