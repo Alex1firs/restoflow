@@ -43,6 +43,8 @@ class Fake implements DiscoveryStore {
   async getRestaurantsForGeocode() { return []; }
   async applyRestaurantGeo() {}
   async getVisibleDiscoveryRestaurants() { return []; }
+  async getVisibleDiscoveryDishes() { return []; }
+  async getDiscoveryDishById() { return null; }
 }
 
 const order = (slug: string, ageDays: number, lines: { dishId: string; quantity: number }[]): PopularityOrder =>

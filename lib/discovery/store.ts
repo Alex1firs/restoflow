@@ -42,4 +42,10 @@ export interface DiscoveryStore {
   applyRestaurantGeo(updates: GeoUpdate[]): Promise<void>;
   /** Visible discovery restaurants (read-only) — feeds /near and /search orchestration. */
   getVisibleDiscoveryRestaurants(): Promise<DiscoveryRestaurant[]>;
+
+  // ── Ranking read surface (2.5b) — READ-ONLY over discovery collections. ──
+  /** Visible discovery dishes — feeds /search, /collections, /categories, related. */
+  getVisibleDiscoveryDishes(): Promise<DiscoveryDish[]>;
+  /** A single discovery dish by id (dish detail), or null if absent. */
+  getDiscoveryDishById(dishId: string): Promise<DiscoveryDish | null>;
 }
