@@ -8,6 +8,8 @@ import type { Firestore } from "firebase-admin/firestore";
 import type { DiscoveryStore } from "./store";
 import type { DiscoveryDish, DiscoveryRestaurant, SourceMenuItem, SourceRestaurant } from "./types";
 import type { PopularityOrder, PopularityUpdate } from "./popularity";
+import type { GeoCandidate, GeoUpdate } from "./geocode-job";
+import type { GeoStatus } from "./geo";
 
 const DISHES = "discovery_dishes";
 const RESTAURANTS = "discovery_restaurants";
@@ -59,7 +61,15 @@ function normalizeRestaurant(slug: string, d: Doc): SourceRestaurant {
     longitude: typeof d.longitude === "number" ? d.longitude : null,
     geohash: (d.geohash as string) ?? null,
     formattedAddress: (d.formattedAddress as string) ?? null,
+    geoStatus: normalizeGeoStatus(d.geoStatus),
+    geoConfirmedAtMs: toMillis(d.geoConfirmedAt),
+    geoConfidence: (d.geoConfidence as SourceRestaurant["geoConfidence"]) ?? null,
+    geoQuery: (d.geoQuery as string) ?? null,
   };
+}
+
+function normalizeGeoStatus(v: unknown): GeoStatus {
+  return v === "geocoded" || v === "confirmed" || v === "failed" ? v : "none";
 }
 
 async function commitInChunks<T>(items: T[], run: (chunk: T[]) => Promise<void>): Promise<void> {
@@ -175,6 +185,52 @@ export function createFirestoreStore(db: Firestore): DiscoveryStore {
 
     async applyRestaurantPopularity(updates: PopularityUpdate[]) {
       await applyPopularity(db, RESTAURANTS, updates);
+    },
+
+    // ── Geo (2.4) ──
+    async getRestaurantsForGeocode() {
+      // READ-ONLY. Only the geo-relevant fields the job reasons about.
+      const snap = await db.collection("restaurants").get();
+      return snap.docs.map((doc) => {
+        const d = doc.data() as Doc;
+        const c: GeoCandidate = {
+          slug: doc.id,
+          address: (d.address as string) ?? null,
+          geoStatus: normalizeGeoStatus(d.geoStatus),
+          geoQuery: (d.geoQuery as string) ?? null,
+        };
+        return c;
+      });
+    },
+
+    async applyRestaurantGeo(updates: GeoUpdate[]) {
+      // Merge-write ONLY additive geo fields onto `restaurants`. geoConfirmedAt is
+      // intentionally NOT touched here — confirmation is a super-admin action (2.4c).
+      await commitInChunks(updates, async (chunk) => {
+        const batch = db.batch();
+        for (const u of chunk) {
+          batch.set(
+            db.collection("restaurants").doc(u.slug),
+            {
+              latitude: u.latitude,
+              longitude: u.longitude,
+              geohash: u.geohash,
+              formattedAddress: u.formattedAddress,
+              geoStatus: u.geoStatus,
+              geoConfidence: u.geoConfidence,
+              geoQuery: u.geoQuery,
+              geocodedAt: new Date(u.geocodedAtMs),
+            },
+            { merge: true },
+          );
+        }
+        await batch.commit();
+      });
+    },
+
+    async getVisibleDiscoveryRestaurants() {
+      const snap = await db.collection(RESTAURANTS).where("visible", "==", true).get();
+      return snap.docs.map((d) => d.data() as DiscoveryRestaurant);
     },
   };
 }

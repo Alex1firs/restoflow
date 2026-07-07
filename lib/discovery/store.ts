@@ -7,6 +7,7 @@
 
 import type { DiscoveryDish, DiscoveryRestaurant, SourceMenuItem, SourceRestaurant } from "./types";
 import type { PopularityOrder, PopularityUpdate } from "./popularity";
+import type { GeoCandidate, GeoUpdate } from "./geocode-job";
 
 export interface DiscoveryStore {
   /** All restaurant slugs (doc ids of the `restaurants` collection). */
@@ -32,4 +33,13 @@ export interface DiscoveryStore {
   listDiscoveryRestaurantSlugs(): Promise<string[]>;
   applyDishPopularity(updates: PopularityUpdate[]): Promise<void>;
   applyRestaurantPopularity(updates: PopularityUpdate[]): Promise<void>;
+
+  // ── Geo (2.4) — READS `restaurants`; the ONLY geo write target is `restaurants`
+  //    (additive geo fields). Gated behind the dry-run/backfill flow. ──
+  /** Minimal geo-relevant projection of every restaurant, for the geocode job. */
+  getRestaurantsForGeocode(): Promise<GeoCandidate[]>;
+  /** Merge-write ONLY additive geo fields onto `restaurants` docs. No-op under dry-run. */
+  applyRestaurantGeo(updates: GeoUpdate[]): Promise<void>;
+  /** Visible discovery restaurants (read-only) — feeds /near and /search orchestration. */
+  getVisibleDiscoveryRestaurants(): Promise<DiscoveryRestaurant[]>;
 }

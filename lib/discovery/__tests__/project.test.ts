@@ -70,8 +70,31 @@ test("projects safe restaurant fields with placeholders for later phases", () =>
   assert.equal(d.pickupAddress, "12 Marina Rd, Lagos");
   assert.deepEqual(d.taxonomyTags, []);           // 2.2
   assert.equal(d.popularityScore, NEUTRAL_POPULARITY); // 2.3 baseline
-  assert.equal(d.location, null);                 // 2.4
+  assert.equal(d.location, null);                 // 2.4 — no usable geo yet
+  assert.equal(d.geoStatus, "none");              // 2.4
+  assert.equal(d.geoConfirmedAt, null);           // 2.4
   assert.equal(d.signalsComputedAt, null);
+});
+
+// ── Geo projection (2.4) ──
+test("location projected ONLY for usable geo (confirmed / high-confidence geocoded)", () => {
+  const coords = { latitude: 6.4531, longitude: 3.3958, geohash: "s14fpmk" };
+  // failed / none / missing status → no location, even with coords present
+  assert.equal(projectRestaurant({ ...baseR, ...coords, geoStatus: "failed" }, NOW).location, null);
+  assert.equal(projectRestaurant({ ...baseR, ...coords, geoStatus: "none" }, NOW).location, null);
+  // geocoded (approximate) → usable
+  const geo = projectRestaurant({ ...baseR, ...coords, geoStatus: "geocoded" }, NOW);
+  assert.equal(geo.location?.lat, 6.4531);
+  assert.equal(geo.geoStatus, "geocoded");
+  assert.equal(geo.geoConfirmedAt, null); // not owner-confirmed
+  // confirmed → usable + geoConfirmedAt surfaced
+  const conf = projectRestaurant({ ...baseR, ...coords, geoStatus: "confirmed", geoConfirmedAtMs: NOW - DAY }, NOW);
+  assert.equal(conf.location?.lng, 3.3958);
+  assert.equal(conf.geoConfirmedAt, NOW - DAY);
+});
+
+test("invalid coordinates never yield a location even when status says usable", () => {
+  assert.equal(projectRestaurant({ ...baseR, latitude: 999, longitude: 3.3, geoStatus: "confirmed" }, NOW).location, null);
 });
 
 test("payments list only enabled methods", () => {
@@ -133,7 +156,7 @@ test("projected RESTAURANT contains ONLY allowlisted keys (no PII can leak)", ()
   // Hand the projector a fat source object with sensitive junk.
   const dirty = { ...baseR, phone: "0803...", ownerEmail: "a@b.com", paystackSubaccountCode: "ACCT_x", subscriptionEndDateMs: NOW + DAY } as SourceRestaurant;
   const d = projectRestaurant(dirty, NOW);
-  const allowed = ["slug","name","description","logo","coverImage","fulfillment","deliveryFee","feeDynamic","payments","pickupAddress","location","serviceAreas","openingHours","promo","taxonomyTags","taxonomyVersion","popularityScore","popularityRaw","popularityOrders","visible","updatedAt","signalsComputedAt","schemaVersion"].sort();
+  const allowed = ["slug","name","description","logo","coverImage","fulfillment","deliveryFee","feeDynamic","payments","pickupAddress","location","geoStatus","geoConfirmedAt","serviceAreas","openingHours","promo","taxonomyTags","taxonomyVersion","popularityScore","popularityRaw","popularityOrders","visible","updatedAt","signalsComputedAt","schemaVersion"].sort();
   assert.deepEqual(Object.keys(d).sort(), allowed);
   const blob = JSON.stringify(d);
   for (const secret of ["0803", "a@b.com", "ACCT_x", "paystack"]) assert.ok(!blob.includes(secret), `must not contain ${secret}`);

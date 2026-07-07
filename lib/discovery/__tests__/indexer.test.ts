@@ -35,6 +35,11 @@ class FakeStore implements DiscoveryStore {
   async applyDishPopularity() {}
   async applyRestaurantPopularity() {}
 
+  // Geo port methods (unused by these indexer tests).
+  async getRestaurantsForGeocode() { return []; }
+  async applyRestaurantGeo() {}
+  async getVisibleDiscoveryRestaurants() { return [...this.discR.values()]; }
+
   dishesFor(slug: string) { return [...this.discD.values()].filter((d) => d.restaurantSlug === slug); }
 }
 

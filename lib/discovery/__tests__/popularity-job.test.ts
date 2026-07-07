@@ -38,6 +38,11 @@ class Fake implements DiscoveryStore {
   async deleteDishesNotIn() {}
   async deleteRestaurant() {}
   async deleteAllDishesForRestaurant() {}
+
+  // unused geo surface
+  async getRestaurantsForGeocode() { return []; }
+  async applyRestaurantGeo() {}
+  async getVisibleDiscoveryRestaurants() { return []; }
 }
 
 const order = (slug: string, ageDays: number, lines: { dishId: string; quantity: number }[]): PopularityOrder =>

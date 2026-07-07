@@ -11,6 +11,8 @@
 //   - popularityScore: NEUTRAL    (cold-start baseline; real value computed in 2.3)
 //   - location: null              (geo backfilled in 2.4)
 
+import type { GeoStatus, GeoConfidence } from "./geo";
+
 export const SCHEMA_VERSION = 1;
 
 // Cold-start baseline (decision #5): new/unscored dishes get a neutral value, not
@@ -51,10 +53,14 @@ export type SourceRestaurant = {
   openingHours?: unknown;              // opaque map, stored verbatim for live open-now recompute
   serviceAreas?: string[];
   promo?: StructuredPromo | null;      // structured promo IF one already exists (display-only in 2.1)
-  latitude?: number | null;            // geo fields — normally absent until 2.4
+  latitude?: number | null;            // geo fields (2.4) — normally absent until geocoded/confirmed
   longitude?: number | null;
   geohash?: string | null;
   formattedAddress?: string | null;
+  geoStatus?: GeoStatus | null;        // "none" | "geocoded" | "confirmed" | "failed"
+  geoConfirmedAtMs?: number | null;    // resolved from Firestore Timestamp by the adapter
+  geoConfidence?: GeoConfidence | null; // provider precision (audit) — NOT projected to discovery
+  geoQuery?: string | null;            // address string that produced the current pin (staleness check)
 };
 
 export type SourceMenuItem = {
@@ -85,12 +91,14 @@ export type RestaurantSnapshot = {
   feeDynamic: boolean;          // true → "calculated at checkout"
   payments: string[];           // only methods actually enabled
   pickupAddress: string | null; // only when pickup enabled + address present
-  location: DiscoveryLocation;  // null until geo backfill (2.4)
+  location: DiscoveryLocation;  // null until a usable (confirmed/high-confidence) geo exists (2.4)
+  geoStatus: GeoStatus;         // trust state so a dish card knows if its distance is reliable (2.4)
 };
 
 export type DiscoveryRestaurant = RestaurantSnapshot & {
   serviceAreas: string[];
   openingHours: unknown;        // stored so APIs recompute open-now live
+  geoConfirmedAt: number | null; // ms; set only when a super-admin confirms the pin (2.4)
   promo: StructuredPromo | null;
   taxonomyTags: string[];       // union of dish tags (2.2)
   taxonomyVersion: number;      // which taxonomy version tagged this doc

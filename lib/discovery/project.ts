@@ -8,6 +8,7 @@
 
 import { normalizeCategoryKey } from "../menu-utils";
 import { deriveTaxonomyTags, TAXONOMY_VERSION } from "./taxonomy";
+import { encodeGeohash, isUsableForDistance, isValidCoord, type GeoStatus } from "./geo";
 import {
   NEUTRAL_POPULARITY,
   SCHEMA_VERSION,
@@ -64,16 +65,29 @@ function deliveryFeeShape(r: SourceRestaurant): { deliveryFee: number | null; fe
   return { deliveryFee: null, feeDynamic: true }; // 0 / unset → never claim "free"
 }
 
+function geoStatusOf(r: SourceRestaurant): GeoStatus {
+  const s = r.geoStatus;
+  return s === "geocoded" || s === "confirmed" || s === "failed" ? s : "none";
+}
+
+/**
+ * A location is projected into discovery ONLY when the trust state is usable
+ * (confirmed or high-confidence geocoded) AND the coordinates are valid. A pin
+ * that is missing, "failed", or low-confidence yields `null` — so distance
+ * surfaces never see an untrusted coordinate. Geohash is (re)derived here to
+ * guarantee it agrees with the stored lat/lng.
+ */
 function locationOf(r: SourceRestaurant): DiscoveryLocation {
-  if (typeof r.latitude === "number" && typeof r.longitude === "number" && str(r.geohash)) {
-    return {
-      lat: r.latitude,
-      lng: r.longitude,
-      geohash: str(r.geohash),
-      formattedAddress: str(r.formattedAddress) || str(r.address),
-    };
-  }
-  return null; // geo backfilled in 2.4
+  if (!isUsableForDistance(geoStatusOf(r))) return null;
+  if (!isValidCoord(r.latitude, r.longitude)) return null;
+  const lat = r.latitude as number;
+  const lng = r.longitude as number;
+  return {
+    lat,
+    lng,
+    geohash: str(r.geohash) || encodeGeohash(lat, lng),
+    formattedAddress: str(r.formattedAddress) || str(r.address),
+  };
 }
 
 function serviceAreasOf(r: SourceRestaurant): string[] {
@@ -106,6 +120,7 @@ export function restaurantSnapshotOf(r: SourceRestaurant): RestaurantSnapshot {
     payments: enabledPayments(r),
     pickupAddress: r.pickupEnabled && loc ? loc : null,
     location: locationOf(r),
+    geoStatus: geoStatusOf(r),
   };
 }
 
@@ -119,6 +134,7 @@ export function projectRestaurant(r: SourceRestaurant, nowMs: number, taxonomyTa
     ...snap,
     serviceAreas: serviceAreasOf(r),
     openingHours: r.openingHours ?? null,
+    geoConfirmedAt: geoStatusOf(r) === "confirmed" && typeof r.geoConfirmedAtMs === "number" ? r.geoConfirmedAtMs : null,
     promo: r.promo ?? null,
     taxonomyTags,
     taxonomyVersion: TAXONOMY_VERSION,
