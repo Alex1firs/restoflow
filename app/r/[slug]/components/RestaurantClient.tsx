@@ -1300,44 +1300,6 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
         </div>
       )}
 
-      {/* ── Sticky Section Navigation ────────────────────────────────────────── */}
-      <nav className="sticky top-0 z-30 bg-[#FAF9F5]/90 dark:bg-[#0D0C0B]/90 backdrop-blur-md border-b border-[#EFECE6] dark:border-[#1F1F1C] shadow-sm py-2.5 transition-all">
-        <div className="max-w-6xl mx-auto px-6 w-full flex items-center justify-between">
-          <div className="flex gap-1.5 overflow-x-auto scrollbar-hide py-1">
-            {navSections.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => selectTabAndScroll(s.id)}
-                style={activeTab === s.id ? { backgroundColor: primary } : {}}
-                className={`flex-shrink-0 px-4.5 py-2 rounded-full text-xs font-black uppercase tracking-wider transition-all ${
-                  activeTab === s.id
-                    ? "text-white shadow-md shadow-[var(--brand-primary-20)] scale-105"
-                    : "text-[#7A7368] hover:text-neutral-900 dark:text-[#A19B91] dark:hover:text-white hover:bg-stone-100/50 dark:hover:bg-stone-900/50"
-                }`}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={() => setCartOpen(true)}
-            className="relative w-9 h-9 flex items-center justify-center rounded-2xl bg-white dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] hover:border-[var(--brand-primary)] shadow-sm transition-all"
-          >
-            {totalItems > 0 && (
-              <span
-                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black text-white shadow-md animate-scaleUp"
-                style={{ backgroundColor: primary }}
-              >
-                {totalItems}
-              </span>
-            )}
-            <svg className="w-4 h-4 text-neutral-800 dark:text-neutral-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-            </svg>
-          </button>
-        </div>
-      </nav>
-
       {/* ── MENU EXPERIENCE REDESIGN (Phase 10B) ──────────────────────────────── */}
       {activeTab === "menu" && (
         <>
