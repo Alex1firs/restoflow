@@ -171,5 +171,19 @@ service cloud.firestore {
       allow read:  if false;
       allow write: if false;
     }
+
+    // ─── Food Discovery Engine (discovery_dishes + discovery_restaurants) ─────────
+    // Denormalized, read-only projection of the transactional core, built by the
+    // server (Admin SDK, which bypasses these rules) via the discovery indexer /
+    // backfill. Served ONLY through /api/discovery/* — never read or written
+    // directly by any client.
+    match /discovery_dishes/{dishId} {
+      allow read:  if false;
+      allow write: if false;
+    }
+    match /discovery_restaurants/{slug} {
+      allow read:  if false;
+      allow write: if false;
+    }
   }
 }
