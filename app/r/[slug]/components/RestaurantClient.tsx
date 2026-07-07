@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useCart } from "./CartContext";
 import { loadCheckoutDetails, saveCheckoutDetails, clearCheckoutDetails, type SavedFulfillment, type SavedPayment } from "./checkout-details-storage";
 import { groupCategories, filterMenuItems } from "@/lib/menu-utils";
+import { buildLogisticsSummary } from "@/lib/logistics-summary";
 import { configureAnalytics, track, trackVisitOnce, trackItemViewOnce } from "@/lib/analytics/client";
 import { nextOpenTime, type OpeningHours } from "@/lib/restaurant-utils";
 import SEOSections from "./SEOSections";
@@ -352,6 +353,28 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   const areas = parseList(seo?.serviceAreas);
   const keywords = parseList(seo?.foodKeywords);
   const popularItems = menuItems.filter((i) => i.available).slice(0, 4);
+
+  // Logistics & trust summary for the pre-checkout banner. Uses only real
+  // settings; honest fallbacks when a value is unknown (never invents fees/areas).
+  const logistics = buildLogisticsSummary(
+    {
+      isOpen: restaurant.isOpen,
+      preorderEnabled,
+      nextOpenLabel,
+      deliveryEnabled: restaurant.deliveryEnabled,
+      pickupEnabled: restaurant.pickupEnabled,
+      dineInEnabled: restaurant.dineInEnabled,
+      deliveryFee: restaurant.deliveryFee,
+      deliveryZones: restaurant.deliveryZones ?? [],
+      pickupAddress: restaurant.address ?? null,
+      onlinePaymentEnabled: restaurant.onlinePaymentEnabled,
+      whatsappCheckoutEnabled: !!restaurant.whatsappCheckoutEnabled,
+      payOnDeliveryEnabled: restaurant.payOnDeliveryEnabled !== false,
+      hidePrices: !!restaurant.hidePrices,
+      serviceAreas: areas,
+    },
+    fmt,
+  );
 
   const paymentMethods = [
     restaurant.onlinePaymentEnabled ? "Online payment (card/transfer)" : null,
@@ -1468,6 +1491,76 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
             )}
           </div>
 
+          {/* ── Logistics & trust banner (P1) — answers practical pre-checkout Qs ── */}
+          <div className="mt-4 bg-[#FAF9F5] dark:bg-[#0D0C0B] border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl px-4 py-3">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              {/* Open / closed */}
+              <span className="inline-flex items-center gap-1.5 text-xs font-black">
+                <span className={`w-2 h-2 rounded-full ${logistics.status.open ? "bg-emerald-500" : "bg-amber-500"}`} />
+                <span className={logistics.status.open ? "text-emerald-700 dark:text-emerald-500" : "text-amber-700 dark:text-amber-500"}>
+                  {logistics.status.open
+                    ? "Open now"
+                    : `Closed now${logistics.status.opensLabel ? ` • Opens ${logistics.status.opensLabel}` : ""}`}
+                </span>
+                {logistics.status.preorder && (
+                  <span className="text-[#7A7368] dark:text-[#A19B91] font-bold">· Accepting pre-orders</span>
+                )}
+              </span>
+
+              {/* Delivery */}
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#7A7368] dark:text-[#A19B91]">
+                <span aria-hidden>🛵</span>
+                {logistics.delivery.available
+                  ? logistics.delivery.feeKnown
+                    ? `Delivery ${logistics.delivery.feeLabel}`
+                    : "Delivery"
+                  : logistics.pickup.available
+                  ? "Pickup only"
+                  : "Delivery unavailable"}
+              </span>
+
+              {/* Pickup */}
+              {logistics.pickup.available && (
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#7A7368] dark:text-[#A19B91]">
+                  <span aria-hidden>🏬</span> Pickup available
+                </span>
+              )}
+            </div>
+
+            {/* Honest detail lines — only render what we actually know */}
+            {(logistics.delivery.available && !logistics.delivery.feeKnown) ||
+            logistics.pickup.location ||
+            (logistics.delivery.available && logistics.delivery.areas.length > 0) ? (
+              <div className="mt-2 flex flex-col gap-1 text-[11px] text-[#7A7368] dark:text-[#5C574F] font-medium">
+                {logistics.delivery.available && !logistics.delivery.feeKnown && (
+                  <span>🚚 {logistics.delivery.feeLabel}</span>
+                )}
+                {logistics.pickup.location && <span>📍 Pickup at {logistics.pickup.location}</span>}
+                {logistics.delivery.available && logistics.delivery.areas.length > 0 && (
+                  <span>
+                    🗺️ Serving: {logistics.delivery.areas.slice(0, 6).join(", ")}
+                    {logistics.delivery.areas.length > 6 ? "…" : ""}
+                  </span>
+                )}
+              </div>
+            ) : null}
+
+            {/* Accepted payment methods — only the ones actually enabled */}
+            {logistics.payments.length > 0 && (
+              <div className="mt-2.5 pt-2.5 border-t border-[#EFECE6] dark:border-[#1F1F1C] flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#A19B91] mr-1">Pay with</span>
+                {logistics.payments.map((p) => (
+                  <span
+                    key={p}
+                    className="px-2.5 py-1 rounded-lg bg-white dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] text-[11px] font-bold text-neutral-800 dark:text-neutral-200"
+                  >
+                    {p}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Scrollable menu category pills */}
           <div
             style={{
@@ -2189,6 +2282,13 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                 >
                   {!meetsMinimum ? "Browse More Selections" : "Proceed to Secure Checkout"}
                 </button>
+              )}
+
+              {/* Saved-cart reassurance — only where cart persistence applies */}
+              {!isPreview && items.length > 0 && (
+                <p className="mt-2.5 text-[11px] text-center text-[#7A7368] dark:text-[#5C574F] font-medium">
+                  🔒 Your cart is saved on this device.
+                </p>
               )}
             </div>
           </div>
