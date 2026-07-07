@@ -42,3 +42,62 @@ export type DeliveryZone = {
   name: string;
   fee: number;
 };
+
+const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function fmt12(h: number, m: number): string {
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${m.toString().padStart(2, "0")} ${ampm}`;
+}
+
+export type NextOpen =
+  | { kind: "open" }                                                        // open now, or always-open / no hours set
+  | { kind: "opens"; label: string; date: string; time: string; sameDay: boolean } // next opening window
+  | { kind: "never" };                                                      // no open days configured
+
+/**
+ * Compute the next opening window in Africa/Lagos time. Handles: opens later
+ * today, already closed today (opens a later day), closed all day, always open
+ * (empty/missing hours), and no open days at all.
+ *
+ * `date`/`time` are Lagos wall-clock strings suitable for prefilling a
+ * scheduled-order date/time input. `now` is injectable for testing.
+ */
+export function nextOpenTime(openingHours?: OpeningHours | null, now?: Date): NextOpen {
+  if (!openingHours || Object.keys(openingHours).length === 0) return { kind: "open" };
+
+  const base = now ?? new Date();
+  const lagosNow = new Date(base.toLocaleString("en-US", { timeZone: "Africa/Lagos" }));
+  const curDay = lagosNow.getDay();
+  const curMin = lagosNow.getHours() * 60 + lagosNow.getMinutes();
+  const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+  const pad = (v: number) => v.toString().padStart(2, "0");
+
+  for (let offset = 0; offset < 7; offset++) {
+    const dayH = openingHours[((curDay + offset) % 7).toString()];
+    if (!dayH || !dayH.open || !dayH.from) continue;
+    const from = toMin(dayH.from);
+    const to = dayH.to ? toMin(dayH.to) : from;
+
+    if (offset === 0) {
+      if (curMin >= from && curMin < to) return { kind: "open" }; // open right now
+      if (curMin >= to) continue;                                 // already closed today
+      // else: opens later today → fall through to build
+    }
+
+    const [h, m] = dayH.from.split(":").map(Number);
+    const target = new Date(lagosNow);
+    target.setDate(target.getDate() + offset);
+    target.setHours(h, m, 0, 0);
+    const prefix = offset === 0 ? "" : offset === 1 ? "Tomorrow " : `${WEEKDAY_SHORT[target.getDay()]} `;
+    return {
+      kind: "opens",
+      label: `${prefix}${fmt12(h, m)}`,
+      date: `${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(target.getDate())}`,
+      time: `${pad(h)}:${pad(m)}`,
+      sameDay: offset === 0,
+    };
+  }
+  return { kind: "never" };
+}

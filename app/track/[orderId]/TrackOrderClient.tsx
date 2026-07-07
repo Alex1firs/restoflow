@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { configureAnalytics, track } from "@/lib/analytics/client";
 
 type OrderStatus = "pending" | "scheduled" | "preparing" | "ready" | "completed" | "rejected";
 
@@ -42,12 +43,25 @@ export default function TrackOrderClient({
   orderId,
   token,
   initial,
+  analyticsEnabled,
 }: {
   orderId: string;
   token: string;
   initial: SafeOrder;
+  analyticsEnabled?: boolean;
 }) {
   const [order, setOrder] = useState<SafeOrder>(initial);
+
+  // order_tracking_opened — once per mount, scoped to the order's restaurant.
+  // Fire-and-forget; no-op unless analytics is enabled.
+  const trackedOpen = useRef(false);
+  useEffect(() => {
+    if (trackedOpen.current) return;
+    trackedOpen.current = true;
+    const on = !!analyticsEnabled;
+    configureAnalytics(initial.restaurantId, on);
+    if (on) track("order_tracking_opened");
+  }, [analyticsEnabled, initial.restaurantId]);
 
   // Editing state
   const [editOpen, setEditOpen] = useState(false);

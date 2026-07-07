@@ -263,11 +263,12 @@ export default async function RDomainPage({
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <CartProvider>
+      <CartProvider slug={slug}>
         <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center text-orange-500">Loading…</div>}>
           <RestaurantClient
             restaurant={restaurantProps}
             menuItems={menuItems}
+            analyticsEnabled={process.env.STOREFRONT_ANALYTICS_ENABLED === "true"}
             seo={{
               seoTitle: seoData.seoTitle,
               seoDescription: seoData.seoDescription,

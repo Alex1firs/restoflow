@@ -3,6 +3,7 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { checkIsOpen } from "@/lib/restaurant-utils";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { recordServerEvent } from "@/lib/analytics/rollup";
 import { GRACE_DAYS } from "@/lib/constants";
 
 export async function POST(req: NextRequest) {
@@ -185,6 +186,11 @@ export async function POST(req: NextRequest) {
       ...(orderType === "scheduled" ? { scheduledFor } : {}),
       createdAt: FieldValue.serverTimestamp(),
     });
+
+    // Funnel analytics (money-truth, non-blocking, never throws). The customer
+    // submitted checkout and was sent to Paystack — count both stages.
+    await recordServerEvent(restaurantId.trim(), "order_submitted", { method: "online", fulfillment: resolvedDeliveryType });
+    await recordServerEvent(restaurantId.trim(), "payment_initialized", { method: "online" });
 
     return NextResponse.json({ authorizationUrl, reference });
   } catch {

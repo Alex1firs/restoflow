@@ -7,6 +7,7 @@ import { sendNewOrderAlert } from "@/lib/notifications";
 import { sendCustomerNotification } from "@/lib/customer-notifications";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { awardLoyaltyTick } from "@/lib/loyalty";
+import { recordServerEvent } from "@/lib/analytics/rollup";
 import { serverEnv } from "@/lib/env";
 
 export async function POST(req: NextRequest) {
@@ -53,6 +54,11 @@ export async function POST(req: NextRequest) {
             const itemsSummary = (d.items as { name: string; quantity: number }[])
               .map((i) => `${i.quantity}× ${i.name}`)
               .join(", ");
+
+            // Funnel analytics — emitted only when this webhook is the order's
+            // creator (result != null), so it counts exactly once across
+            // verify/webhook/callback. Non-blocking, never throws.
+            await recordServerEvent(d.restaurantId as string, "payment_successful", { method: "online" });
 
             sendNewOrderAlert({
               restaurantSlug: d.restaurantId as string,

@@ -114,6 +114,7 @@ export default async function PreviewPage({
     deliveryFee: rData.deliveryFee ?? 0,
     minimumOrder: rData.minimumOrder ?? 0,
     isOpen: checkIsOpen(rData.openingHours),
+    openingHours: rData.openingHours ?? null,
     deliveryEnabled: rData.deliveryEnabled !== false,
     pickupEnabled: rData.pickupEnabled !== false,
     dineInEnabled: rData.dineInEnabled === true,
@@ -129,7 +130,7 @@ export default async function PreviewPage({
   };
 
   return (
-    <CartProvider>
+    <CartProvider slug={`preview:${slug}`}>
       <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center text-orange-500">Loading…</div>}>
         <RestaurantClient
           restaurant={restaurantProps}

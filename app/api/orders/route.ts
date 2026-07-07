@@ -6,6 +6,7 @@ import { checkIsOpen } from "@/lib/restaurant-utils";
 import { sendNewOrderAlert } from "@/lib/notifications";
 import { sendCustomerNotification } from "@/lib/customer-notifications";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { recordServerEvent } from "@/lib/analytics/rollup";
 import { GRACE_DAYS } from "@/lib/constants";
 
 export async function POST(request: NextRequest) {
@@ -234,6 +235,12 @@ export async function POST(request: NextRequest) {
       paymentMethod: paymentMethod === "whatsapp" ? "whatsapp" : "cash",
       deliveryType: resolvedDeliveryType,
     }).catch(() => {});
+
+    // Funnel analytics (money-truth, non-blocking, never throws)
+    await recordServerEvent(restaurantId.trim(), "order_submitted", {
+      method: paymentMethod === "whatsapp" ? "whatsapp" : "cash",
+      fulfillment: resolvedDeliveryType,
+    });
 
     return NextResponse.json({ orderId, trackingToken }, { status: 201 });
   } catch {

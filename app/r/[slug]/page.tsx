@@ -248,6 +248,7 @@ export default async function RestaurantPage({
     deliveryZones: rData.deliveryZones ?? [],
     payOnDeliveryEnabled: rData.payOnDeliveryEnabled !== false,
     whatsappCheckoutEnabled: !!(rData as any).whatsappCheckoutEnabled,
+    openingHours: rData.openingHours ?? null,
   };
 
   return (
@@ -258,12 +259,13 @@ export default async function RestaurantPage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <CartProvider>
+      <CartProvider slug={slug}>
         <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center text-orange-500">Loading…</div>}>
           <RestaurantClient
             restaurant={restaurantProps}
             menuItems={menuItems}
             initialTable={initialTable}
+            analyticsEnabled={process.env.STOREFRONT_ANALYTICS_ENABLED === "true"}
             seo={{
               seoTitle: seoData?.seoTitle,
               seoDescription: seoData?.seoDescription,
