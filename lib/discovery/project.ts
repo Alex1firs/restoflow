@@ -7,6 +7,7 @@
 // discovery index.
 
 import { normalizeCategoryKey } from "../menu-utils";
+import { deriveTaxonomyTags, TAXONOMY_VERSION } from "./taxonomy";
 import {
   NEUTRAL_POPULARITY,
   SCHEMA_VERSION,
@@ -108,15 +109,19 @@ export function restaurantSnapshotOf(r: SourceRestaurant): RestaurantSnapshot {
   };
 }
 
-/** Full discovery_restaurants document. */
-export function projectRestaurant(r: SourceRestaurant, nowMs: number): DiscoveryRestaurant {
+/**
+ * Full discovery_restaurants document. `taxonomyTags` is the union of its dishes'
+ * tags — supplied by the indexer, which has projected the dishes (defaults to []).
+ */
+export function projectRestaurant(r: SourceRestaurant, nowMs: number, taxonomyTags: string[] = []): DiscoveryRestaurant {
   const snap = restaurantSnapshotOf(r);
   return {
     ...snap,
     serviceAreas: serviceAreasOf(r),
     openingHours: r.openingHours ?? null,
     promo: r.promo ?? null,
-    taxonomyTags: [],
+    taxonomyTags,
+    taxonomyVersion: TAXONOMY_VERSION,
     popularityScore: NEUTRAL_POPULARITY,
     visible: computeVisibility(r, nowMs),
     updatedAt: nowMs,
@@ -146,7 +151,8 @@ export function projectDish(
     available: item.available !== false,
     rawCategory,
     categoryKey: normalizeCategoryKey(rawCategory),
-    taxonomyTags: [],
+    taxonomyTags: deriveTaxonomyTags(rawCategory, str(item.name)),
+    taxonomyVersion: TAXONOMY_VERSION,
     popularityScore: NEUTRAL_POPULARITY,
     promo: promo ?? null,
     restaurantSnapshot: snapshot,

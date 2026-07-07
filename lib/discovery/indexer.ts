@@ -4,7 +4,7 @@
 // (upsert + reconcile-delete → re-run yields identical state) and resilient
 // (a single failing restaurant never aborts a backfill). No firebase import.
 
-import { projectDish, projectRestaurant, restaurantSnapshotOf } from "./project";
+import { computeVisibility, projectDish, projectRestaurant, restaurantSnapshotOf } from "./project";
 import type { DiscoveryStore } from "./store";
 
 export type ReindexResult = {
@@ -35,12 +35,15 @@ export async function reindexRestaurant(
       return { slug, ok: true, visible: false, dishCount: 0, purged: true };
     }
 
-    const restaurantDoc = projectRestaurant(source, nowMs);
     const snapshot = restaurantSnapshotOf(source);
+    const visible = computeVisibility(source, nowMs);
     const items = await store.getMenuItems(slug);
     const dishes = items.map((it) =>
-      projectDish(it, snapshot, restaurantDoc.visible, nowMs, !!source.hidePrices, restaurantDoc.promo),
+      projectDish(it, snapshot, visible, nowMs, !!source.hidePrices, source.promo ?? null),
     );
+    // Restaurant-level taxonomy = union of its dishes' tags (2.2).
+    const taxonomyTags = [...new Set(dishes.flatMap((d) => d.taxonomyTags))];
+    const restaurantDoc = projectRestaurant(source, nowMs, taxonomyTags);
 
     await store.upsertRestaurant(restaurantDoc);
     if (dishes.length) await store.upsertDishes(dishes);

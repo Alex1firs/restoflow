@@ -92,7 +92,8 @@ export type DiscoveryRestaurant = RestaurantSnapshot & {
   serviceAreas: string[];
   openingHours: unknown;        // stored so APIs recompute open-now live
   promo: StructuredPromo | null;
-  taxonomyTags: string[];       // [] in 2.1
+  taxonomyTags: string[];       // union of dish tags (2.2)
+  taxonomyVersion: number;      // which taxonomy version tagged this doc
   popularityScore: number;      // NEUTRAL_POPULARITY in 2.1
   visible: boolean;             // status==live && subscription not expired (computed)
   updatedAt: number;
@@ -111,7 +112,8 @@ export type DiscoveryDish = {
   available: boolean;
   rawCategory: string;          // preserved, un-normalized
   categoryKey: string;          // Sprint-1 normalizeCategoryKey
-  taxonomyTags: string[];       // [] in 2.1
+  taxonomyTags: string[];       // canonical tags + provisional fallback (2.2)
+  taxonomyVersion: number;      // which taxonomy version tagged this doc
   popularityScore: number;      // NEUTRAL_POPULARITY in 2.1
   promo: StructuredPromo | null;
   restaurantSnapshot: RestaurantSnapshot;
