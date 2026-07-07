@@ -7,6 +7,7 @@
 import type { Firestore } from "firebase-admin/firestore";
 import type { DiscoveryStore } from "./store";
 import type { DiscoveryDish, DiscoveryRestaurant, SourceMenuItem, SourceRestaurant } from "./types";
+import type { PopularityOrder, PopularityUpdate } from "./popularity";
 
 const DISHES = "discovery_dishes";
 const RESTAURANTS = "discovery_restaurants";
@@ -133,5 +134,67 @@ export function createFirestoreStore(db: Firestore): DiscoveryStore {
         await batch.commit();
       });
     },
+
+    // ── Popularity (2.3) ──
+    async getRecentOrders(sinceMs) {
+      // READ-ONLY. Paid + non-rejected filtered in-memory (avoids a composite index);
+      // the createdAt range keeps the scan bounded to the popularity window.
+      const snap = await db.collection("orders").where("createdAt", ">=", new Date(sinceMs)).get();
+      const out: PopularityOrder[] = [];
+      for (const d of snap.docs) {
+        const x = d.data() as Doc;
+        if (x.paymentStatus !== "paid" || x.status === "rejected") continue;
+        const lines = (Array.isArray(x.items) ? x.items : []).map((it) => {
+          const line = it as { id?: string; quantity?: number };
+          return { dishId: String(line.id ?? ""), quantity: typeof line.quantity === "number" ? line.quantity : 0 };
+        });
+        out.push({
+          restaurantSlug: String(x.restaurantId ?? ""),
+          createdAtMs: toMillis(x.createdAt) ?? 0,
+          paymentStatus: x.paymentStatus as string | undefined,
+          status: x.status as string | undefined,
+          lines,
+        });
+      }
+      return out;
+    },
+
+    async listDiscoveryDishIds() {
+      const snap = await db.collection(DISHES).select().get(); // ids only
+      return snap.docs.map((d) => d.id);
+    },
+
+    async listDiscoveryRestaurantSlugs() {
+      const snap = await db.collection(RESTAURANTS).select().get();
+      return snap.docs.map((d) => d.id);
+    },
+
+    async applyDishPopularity(updates: PopularityUpdate[]) {
+      await applyPopularity(db, DISHES, updates);
+    },
+
+    async applyRestaurantPopularity(updates: PopularityUpdate[]) {
+      await applyPopularity(db, RESTAURANTS, updates);
+    },
   };
+}
+
+// Merge-write ONLY the popularity fields onto existing discovery docs.
+async function applyPopularity(db: Firestore, collection: string, updates: PopularityUpdate[]): Promise<void> {
+  await commitInChunks(updates, async (chunk) => {
+    const batch = db.batch();
+    for (const u of chunk) {
+      batch.set(
+        db.collection(collection).doc(u.id),
+        {
+          popularityScore: u.popularityScore,
+          popularityRaw: u.popularityRaw,
+          popularityOrders: u.popularityOrders,
+          signalsComputedAt: u.signalsComputedAt,
+        },
+        { merge: true },
+      );
+    }
+    await batch.commit();
+  });
 }

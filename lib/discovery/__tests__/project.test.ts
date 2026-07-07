@@ -133,7 +133,7 @@ test("projected RESTAURANT contains ONLY allowlisted keys (no PII can leak)", ()
   // Hand the projector a fat source object with sensitive junk.
   const dirty = { ...baseR, phone: "0803...", ownerEmail: "a@b.com", paystackSubaccountCode: "ACCT_x", subscriptionEndDateMs: NOW + DAY } as SourceRestaurant;
   const d = projectRestaurant(dirty, NOW);
-  const allowed = ["slug","name","description","logo","coverImage","fulfillment","deliveryFee","feeDynamic","payments","pickupAddress","location","serviceAreas","openingHours","promo","taxonomyTags","taxonomyVersion","popularityScore","visible","updatedAt","signalsComputedAt","schemaVersion"].sort();
+  const allowed = ["slug","name","description","logo","coverImage","fulfillment","deliveryFee","feeDynamic","payments","pickupAddress","location","serviceAreas","openingHours","promo","taxonomyTags","taxonomyVersion","popularityScore","popularityRaw","popularityOrders","visible","updatedAt","signalsComputedAt","schemaVersion"].sort();
   assert.deepEqual(Object.keys(d).sort(), allowed);
   const blob = JSON.stringify(d);
   for (const secret of ["0803", "a@b.com", "ACCT_x", "paystack"]) assert.ok(!blob.includes(secret), `must not contain ${secret}`);
@@ -142,7 +142,7 @@ test("projected RESTAURANT contains ONLY allowlisted keys (no PII can leak)", ()
 test("projected DISH contains ONLY allowlisted keys", () => {
   const snap = restaurantSnapshotOf(baseR);
   const d = projectDish({ ...item, restaurantId: "kapitol" }, snap, true, NOW, false, null);
-  const allowed = ["dishId","restaurantSlug","name","description","price","priceHidden","image","available","rawCategory","categoryKey","taxonomyTags","taxonomyVersion","popularityScore","promo","restaurantSnapshot","visible","updatedAt","signalsComputedAt","schemaVersion"].sort();
+  const allowed = ["dishId","restaurantSlug","name","description","price","priceHidden","image","available","rawCategory","categoryKey","taxonomyTags","taxonomyVersion","popularityScore","popularityRaw","popularityOrders","promo","restaurantSnapshot","visible","updatedAt","signalsComputedAt","schemaVersion"].sort();
   assert.deepEqual(Object.keys(d).sort(), allowed);
 });
 

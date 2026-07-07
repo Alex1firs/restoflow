@@ -94,7 +94,9 @@ export type DiscoveryRestaurant = RestaurantSnapshot & {
   promo: StructuredPromo | null;
   taxonomyTags: string[];       // union of dish tags (2.2)
   taxonomyVersion: number;      // which taxonomy version tagged this doc
-  popularityScore: number;      // NEUTRAL_POPULARITY in 2.1
+  popularityScore: number;      // NEUTRAL_POPULARITY until computed (2.3)
+  popularityRaw: number;        // debug: weighted order count (0 until computed)
+  popularityOrders: number;     // debug: # qualifying orders (0 until computed)
   visible: boolean;             // status==live && subscription not expired (computed)
   updatedAt: number;
   signalsComputedAt: number | null; // null until popularity computed (2.3)
@@ -114,7 +116,9 @@ export type DiscoveryDish = {
   categoryKey: string;          // Sprint-1 normalizeCategoryKey
   taxonomyTags: string[];       // canonical tags + provisional fallback (2.2)
   taxonomyVersion: number;      // which taxonomy version tagged this doc
-  popularityScore: number;      // NEUTRAL_POPULARITY in 2.1
+  popularityScore: number;      // NEUTRAL_POPULARITY until computed (2.3)
+  popularityRaw: number;        // debug: weighted order count (0 until computed)
+  popularityOrders: number;     // debug: # qualifying orders (0 until computed)
   promo: StructuredPromo | null;
   restaurantSnapshot: RestaurantSnapshot;
   visible: boolean;             // mirrors restaurant visibility (availability is `available`)

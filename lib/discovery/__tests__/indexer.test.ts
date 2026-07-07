@@ -28,6 +28,13 @@ class FakeStore implements DiscoveryStore {
   async deleteRestaurant(slug: string) { this.discR.delete(slug); }
   async deleteAllDishesForRestaurant(slug: string) { for (const [id, d] of this.discD) if (d.restaurantSlug === slug) this.discD.delete(id); }
 
+  // Popularity port methods (unused by these indexer tests).
+  async getRecentOrders() { return []; }
+  async listDiscoveryDishIds() { return [...this.discD.keys()]; }
+  async listDiscoveryRestaurantSlugs() { return [...this.discR.keys()]; }
+  async applyDishPopularity() {}
+  async applyRestaurantPopularity() {}
+
   dishesFor(slug: string) { return [...this.discD.values()].filter((d) => d.restaurantSlug === slug); }
 }
 

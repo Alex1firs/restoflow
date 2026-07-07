@@ -6,6 +6,7 @@
 // the Admin SDK; the backfill script wires the same adapter with its own db.
 
 import type { DiscoveryDish, DiscoveryRestaurant, SourceMenuItem, SourceRestaurant } from "./types";
+import type { PopularityOrder, PopularityUpdate } from "./popularity";
 
 export interface DiscoveryStore {
   /** All restaurant slugs (doc ids of the `restaurants` collection). */
@@ -23,4 +24,12 @@ export interface DiscoveryStore {
   /** Purge (restaurant removed entirely). */
   deleteRestaurant(slug: string): Promise<void>;
   deleteAllDishesForRestaurant(slug: string): Promise<void>;
+
+  // ── Popularity (2.3) — READ-ONLY on `orders`; writes only discovery docs. ──
+  /** Paid, non-rejected orders created at/after `sinceMs`, across all restaurants. */
+  getRecentOrders(sinceMs: number): Promise<PopularityOrder[]>;
+  listDiscoveryDishIds(): Promise<string[]>;
+  listDiscoveryRestaurantSlugs(): Promise<string[]>;
+  applyDishPopularity(updates: PopularityUpdate[]): Promise<void>;
+  applyRestaurantPopularity(updates: PopularityUpdate[]): Promise<void>;
 }

@@ -33,9 +33,7 @@ const slug = args.find((a) => a.startsWith("--slug="))?.split("=")[1];
 function readOnly(base: DiscoveryStore): DiscoveryStore {
   const noop = async (label: string) => { console.log(`  · [dry-run] skipped ${label}`); };
   return {
-    listRestaurantSlugs: base.listRestaurantSlugs,
-    getRestaurant: base.getRestaurant,
-    getMenuItems: base.getMenuItems,
+    ...base,
     upsertRestaurant: async (d) => noop(`upsert restaurant ${d.slug}`),
     upsertDishes: async (docs) => noop(`upsert ${docs.length} dishes`),
     deleteDishesNotIn: async (s) => noop(`reconcile dishes for ${s}`),
