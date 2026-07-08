@@ -30,6 +30,8 @@ export type DishCardData = {
     payments: string[];
     location: PublicLocation;
     geoStatus: string;
+    state: string | null;
+    city: string | null;
     openNow: boolean;
   };
   distanceKm: number | null;
@@ -50,6 +52,8 @@ export type RestaurantCardData = {
   location: PublicLocation;
   geoStatus: string;
   geoConfirmedAt: number | null;
+  state: string | null;
+  city: string | null;
   openNow: boolean;
   promo: PublicPromo;
   tags: string[];

@@ -32,7 +32,7 @@ export type PublicRestaurantMini = {
   slug: string; name: string; logo: string; coverImage: string;
   fulfillment: { delivery: boolean; pickup: boolean; dineIn: boolean };
   deliveryFee: number | null; feeDynamic: boolean; payments: string[];
-  location: DiscoveryLocation; geoStatus: string; openNow: boolean;
+  location: DiscoveryLocation; geoStatus: string; state: string | null; city: string | null; openNow: boolean;
 };
 
 export type PublicDish = {
@@ -46,6 +46,7 @@ export type PublicRestaurant = {
   fulfillment: { delivery: boolean; pickup: boolean; dineIn: boolean };
   deliveryFee: number | null; feeDynamic: boolean; payments: string[];
   serviceAreas: string[]; location: DiscoveryLocation; geoStatus: string; geoConfirmedAt: number | null;
+  state: string | null; city: string | null;
   openNow: boolean; promo: PublicPromo; tags: string[];
 };
 
@@ -94,7 +95,8 @@ function dishToPublic(d: DiscoveryDish, openNow: boolean): PublicDish {
     restaurant: {
       slug: s.slug, name: s.name, logo: s.logo, coverImage: s.coverImage,
       fulfillment: s.fulfillment, deliveryFee: s.deliveryFee, feeDynamic: s.feeDynamic,
-      payments: s.payments, location: s.location, geoStatus: s.geoStatus, openNow,
+      payments: s.payments, location: s.location, geoStatus: s.geoStatus,
+      state: s.state ?? null, city: s.city ?? null, openNow,
     },
   };
 }
@@ -104,6 +106,7 @@ function restaurantToPublic(r: DiscoveryRestaurant, openNow: boolean): PublicRes
     slug: r.slug, name: r.name, description: r.description, logo: r.logo, coverImage: r.coverImage,
     fulfillment: r.fulfillment, deliveryFee: r.deliveryFee, feeDynamic: r.feeDynamic, payments: r.payments,
     serviceAreas: r.serviceAreas, location: r.location, geoStatus: r.geoStatus, geoConfirmedAt: r.geoConfirmedAt,
+    state: r.state ?? null, city: r.city ?? null,
     openNow, promo: toPromo(r.promo), tags: r.taxonomyTags,
   };
 }

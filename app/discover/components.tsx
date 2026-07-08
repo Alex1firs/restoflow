@@ -5,13 +5,35 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { DishCardData, Facet, RestaurantCardData } from "./types";
-import { dishHref, restaurantHref, formatPrice, formatDistance, fulfillmentLabel, statusLabel } from "./lib";
+import { dishHref, restaurantHref, formatPrice, formatDistance, fulfillmentLabel, statusLabel, locationLabel } from "./lib";
 
 const CARD = "bg-white dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl";
 const MUTED = "text-[#7A7368] dark:text-[#A19B91]";
 
 function initial(name: string) {
   return (name || "?").trim().charAt(0).toUpperCase();
+}
+
+const MiniPin = () => (
+  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="2.6" /></svg>
+);
+
+/** City/State label, or an "Other state" marker for out-of-area cards. */
+function LocationLine({ state, city, outOfArea }: { state: string | null; city: string | null; outOfArea?: boolean }) {
+  const label = locationLabel({ state, city });
+  if (outOfArea) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+        <MiniPin /> {label ? `${label} · other state` : "Other state"}
+      </span>
+    );
+  }
+  if (!label) return null;
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${MUTED}`}>
+      <MiniPin /> {label}
+    </span>
+  );
 }
 
 function StatusPill({ openNow }: { openNow: boolean }) {
@@ -43,7 +65,7 @@ function Thumb({ src, name, className }: { src: string | null; name: string; cla
   );
 }
 
-export function DishCard({ dish }: { dish: DishCardData }) {
+export function DishCard({ dish, outOfArea }: { dish: DishCardData; outOfArea?: boolean }) {
   const img = dish.image || dish.restaurant.coverImage || dish.restaurant.logo || null;
   const dist = formatDistance(dish.distanceKm, dish.approximate);
   return (
@@ -65,6 +87,7 @@ export function DishCard({ dish }: { dish: DishCardData }) {
           <Thumb src={dish.restaurant.logo || null} name={dish.restaurant.name} className="w-4 h-4 rounded-full shrink-0" />
           <span className={`text-xs truncate ${MUTED}`}>{dish.restaurant.name}</span>
         </div>
+        <LocationLine state={dish.restaurant.state} city={dish.restaurant.city} outOfArea={outOfArea} />
         <div className="flex items-center justify-between gap-2 pt-0.5">
           <StatusPill openNow={dish.restaurant.openNow} />
           {dist && <span className={`text-[10px] font-semibold ${MUTED}`}>{dist}</span>}
@@ -75,7 +98,7 @@ export function DishCard({ dish }: { dish: DishCardData }) {
   );
 }
 
-export function RestaurantCard({ restaurant }: { restaurant: RestaurantCardData }) {
+export function RestaurantCard({ restaurant, outOfArea }: { restaurant: RestaurantCardData; outOfArea?: boolean }) {
   const img = restaurant.coverImage || restaurant.logo || null;
   const dist = formatDistance(restaurant.distanceKm, restaurant.approximate);
   return (
@@ -83,8 +106,9 @@ export function RestaurantCard({ restaurant }: { restaurant: RestaurantCardData 
       <Thumb src={img} name={restaurant.name} className="w-14 h-14 rounded-xl shrink-0" />
       <div className="flex flex-col gap-1 min-w-0 flex-1">
         <h3 className="font-bold text-sm leading-tight truncate text-[#141412] dark:text-[#F5F3EF]">{restaurant.name}</h3>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <StatusPill openNow={restaurant.openNow} />
+          <LocationLine state={restaurant.state} city={restaurant.city} outOfArea={outOfArea} />
           {dist && <span className={`text-[10px] font-semibold ${MUTED}`}>{dist}</span>}
         </div>
         <p className={`text-[10px] ${MUTED} line-clamp-1`}>{fulfillmentLabel(restaurant)}</p>

@@ -14,24 +14,28 @@ import {
   filterOpenNowRestaurants,
   dishHref,
   restaurantHref,
+  locationLabel,
+  sameState,
+  partitionByArea,
+  normalizeStateParam,
 } from "../lib";
 import type { DishCardData, RestaurantCardData } from "../types";
 
 let passed = 0;
 const test = (name: string, fn: () => void) => { fn(); passed++; console.log(`  ✓ ${name}`); };
 
-const rmini = (openNow: boolean) => ({
+const rmini = (openNow: boolean, state: string | null = null, city: string | null = null) => ({
   slug: "r1", name: "R1", logo: "", coverImage: "", fulfillment: { delivery: true, pickup: true, dineIn: false },
-  deliveryFee: null, feeDynamic: true, payments: ["Cash"], location: null, geoStatus: "none", openNow,
+  deliveryFee: null, feeDynamic: true, payments: ["Cash"], location: null, geoStatus: "none", state, city, openNow,
 });
-const dish = (id: string, openNow: boolean): DishCardData => ({
+const dish = (id: string, openNow: boolean, state: string | null = null): DishCardData => ({
   id, name: id, description: "", price: 1000, priceHidden: false, image: null, category: "cat", tags: [], available: true, promo: null,
-  restaurant: rmini(openNow), distanceKm: null, approximate: false,
+  restaurant: rmini(openNow, state), distanceKm: null, approximate: false,
 });
-const resto = (slug: string, openNow: boolean): RestaurantCardData => ({
+const resto = (slug: string, openNow: boolean, state: string | null = null): RestaurantCardData => ({
   slug, name: slug, description: "", logo: "", coverImage: "", fulfillment: { delivery: true, pickup: false, dineIn: false },
   deliveryFee: null, feeDynamic: true, payments: ["Cash"], serviceAreas: [], location: null, geoStatus: "none", geoConfirmedAt: null,
-  openNow, promo: null, tags: [], distanceKm: null, approximate: false,
+  state, city: null, openNow, promo: null, tags: [], distanceKm: null, approximate: false,
 });
 
 console.log("discover/lib");
@@ -89,6 +93,53 @@ test("open-now filters keep only open items when toggled", () => {
 test("href helpers deep-link into the existing storefront", () => {
   assert.equal(dishHref(dish("a", true)), "/r/r1#menu");
   assert.equal(restaurantHref("tricias-kitchen"), "/r/tricias-kitchen");
+});
+
+// ── Location (G3) ──
+test("locationLabel: 'City, State' / 'State' / null; trims blanks", () => {
+  assert.equal(locationLabel({ city: "Onitsha", state: "Anambra" }), "Onitsha, Anambra");
+  assert.equal(locationLabel({ city: "  ", state: "Lagos" }), "Lagos");
+  assert.equal(locationLabel({ city: "Awoyaya", state: null }), "Awoyaya");
+  assert.equal(locationLabel({ city: null, state: null }), null);
+});
+
+test("sameState: case/space-insensitive", () => {
+  assert.equal(sameState("Anambra", "anambra"), true);
+  assert.equal(sameState("  Lagos ", "Lagos"), true);
+  assert.equal(sameState("Lagos", "Anambra"), false);
+  assert.equal(sameState(null, "Lagos"), false);
+});
+
+test("partitionByArea: no state → all-with-state in-area, stateless unknown", () => {
+  const items = [resto("a", true, "Anambra"), resto("b", true, null), resto("c", true, "Lagos")];
+  const b = partitionByArea(items, null, (r) => r.state);
+  assert.deepEqual(b.inArea.map((r) => r.slug), ["a", "c"]);
+  assert.deepEqual(b.unknown.map((r) => r.slug), ["b"]);
+  assert.deepEqual(b.outOfArea, []);
+});
+
+test("partitionByArea: state selected → same=inArea, diff=outOfArea, blank=unknown", () => {
+  const items = [resto("a", true, "Anambra"), resto("b", true, "Lagos"), resto("c", true, null), resto("d", true, "anambra")];
+  const b = partitionByArea(items, "Anambra", (r) => r.state);
+  assert.deepEqual(b.inArea.map((r) => r.slug), ["a", "d"]); // case-insensitive match
+  assert.deepEqual(b.outOfArea.map((r) => r.slug), ["b"]);
+  assert.deepEqual(b.unknown.map((r) => r.slug), ["c"]);
+});
+
+test("partitionByArea works on dishes via restaurant.state accessor", () => {
+  const ds = [dish("x", true, "Anambra"), dish("y", true, "Lagos")];
+  const b = partitionByArea(ds, "Lagos", (d) => d.restaurant.state);
+  assert.deepEqual(b.inArea.map((d) => d.id), ["y"]);
+  assert.deepEqual(b.outOfArea.map((d) => d.id), ["x"]);
+});
+
+test("normalizeStateParam: canonicalizes valid, rejects unknown/blank", () => {
+  const allowed = ["Anambra", "Lagos", "Kano"];
+  assert.equal(normalizeStateParam("anambra", allowed), "Anambra");
+  assert.equal(normalizeStateParam("  LAGOS ", allowed), "Lagos");
+  assert.equal(normalizeStateParam("Atlantis", allowed), null);
+  assert.equal(normalizeStateParam("", allowed), null);
+  assert.equal(normalizeStateParam(null, allowed), null);
 });
 
 console.log(`\n${passed} checks passed`);

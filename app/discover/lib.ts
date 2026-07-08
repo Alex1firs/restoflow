@@ -76,6 +76,48 @@ export function filterOpenNowRestaurants(restaurants: RestaurantCardData[], open
   return openOnly ? restaurants.filter((r) => r.openNow) : restaurants;
 }
 
+// ── Location (G3) ─────────────────────────────────────────────────────────────
+
+/** "City, State" / "State" / null — for card labels. Trims and drops blanks. */
+export function locationLabel(loc: { city?: string | null; state?: string | null }): string | null {
+  const city = (loc.city ?? "").trim();
+  const state = (loc.state ?? "").trim();
+  if (city && state) return `${city}, ${state}`;
+  return state || city || null;
+}
+
+/** Case/space-insensitive state equality (canonical values compared leniently). */
+export function sameState(a: string | null | undefined, b: string | null | undefined): boolean {
+  return (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
+}
+
+export type AreaBuckets<T> = { inArea: T[]; outOfArea: T[]; unknown: T[] };
+
+/**
+ * Bucket items against the customer's selected state (client-side, D4).
+ * - no state selected → everything with a state is "inArea", stateless is "unknown".
+ * - state selected → same-state = inArea, different = outOfArea, stateless = unknown.
+ * Order within each bucket is preserved (ranking order is untouched).
+ */
+export function partitionByArea<T>(items: T[], selectedState: string | null, stateOf: (item: T) => string | null): AreaBuckets<T> {
+  const b: AreaBuckets<T> = { inArea: [], outOfArea: [], unknown: [] };
+  const sel = (selectedState ?? "").trim();
+  for (const it of items) {
+    const st = (stateOf(it) ?? "").trim();
+    if (!st) b.unknown.push(it);
+    else if (!sel || sameState(st, sel)) b.inArea.push(it);
+    else b.outOfArea.push(it);
+  }
+  return b;
+}
+
+/** Validate a raw ?state= param against the allowed list; returns canonical or null. */
+export function normalizeStateParam(raw: string | null | undefined, allowed: readonly string[]): string | null {
+  const v = (raw ?? "").trim();
+  if (!v) return null;
+  return allowed.find((s) => s.toLowerCase() === v.toLowerCase()) ?? null;
+}
+
 /** Deep-link a dish into the existing storefront menu section (anchor already exists). */
 export function dishHref(d: { restaurant: { slug: string } }): string {
   return `/r/${d.restaurant.slug}#menu`;

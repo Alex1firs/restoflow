@@ -227,7 +227,29 @@ console.log("discovery/api-handlers");
     const dishKeys = Object.keys(search.items[0]).filter((k) => !k.startsWith("_")).sort();
     assert.deepEqual(dishKeys, ["approximate", "available", "category", "description", "distanceKm", "id", "image", "name", "price", "priceHidden", "promo", "restaurant", "tags"].sort());
     const restoKeys = Object.keys(browse.items[0]).filter((k) => !k.startsWith("_")).sort();
-    assert.deepEqual(restoKeys, ["approximate", "coverImage", "deliveryFee", "description", "distanceKm", "feeDynamic", "fulfillment", "geoConfirmedAt", "geoStatus", "location", "logo", "name", "openNow", "payments", "promo", "serviceAreas", "slug", "tags"].sort());
+    assert.deepEqual(restoKeys, ["approximate", "city", "coverImage", "deliveryFee", "description", "distanceKm", "feeDynamic", "fulfillment", "geoConfirmedAt", "geoStatus", "location", "logo", "name", "openNow", "payments", "promo", "serviceAreas", "slug", "state", "tags"].sort());
+    // Dish card's embedded restaurant exposes state/city too (card labeling).
+    const miniKeys = Object.keys(search.items[0].restaurant).sort();
+    assert.deepEqual(miniKeys, ["city", "coverImage", "deliveryFee", "feeDynamic", "fulfillment", "geoStatus", "location", "logo", "name", "openNow", "payments", "slug", "state"].sort());
+  });
+
+  // ── G3: state/city surfaced through DTOs ──
+  await test("state/city project through restaurant + embedded dish DTOs (null when absent)", async () => {
+    const withLoc: DiscoveryRestaurant = { ...restaurant("r1"), state: "Anambra", city: "Onitsha" };
+    const noLoc = restaurant("r2");
+    const d1 = dish("d1", "r1", { name: "jollof" });
+    d1.restaurantSnapshot.state = "Anambra";
+    d1.restaurantSnapshot.city = "Onitsha";
+    const s = makeStore([d1], [withLoc, noLoc]);
+    const browse = await restaurantsHandler(deps(s), {});
+    const bySlug = Object.fromEntries(browse.items.map((r) => [r.slug, r]));
+    assert.equal(bySlug["r1"].state, "Anambra");
+    assert.equal(bySlug["r1"].city, "Onitsha");
+    assert.equal(bySlug["r2"].state, null);
+    assert.equal(bySlug["r2"].city, null);
+    const search = await searchDishesHandler(deps(s), {});
+    assert.equal(search.items[0].restaurant.state, "Anambra");
+    assert.equal(search.items[0].restaurant.city, "Onitsha");
   });
 
   // ── Param parsing ──
