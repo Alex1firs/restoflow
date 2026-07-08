@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, CheckCircle2, PlayCircle, Smartphone, Store, ShieldCheck, Zap, Globe, RefreshCcw, TrendingUp } from "lucide-react";
 import PublicNav from "./components/PublicNav";
 import { HeroDashboardMockup, MobileOrderMockup } from "./components/LandingMockups";
+import DiscoverShowcase from "./components/DiscoverShowcase";
 import Footer from "./components/Footer";
 import { CircularTestimonials } from "@/components/ui/circular-testimonials";
 import { PLANS } from "@/lib/plans";
@@ -142,7 +143,10 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 2. TRUST SECTION */}
+      {/* 2. FOR FOOD LOVERS — customer discovery awareness */}
+      <DiscoverShowcase />
+
+      {/* 3. TRUST SECTION */}
       <section className="py-12 border-y border-white/5 bg-white/[0.01]">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <p className="text-xs font-bold uppercase tracking-widest text-white/40 mb-8">
