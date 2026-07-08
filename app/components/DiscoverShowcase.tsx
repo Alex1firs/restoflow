@@ -12,10 +12,52 @@ import { ArrowRight, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import type { DishCardData, SearchResponse } from "@/app/discover/types";
 import type { PublicCampaign } from "@/lib/campaigns/types";
 import { formatPrice, locationLabel, dishHref } from "@/app/discover/lib";
+import { resolveBannerHref } from "@/lib/campaigns/logic";
 import { serviceAreaLine } from "./discover-showcase-lib";
 
 function initial(name: string) {
   return (name || "?").trim().charAt(0).toUpperCase();
+}
+
+// Premium promo banner for an active campaign. Renders only when the public
+// projection carries a bannerImageUrl (Slice A gates this on active + enabled).
+// Layout-safe: fixed aspect ratio, object-cover, lazy, and self-hides on load error.
+function CampaignBanner({ campaign }: { campaign: PublicCampaign }) {
+  const [failed, setFailed] = useState(false);
+  if (!campaign.bannerImageUrl || failed) return null;
+
+  const href = resolveBannerHref(campaign.id, campaign.bannerCtaHref);
+  const alt = campaign.bannerAlt || campaign.name;
+  const cta = campaign.bannerCtaLabel || "See the promo";
+  const desktop = campaign.bannerImageUrl;
+  const mobile = campaign.bannerMobileImageUrl || desktop;
+
+  return (
+    <Link
+      href={href}
+      aria-label={alt}
+      className="group relative mb-12 block overflow-hidden rounded-2xl border border-white/10 hover:border-orange-500/40 transition-colors duration-300"
+    >
+      <div className="relative w-full aspect-[16/7] sm:aspect-[16/5] bg-white/[0.03]">
+        <picture>
+          <source media="(max-width: 640px)" srcSet={mobile} />
+          <img
+            src={desktop}
+            alt={alt}
+            loading="lazy"
+            onError={() => setFailed(true)}
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+          />
+        </picture>
+        {/* readability scrim + CTA chip */}
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+        <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-4 py-2 text-xs font-bold text-white shadow-lg group-hover:bg-orange-400 transition-colors">
+          {cta}
+          <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+        </span>
+      </div>
+    </Link>
+  );
 }
 
 function Thumb({ src, name }: { src: string | null; name: string }) {
@@ -118,6 +160,9 @@ export default function DiscoverShowcase() {
         transition={{ duration: 0.7 }}
         className="max-w-7xl mx-auto relative z-10"
       >
+        {/* Active campaign promo banner (renders only when one is configured) */}
+        {campaign?.bannerImageUrl && <CampaignBanner campaign={campaign} />}
+
         <div className="text-center max-w-2xl mx-auto">
           <span className="text-[11px] font-black uppercase tracking-widest text-orange-400">For Food Lovers</span>
           <h2 className="mt-3 text-3xl md:text-5xl font-black uppercase tracking-tighter text-white">

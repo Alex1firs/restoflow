@@ -21,6 +21,18 @@ export type Campaign = {
   prize: string;
   /** Which entry points may attribute an order to this campaign. */
   entryPoints: CampaignEntryPoint[];
+  /**
+   * Optional promo banner (marketing asset — NOT PII). Rendered on public
+   * entry points for active campaigns when `bannerEnabled` and a URL exist.
+   * All optional/additive; absence = no banner (current behaviour preserved).
+   */
+  bannerImageUrl: string | null;
+  bannerMobileImageUrl: string | null;
+  bannerAlt: string;
+  bannerCtaLabel: string;
+  /** Explicit click destination; when null the UI defaults to /discover?camp=<id>. */
+  bannerCtaHref: string | null;
+  bannerEnabled: boolean;
   createdAtMs: number;
   updatedAtMs: number;
   createdBy: string;
@@ -52,6 +64,16 @@ export type PublicCampaign = {
   prize: string;
   threshold: number;
   entryPoints: CampaignEntryPoint[];
+  /**
+   * Public banner fields. Present only when the banner is meant to render
+   * (see `toPublicCampaign`): `bannerEnabled` true AND a `bannerImageUrl` set.
+   * When there is no renderable banner, `bannerImageUrl` is null.
+   */
+  bannerImageUrl: string | null;
+  bannerMobileImageUrl: string | null;
+  bannerAlt: string;
+  bannerCtaLabel: string;
+  bannerCtaHref: string | null;
 };
 
 /** A derived (read-only) participant tally for a campaign. */

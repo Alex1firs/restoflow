@@ -30,6 +30,12 @@ function normalizeEntryPoints(v: unknown): CampaignEntryPoint[] {
   return allowed.filter((a) => v.includes(a));
 }
 
+/** Trim a string field to a value or null (empty → null). */
+function strOrNull(v: unknown): string | null {
+  const s = typeof v === "string" ? v.trim() : "";
+  return s ? s : null;
+}
+
 function mapCampaign(id: string, d: Record<string, unknown>): Campaign {
   const rule = (d.rule ?? {}) as { type?: unknown; threshold?: unknown };
   return {
@@ -42,6 +48,12 @@ function mapCampaign(id: string, d: Record<string, unknown>): Campaign {
     rule: { type: "order_count", threshold: typeof rule.threshold === "number" ? rule.threshold : 0 },
     prize: String(d.prize ?? ""),
     entryPoints: normalizeEntryPoints(d.entryPoints),
+    bannerImageUrl: strOrNull(d.bannerImageUrl),
+    bannerMobileImageUrl: strOrNull(d.bannerMobileImageUrl),
+    bannerAlt: String(d.bannerAlt ?? ""),
+    bannerCtaLabel: String(d.bannerCtaLabel ?? ""),
+    bannerCtaHref: strOrNull(d.bannerCtaHref),
+    bannerEnabled: d.bannerEnabled === true,
     createdAtMs: toMillis(d.createdAt),
     updatedAtMs: toMillis(d.updatedAt),
     createdBy: String(d.createdBy ?? ""),
@@ -80,6 +92,12 @@ export type CampaignInput = {
   threshold: number;
   prize?: string;
   entryPoints?: CampaignEntryPoint[];
+  bannerImageUrl?: string | null;
+  bannerMobileImageUrl?: string | null;
+  bannerAlt?: string;
+  bannerCtaLabel?: string;
+  bannerCtaHref?: string | null;
+  bannerEnabled?: boolean;
   createdBy: string;
 };
 
@@ -103,6 +121,12 @@ export async function upsertCampaign(
     rule: { type: "order_count", threshold: Math.max(1, Math.floor(input.threshold || 1)) },
     prize: (input.prize ?? "").trim(),
     entryPoints: normalizeEntryPoints(input.entryPoints),
+    bannerImageUrl: strOrNull(input.bannerImageUrl),
+    bannerMobileImageUrl: strOrNull(input.bannerMobileImageUrl),
+    bannerAlt: (input.bannerAlt ?? "").trim(),
+    bannerCtaLabel: (input.bannerCtaLabel ?? "").trim(),
+    bannerCtaHref: strOrNull(input.bannerCtaHref),
+    bannerEnabled: input.bannerEnabled === true,
     updatedAt: serverTimestamp(),
   };
   if (exists) {

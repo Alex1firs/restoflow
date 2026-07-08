@@ -10,9 +10,11 @@ type Props = {
   storagePath: string;
   label?: string;
   aspect?: "wide" | "square";
+  /** Upload endpoint. Defaults to the merchant route; pass a super-admin route for campaign assets. */
+  endpoint?: string;
 };
 
-export default function ImageUpload({ value, onChange, storagePath, label, aspect = "wide" }: Props) {
+export default function ImageUpload({ value, onChange, storagePath, label, aspect = "wide", endpoint }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState("");
@@ -28,7 +30,7 @@ export default function ImageUpload({ value, onChange, storagePath, label, aspec
     setProgress(0);
 
     try {
-      const url = await uploadImage(file, storagePath, setProgress);
+      const url = await uploadImage(file, storagePath, setProgress, endpoint);
       URL.revokeObjectURL(objectUrl);
       setPreview(url);
       onChange(url);

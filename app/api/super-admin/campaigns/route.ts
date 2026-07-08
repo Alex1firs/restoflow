@@ -39,6 +39,12 @@ export async function POST(req: NextRequest) {
     threshold,
     prize: typeof body.prize === "string" ? body.prize : "",
     entryPoints: Array.isArray(body.entryPoints) ? body.entryPoints : [],
+    bannerImageUrl: typeof body.bannerImageUrl === "string" ? body.bannerImageUrl : null,
+    bannerMobileImageUrl: typeof body.bannerMobileImageUrl === "string" ? body.bannerMobileImageUrl : null,
+    bannerAlt: typeof body.bannerAlt === "string" ? body.bannerAlt : "",
+    bannerCtaLabel: typeof body.bannerCtaLabel === "string" ? body.bannerCtaLabel : "",
+    bannerCtaHref: typeof body.bannerCtaHref === "string" ? body.bannerCtaHref : null,
+    bannerEnabled: body.bannerEnabled === true,
     createdBy: uid,
   };
 

@@ -19,7 +19,8 @@ export function validateVideoFile(file: File): string | null {
 export async function uploadImage(
   file: File,
   path: string,
-  onProgress?: (pct: number) => void
+  onProgress?: (pct: number) => void,
+  endpoint: string = "/api/upload"
 ): Promise<string> {
   onProgress?.(10);
 
@@ -29,7 +30,7 @@ export async function uploadImage(
 
   onProgress?.(30);
 
-  const res = await fetch("/api/upload", { method: "POST", body: formData });
+  const res = await fetch(endpoint, { method: "POST", body: formData });
 
   onProgress?.(90);
 

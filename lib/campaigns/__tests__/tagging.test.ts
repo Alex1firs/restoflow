@@ -15,6 +15,7 @@ const active: Campaign = {
   id: "camp1", name: "Order 5", description: "", status: "active",
   startAtMs: NOW - 5 * DAY, endAtMs: NOW + 5 * DAY,
   rule: { type: "order_count", threshold: 5 }, prize: "Cooker", entryPoints: ["landing", "discover"],
+  bannerImageUrl: null, bannerMobileImageUrl: null, bannerAlt: "", bannerCtaLabel: "", bannerCtaHref: null, bannerEnabled: false,
   createdAtMs: NOW - 10 * DAY, updatedAtMs: NOW - 10 * DAY, createdBy: "sa",
 };
 

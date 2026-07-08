@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Campaign, CampaignEntryPoint, CampaignStatus } from "@/lib/campaigns/types";
+import ImageUpload from "@/app/components/ImageUpload";
 
 const STATUS_STYLES: Record<CampaignStatus, string> = {
   draft: "bg-gray-100 text-gray-600",
@@ -33,11 +34,28 @@ const BLANK = {
   startAt: "",
   endAt: "",
   entryPoints: ["landing", "discover"] as CampaignEntryPoint[],
+  bannerImageUrl: "",
+  bannerMobileImageUrl: "",
+  bannerAlt: "",
+  bannerCtaLabel: "",
+  bannerCtaHref: "",
+  bannerEnabled: false,
 };
+
+/** Storage folder for a campaign's banner assets. New (unsaved) campaigns get a
+ *  random key so uploads never collide with another draft's assets. */
+function bannerFolder(id: string | undefined, key: string): string {
+  return `campaigns/${id || key}`;
+}
+function newBannerKey(): string {
+  const c = globalThis.crypto;
+  return c && "randomUUID" in c ? c.randomUUID() : `draft-${String(Math.floor(performance.now()))}`;
+}
 
 export default function CampaignsClient({ initialCampaigns }: { initialCampaigns: Campaign[] }) {
   const router = useRouter();
   const [form, setForm] = useState({ ...BLANK });
+  const [bannerKey, setBannerKey] = useState("draft");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -48,11 +66,17 @@ export default function CampaignsClient({ initialCampaigns }: { initialCampaigns
       threshold: c.rule.threshold, prize: c.prize,
       startAt: toDateInput(c.startAtMs), endAt: toDateInput(c.endAtMs),
       entryPoints: c.entryPoints.length ? c.entryPoints : ["landing", "discover"],
+      bannerImageUrl: c.bannerImageUrl ?? "",
+      bannerMobileImageUrl: c.bannerMobileImageUrl ?? "",
+      bannerAlt: c.bannerAlt ?? "",
+      bannerCtaLabel: c.bannerCtaLabel ?? "",
+      bannerCtaHref: c.bannerCtaHref ?? "",
+      bannerEnabled: c.bannerEnabled ?? false,
     });
     setShowForm(true);
     setError(null);
   }
-  function newCampaign() { setForm({ ...BLANK }); setShowForm(true); setError(null); }
+  function newCampaign() { setForm({ ...BLANK }); setBannerKey(newBannerKey()); setShowForm(true); setError(null); }
 
   function toggleEntry(ep: CampaignEntryPoint) {
     setForm((f) => ({
@@ -73,6 +97,9 @@ export default function CampaignsClient({ initialCampaigns }: { initialCampaigns
           threshold: Number(form.threshold), prize: form.prize,
           startAtMs: fromDateInput(form.startAt), endAtMs: fromDateInput(form.endAt),
           entryPoints: form.entryPoints,
+          bannerImageUrl: form.bannerImageUrl, bannerMobileImageUrl: form.bannerMobileImageUrl,
+          bannerAlt: form.bannerAlt, bannerCtaLabel: form.bannerCtaLabel,
+          bannerCtaHref: form.bannerCtaHref, bannerEnabled: form.bannerEnabled,
         }),
       });
       const data = await res.json();
@@ -150,6 +177,57 @@ export default function CampaignsClient({ initialCampaigns }: { initialCampaigns
               </div>
             </div>
           </div>
+
+          {/* Promo banner (optional marketing asset shown on landing / discovery) */}
+          <div className="mt-5 border-t border-gray-100 pt-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-black text-gray-900">Promo banner</h3>
+              <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={form.bannerEnabled}
+                  onChange={(e) => setForm((f) => ({ ...f, bannerEnabled: e.target.checked }))}
+                />
+                Show banner
+              </label>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Optional. Shown on the landing page for <strong>active</strong> campaigns only when “Show banner” is on and an image is uploaded. Recommended: landscape ~1600×600, JPG/PNG/WebP, under 5MB.
+            </p>
+
+            <div className="grid sm:grid-cols-2 gap-4 mt-4">
+              <ImageUpload
+                label="Banner image (desktop)"
+                value={form.bannerImageUrl}
+                onChange={(url) => setForm((f) => ({ ...f, bannerImageUrl: url }))}
+                storagePath={`${bannerFolder(form.id, bannerKey)}/banner`}
+                endpoint="/api/super-admin/upload"
+                aspect="wide"
+              />
+              <ImageUpload
+                label="Banner image (mobile, optional)"
+                value={form.bannerMobileImageUrl}
+                onChange={(url) => setForm((f) => ({ ...f, bannerMobileImageUrl: url }))}
+                storagePath={`${bannerFolder(form.id, bannerKey)}/banner-mobile`}
+                endpoint="/api/super-admin/upload"
+                aspect="square"
+              />
+              <label className="text-sm font-medium text-gray-700">
+                Banner alt text
+                <input value={form.bannerAlt} onChange={(e) => setForm((f) => ({ ...f, bannerAlt: e.target.value }))} placeholder="Defaults to the campaign name" className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                CTA label
+                <input value={form.bannerCtaLabel} onChange={(e) => setForm((f) => ({ ...f, bannerCtaLabel: e.target.value }))} placeholder="See the promo" className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+              </label>
+              <label className="text-sm font-medium text-gray-700 sm:col-span-2">
+                CTA destination (optional)
+                <input value={form.bannerCtaHref} onChange={(e) => setForm((f) => ({ ...f, bannerCtaHref: e.target.value }))} placeholder="/discover (default) — or e.g. /r/tricias-kitchen" className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                <span className="block text-xs text-gray-400 mt-1 font-normal">Leave blank to link to /discover. The campaign tag is always preserved on the link.</span>
+              </label>
+            </div>
+          </div>
+
           {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
           <div className="flex gap-2 mt-5">
             <button onClick={save} disabled={saving} className="bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-lg">

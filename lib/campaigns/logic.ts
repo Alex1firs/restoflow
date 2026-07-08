@@ -4,8 +4,38 @@
 
 import type { Campaign, CampaignOrder, CampaignParticipant, PublicCampaign } from "./types";
 
+/**
+ * True when a campaign has a renderable promo banner: explicitly enabled AND a
+ * primary image URL present. Status/window are enforced separately (only active,
+ * in-window campaigns reach the public projection), so this is purely about the
+ * banner asset itself.
+ */
+export function hasRenderableBanner(c: Pick<Campaign, "bannerEnabled" | "bannerImageUrl">): boolean {
+  return Boolean(c.bannerEnabled) && Boolean(c.bannerImageUrl && c.bannerImageUrl.trim());
+}
+
+/**
+ * Resolve where a campaign banner click should go. Defaults to the discovery
+ * entry point carrying the campaign tag (`/discover?camp=<id>`) so attribution
+ * is never lost. An explicit `bannerCtaHref` overrides the path, but the `camp`
+ * tag is still guaranteed to be present on the resulting URL.
+ */
+export function resolveBannerHref(
+  id: string,
+  bannerCtaHref: string | null | undefined,
+): string {
+  const camp = encodeURIComponent(id);
+  const override = (bannerCtaHref ?? "").trim();
+  if (!override) return `/discover?camp=${camp}`;
+  if (/[?&]camp=/.test(override)) return override; // already carries a camp tag
+  const [base, hash = ""] = override.split("#");
+  const withCamp = `${base}${base.includes("?") ? "&" : "?"}camp=${camp}`;
+  return hash ? `${withCamp}#${hash}` : withCamp;
+}
+
 /** Whitelist a campaign down to its PII-free public shape (structural guarantee). */
 export function toPublicCampaign(c: Campaign): PublicCampaign {
+  const showBanner = hasRenderableBanner(c);
   return {
     id: c.id,
     name: c.name,
@@ -13,6 +43,11 @@ export function toPublicCampaign(c: Campaign): PublicCampaign {
     prize: c.prize,
     threshold: c.rule.threshold,
     entryPoints: c.entryPoints,
+    bannerImageUrl: showBanner ? c.bannerImageUrl : null,
+    bannerMobileImageUrl: showBanner ? c.bannerMobileImageUrl : null,
+    bannerAlt: showBanner ? (c.bannerAlt || c.name) : "",
+    bannerCtaLabel: showBanner ? c.bannerCtaLabel : "",
+    bannerCtaHref: showBanner ? c.bannerCtaHref : null,
   };
 }
 
