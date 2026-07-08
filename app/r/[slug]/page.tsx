@@ -121,7 +121,7 @@ export default async function RestaurantPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>,
-  searchParams: Promise<{ table?: string; cs?: string; cc?: string }>,
+  searchParams: Promise<{ table?: string; cs?: string; cc?: string; dish?: string }>,
 }) {
   const [resolvedParams, resolvedSearch] = await Promise.all([params, searchParams]);
   const slug = resolvedParams.slug;
@@ -129,6 +129,8 @@ export default async function RestaurantPage({
   // Customer location carried from /discover (G4) — used only for a passive notice.
   const customerState = (resolvedSearch.cs ?? "").trim();
   const customerCity = (resolvedSearch.cc ?? "").trim();
+  // Deep-linked dish id from /discover — scroll-to + highlight only (presentational).
+  const initialDish = (resolvedSearch.dish ?? "").trim();
 
   const adminDb = getAdminDb();
   const [seoData, docSnap] = await Promise.all([
@@ -275,6 +277,7 @@ export default async function RestaurantPage({
             restaurant={restaurantProps}
             menuItems={menuItems}
             initialTable={initialTable}
+            initialDish={initialDish}
             analyticsEnabled={process.env.STOREFRONT_ANALYTICS_ENABLED === "true"}
             seo={{
               seoTitle: seoData?.seoTitle,

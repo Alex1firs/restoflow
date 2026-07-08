@@ -123,9 +123,12 @@ function locParams(loc?: { state?: string | null; city?: string | null }): strin
   return buildQuery({ cs: loc?.state ?? undefined, cc: loc?.city ?? undefined });
 }
 
-/** Deep-link a dish into the existing storefront menu section (anchor already exists). */
-export function dishHref(d: { restaurant: { slug: string } }, loc?: { state?: string | null; city?: string | null }): string {
-  return `/r/${d.restaurant.slug}${locParams(loc)}#menu`;
+/** Deep-link a dish into the existing storefront menu section (anchor already exists).
+ * Carries ?dish=<id> so the storefront can scroll to + highlight that exact item,
+ * plus the G4 location params; keeps #menu as a no-JS fallback. */
+export function dishHref(d: { id: string; restaurant: { slug: string } }, loc?: { state?: string | null; city?: string | null }): string {
+  const qs = buildQuery({ dish: d.id, cs: loc?.state ?? undefined, cc: loc?.city ?? undefined });
+  return `/r/${d.restaurant.slug}${qs}#menu`;
 }
 export function restaurantHref(slug: string, loc?: { state?: string | null; city?: string | null }): string {
   return `/r/${slug}${locParams(loc)}`;

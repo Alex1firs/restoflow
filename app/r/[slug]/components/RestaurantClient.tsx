@@ -76,6 +76,7 @@ interface RestaurantClientProps {
   };
   isPreview?: boolean;
   initialTable?: string;
+  initialDish?: string;
   analyticsEnabled?: boolean;
 }
 
@@ -108,7 +109,7 @@ function formatWhatsAppNumber(phone: string): string {
   return digits;
 }
 
-export default function RestaurantClient({ restaurant, menuItems, seo, isPreview, initialTable, analyticsEnabled }: RestaurantClientProps) {
+export default function RestaurantClient({ restaurant, menuItems, seo, isPreview, initialTable, initialDish, analyticsEnabled }: RestaurantClientProps) {
   const { items, addToCart, updateQuantity, clearCart, totalPrice, totalItems } = useCart();
 
   const [cartOpen, setCartOpen] = useState(false);
@@ -120,6 +121,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
   const [scrollY, setScrollY] = useState(0);
   const [activeCategory, setActiveCategory] = useState<string | null>(null); // normalized category key
   const [menuSearch, setMenuSearch] = useState("");
+  const [highlightedDish, setHighlightedDish] = useState<string | null>(null); // deep-linked dish (scroll+highlight)
   const [deliveryType, setDeliveryType] = useState<DeliveryType>(() => {
     if (initialTable && restaurant.dineInEnabled) return "dine_in";
     if (restaurant.deliveryEnabled) return "delivery";
@@ -546,6 +548,27 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
     const top = el.getBoundingClientRect().top + window.scrollY - offset;
     window.scrollTo({ top, behavior: "smooth" });
   };
+
+  // Deep-linked dish from /discover (?dish=<id>): reset filters so the item is
+  // guaranteed visible, scroll to it, and highlight briefly. Presentational only —
+  // no cart mutation. Runs once on mount; a missing/unknown id is a graceful no-op.
+  const dishDeepLinked = useRef(false);
+  useEffect(() => {
+    if (dishDeepLinked.current) return;
+    dishDeepLinked.current = true;
+    const id = (initialDish ?? "").trim();
+    if (!id) return;
+    if (!menuItems.some((m) => m.id === id)) return; // unknown dish → no-op (stays at #menu fallback)
+    setActiveTab("menu");
+    setActiveCategory(null);
+    setMenuSearch("");
+    setHighlightedDish(id);
+    // Wait for the menu grid to lay out before scrolling, then clear the highlight.
+    const scrollT = setTimeout(() => scrollTo(`dish-${id}`), 350);
+    const clearT = setTimeout(() => setHighlightedDish(null), 2900);
+    return () => { clearTimeout(scrollT); clearTimeout(clearT); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openCheckout = () => {
     setCartOpen(false);
@@ -1688,6 +1711,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                   return (
                     <div
                       key={item.id}
+                      id={`dish-${item.id}`}
                       data-analytics-item-id={item.id}
                       style={{
                         borderRadius: `${hs.menuCardBorderRadius ?? 16}px`,
@@ -1698,8 +1722,12 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
                             ? "transparent"
                             : undefined,
                       }}
-                      className={`group flex flex-col transition-all duration-300 shadow-[0_4px_25px_rgba(0,0,0,0.01)] border ${
+                      className={`group flex flex-col scroll-mt-24 transition-all duration-300 shadow-[0_4px_25px_rgba(0,0,0,0.01)] border ${
                         hs.menuCardBgStyle === "transparent" ? "bg-transparent border-transparent shadow-none" : "bg-white dark:bg-[#141412] border-[#EFECE6] dark:border-[#1F1F1C]"
+                      } ${
+                        highlightedDish === item.id
+                          ? "ring-2 ring-[var(--brand-primary)] ring-offset-2 ring-offset-[#FAF9F5] dark:ring-offset-[#0D0C0B] animate-pulse !border-[var(--brand-primary)]"
+                          : ""
                       } ${
                         (!item.available || (closed && !preorderEnabled))
                           ? "opacity-90"

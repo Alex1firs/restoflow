@@ -91,21 +91,25 @@ test("open-now filters keep only open items when toggled", () => {
 });
 
 test("href helpers deep-link into the existing storefront", () => {
-  assert.equal(dishHref(dish("a", true)), "/r/r1#menu");
+  assert.equal(dishHref(dish("a", true)), "/r/r1?dish=a#menu"); // carries the dish id
   assert.equal(restaurantHref("tricias-kitchen"), "/r/tricias-kitchen");
 });
 
-test("href helpers carry customer state/city params only when provided (G4)", () => {
-  // no loc → unchanged (direct-visit safe)
-  assert.equal(dishHref(dish("a", true), undefined), "/r/r1#menu");
-  assert.equal(restaurantHref("tricias-kitchen", {}), "/r/tricias-kitchen");
+test("dishHref carries ?dish=<id> + customer state/city; keeps #menu (G4 + deep-link)", () => {
+  // dish id always carried; no loc → just ?dish
+  assert.equal(dishHref(dish("a", true), undefined), "/r/r1?dish=a#menu");
   // state only
-  assert.equal(dishHref(dish("a", true), { state: "Anambra" }), "/r/r1?cs=Anambra#menu");
-  assert.equal(restaurantHref("food-kapitol", { state: "Anambra" }), "/r/food-kapitol?cs=Anambra");
+  assert.equal(dishHref(dish("a", true), { state: "Anambra" }), "/r/r1?dish=a&cs=Anambra#menu");
   // state + city
+  assert.equal(dishHref(dish("a", true), { state: "Anambra", city: "Onitsha" }), "/r/r1?dish=a&cs=Anambra&cc=Onitsha#menu");
+  // blank/null state → dish only, no cs/cc
+  assert.equal(dishHref(dish("a", true), { state: null }), "/r/r1?dish=a#menu");
+});
+
+test("restaurantHref carries only customer state/city (never a dish)", () => {
+  assert.equal(restaurantHref("tricias-kitchen", {}), "/r/tricias-kitchen");
+  assert.equal(restaurantHref("food-kapitol", { state: "Anambra" }), "/r/food-kapitol?cs=Anambra");
   assert.equal(restaurantHref("food-kapitol", { state: "Anambra", city: "Onitsha" }), "/r/food-kapitol?cs=Anambra&cc=Onitsha");
-  // blank/null state → no params
-  assert.equal(dishHref(dish("a", true), { state: null }), "/r/r1#menu");
 });
 
 // ── Location (G3) ──
