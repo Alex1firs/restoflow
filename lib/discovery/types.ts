@@ -38,6 +38,8 @@ export type SourceRestaurant = {
   logo?: string;
   coverImage?: string;
   address?: string;
+  state?: string;                      // structured location (G1) — owner-supplied Nigerian state
+  city?: string;                       // structured location (G1) — owner-supplied city/town
   status?: string;                     // "live" | "draft" | "pending" | "rejected" | "suspended" | ...
   subscriptionStatus?: string;         // "active" | "expired" | ...
   subscriptionEndDateMs?: number | null; // resolved from Firestore Timestamp by the adapter
@@ -93,6 +95,8 @@ export type RestaurantSnapshot = {
   pickupAddress: string | null; // only when pickup enabled + address present
   location: DiscoveryLocation;  // null until a usable (confirmed/high-confidence) geo exists (2.4)
   geoStatus: GeoStatus;         // trust state so a dish card knows if its distance is reliable (2.4)
+  state: string | null;         // structured location (G1) — owner-supplied, nullable
+  city: string | null;          // structured location (G1) — owner-supplied, nullable
 };
 
 export type DiscoveryRestaurant = RestaurantSnapshot & {

@@ -38,7 +38,7 @@ function snap(slug: string, geoStatus: GeoStatus, coords: { lat: number; lng: nu
   return {
     slug, name: `R ${slug}`, description: "", logo: `${slug}.png`, coverImage: "c.png",
     fulfillment: { delivery: true, pickup: true, dineIn: false },
-    deliveryFee: null, feeDynamic: true, payments: ["Cash"], pickupAddress: null, location, geoStatus,
+    deliveryFee: null, feeDynamic: true, payments: ["Cash"], pickupAddress: null, location, geoStatus, state: null, city: null,
   };
 }
 

@@ -29,7 +29,7 @@ function snap(slug: string, geoStatus: GeoStatus, coords: { lat: number; lng: nu
     slug, name: slug, description: "", logo: "", coverImage: "",
     fulfillment: { delivery: true, pickup: true, dineIn: false },
     deliveryFee: null, feeDynamic: true, payments: ["Cash"], pickupAddress: null,
-    location, geoStatus,
+    location, geoStatus, state: null, city: null,
   };
 }
 

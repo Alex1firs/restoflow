@@ -97,6 +97,20 @@ test("invalid coordinates never yield a location even when status says usable", 
   assert.equal(projectRestaurant({ ...baseR, latitude: 999, longitude: 3.3, geoStatus: "confirmed" }, NOW).location, null);
 });
 
+// ── Structured location (G1) ──
+test("state/city projected when present, trimmed; null when absent/blank", () => {
+  const d = projectRestaurant({ ...baseR, state: "  Anambra ", city: "Onitsha" }, NOW);
+  assert.equal(d.state, "Anambra");
+  assert.equal(d.city, "Onitsha");
+  const none = projectRestaurant({ ...baseR, state: "   ", city: undefined }, NOW);
+  assert.equal(none.state, null);
+  assert.equal(none.city, null);
+  // dish snapshot carries them too (card labeling)
+  const snap = restaurantSnapshotOf({ ...baseR, state: "Lagos", city: "Ajah" });
+  assert.equal(snap.state, "Lagos");
+  assert.equal(snap.city, "Ajah");
+});
+
 test("payments list only enabled methods", () => {
   assert.deepEqual(projectRestaurant(baseR, NOW).payments, ["Pay online", "Cash"]);
   assert.deepEqual(projectRestaurant({ ...baseR, hidePrices: true }, NOW).payments, ["Cash"]);
@@ -156,7 +170,7 @@ test("projected RESTAURANT contains ONLY allowlisted keys (no PII can leak)", ()
   // Hand the projector a fat source object with sensitive junk.
   const dirty = { ...baseR, phone: "0803...", ownerEmail: "a@b.com", paystackSubaccountCode: "ACCT_x", subscriptionEndDateMs: NOW + DAY } as SourceRestaurant;
   const d = projectRestaurant(dirty, NOW);
-  const allowed = ["slug","name","description","logo","coverImage","fulfillment","deliveryFee","feeDynamic","payments","pickupAddress","location","geoStatus","geoConfirmedAt","serviceAreas","openingHours","promo","taxonomyTags","taxonomyVersion","popularityScore","popularityRaw","popularityOrders","visible","updatedAt","signalsComputedAt","schemaVersion"].sort();
+  const allowed = ["slug","name","description","logo","coverImage","fulfillment","deliveryFee","feeDynamic","payments","pickupAddress","location","geoStatus","state","city","geoConfirmedAt","serviceAreas","openingHours","promo","taxonomyTags","taxonomyVersion","popularityScore","popularityRaw","popularityOrders","visible","updatedAt","signalsComputedAt","schemaVersion"].sort();
   assert.deepEqual(Object.keys(d).sort(), allowed);
   const blob = JSON.stringify(d);
   for (const secret of ["0803", "a@b.com", "ACCT_x", "paystack"]) assert.ok(!blob.includes(secret), `must not contain ${secret}`);

@@ -121,6 +121,8 @@ export function restaurantSnapshotOf(r: SourceRestaurant): RestaurantSnapshot {
     pickupAddress: r.pickupEnabled && loc ? loc : null,
     location: locationOf(r),
     geoStatus: geoStatusOf(r),
+    state: str(r.state).trim() || null,
+    city: str(r.city).trim() || null,
   };
 }
 

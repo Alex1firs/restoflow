@@ -60,6 +60,8 @@ function normalizeRestaurant(slug: string, d: Doc): SourceRestaurant {
     logo: d.logo as string | undefined,
     coverImage: d.coverImage as string | undefined,
     address: d.address as string | undefined,
+    state: d.state as string | undefined,
+    city: d.city as string | undefined,
     status: d.status as string | undefined,
     subscriptionStatus: d.subscriptionStatus as string | undefined,
     subscriptionEndDateMs: toMillis(d.subscriptionEndDate),
