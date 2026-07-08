@@ -121,11 +121,14 @@ export default async function RestaurantPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>,
-  searchParams: Promise<{ table?: string }>,
+  searchParams: Promise<{ table?: string; cs?: string; cc?: string }>,
 }) {
   const [resolvedParams, resolvedSearch] = await Promise.all([params, searchParams]);
   const slug = resolvedParams.slug;
   const initialTable = resolvedSearch.table ?? "";
+  // Customer location carried from /discover (G4) — used only for a passive notice.
+  const customerState = (resolvedSearch.cs ?? "").trim();
+  const customerCity = (resolvedSearch.cc ?? "").trim();
 
   const adminDb = getAdminDb();
   const [seoData, docSnap] = await Promise.all([
@@ -208,6 +211,8 @@ export default async function RestaurantPage({
     whatsappNumber?: string;
     showContactSupport?: boolean;
     payOnDeliveryEnabled?: boolean;
+    state?: string;
+    city?: string;
   };
 
   const todayH = todayHours(rData.openingHours);
@@ -249,6 +254,11 @@ export default async function RestaurantPage({
     payOnDeliveryEnabled: rData.payOnDeliveryEnabled !== false,
     whatsappCheckoutEnabled: !!(rData as any).whatsappCheckoutEnabled,
     openingHours: rData.openingHours ?? null,
+    // G4: restaurant's own location + the customer's selected state (from /discover).
+    restaurantState: rData.state ?? null,
+    restaurantCity: rData.city ?? null,
+    customerState: customerState || null,
+    customerCity: customerCity || null,
   };
 
   return (

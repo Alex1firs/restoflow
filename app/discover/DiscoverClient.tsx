@@ -115,6 +115,9 @@ export default function DiscoverClient() {
   const otherCount = otherDishes.length + otherRestaurants.length;
   const isEmpty = !loading && !error && primaryCount === 0 && otherCount === 0;
 
+  // Carry the customer's selected state into storefront links for the G4 notice.
+  const loc = selectedState ? { state: selectedState } : undefined;
+
   const heading = query.trim()
     ? `Results for “${query.trim()}”`
     : tag
@@ -236,7 +239,7 @@ export default function DiscoverClient() {
                 </div>
               ) : primaryDishes.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {primaryDishes.map((d) => <DishCard key={d.id} dish={d} />)}
+                  {primaryDishes.map((d) => <DishCard key={d.id} dish={d} loc={loc} />)}
                 </div>
               ) : !isEmpty ? (
                 <p className="text-sm text-[#A19B91] py-6">
@@ -250,7 +253,7 @@ export default function DiscoverClient() {
               <section aria-label="Restaurants" className="mt-8">
                 <h2 className="text-base font-black mb-3">{selectedState ? `Restaurants in ${selectedState}` : "Restaurants"}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {primaryRestaurants.map((r) => <RestaurantCard key={r.slug} restaurant={r} />)}
+                  {primaryRestaurants.map((r) => <RestaurantCard key={r.slug} restaurant={r} loc={loc} />)}
                 </div>
               </section>
             )}
@@ -262,12 +265,12 @@ export default function DiscoverClient() {
                 <p className="text-[11px] text-[#A19B91] mb-3">Outside {selectedState} — check delivery is available to you before ordering.</p>
                 {otherDishes.length > 0 && (
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {otherDishes.map((d) => <DishCard key={d.id} dish={d} outOfArea={outDishIds.has(d.id)} />)}
+                    {otherDishes.map((d) => <DishCard key={d.id} dish={d} outOfArea={outDishIds.has(d.id)} loc={loc} />)}
                   </div>
                 )}
                 {otherRestaurants.length > 0 && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
-                    {otherRestaurants.map((r) => <RestaurantCard key={r.slug} restaurant={r} outOfArea={outRestSlugs.has(r.slug)} />)}
+                    {otherRestaurants.map((r) => <RestaurantCard key={r.slug} restaurant={r} outOfArea={outRestSlugs.has(r.slug)} loc={loc} />)}
                   </div>
                 )}
               </section>

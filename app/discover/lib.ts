@@ -118,10 +118,15 @@ export function normalizeStateParam(raw: string | null | undefined, allowed: rea
   return allowed.find((s) => s.toLowerCase() === v.toLowerCase()) ?? null;
 }
 
-/** Deep-link a dish into the existing storefront menu section (anchor already exists). */
-export function dishHref(d: { restaurant: { slug: string } }): string {
-  return `/r/${d.restaurant.slug}#menu`;
+/** Customer-location query (G4): only emitted when a state is selected. */
+function locParams(loc?: { state?: string | null; city?: string | null }): string {
+  return buildQuery({ cs: loc?.state ?? undefined, cc: loc?.city ?? undefined });
 }
-export function restaurantHref(slug: string): string {
-  return `/r/${slug}`;
+
+/** Deep-link a dish into the existing storefront menu section (anchor already exists). */
+export function dishHref(d: { restaurant: { slug: string } }, loc?: { state?: string | null; city?: string | null }): string {
+  return `/r/${d.restaurant.slug}${locParams(loc)}#menu`;
+}
+export function restaurantHref(slug: string, loc?: { state?: string | null; city?: string | null }): string {
+  return `/r/${slug}${locParams(loc)}`;
 }

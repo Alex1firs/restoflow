@@ -8,6 +8,7 @@ import { buildLogisticsSummary } from "@/lib/logistics-summary";
 import { configureAnalytics, track, trackVisitOnce, trackItemViewOnce } from "@/lib/analytics/client";
 import { nextOpenTime, type OpeningHours } from "@/lib/restaurant-utils";
 import SEOSections from "./SEOSections";
+import LocationNotice from "./LocationNotice";
 import LoyaltyCard from "@/app/components/LoyaltyCard";
 import { DEFAULT_HERO_SETTINGS, type HeroSettings } from "@/lib/hero-settings";
 
@@ -58,6 +59,10 @@ interface RestaurantClientProps {
     payOnDeliveryEnabled?: boolean;
     whatsappCheckoutEnabled?: boolean;
     openingHours?: OpeningHours | null;
+    restaurantState?: string | null;
+    restaurantCity?: string | null;
+    customerState?: string | null;
+    customerCity?: string | null;
   };
   menuItems: MenuItemData[];
   seo?: {
@@ -1388,6 +1393,12 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
           </div>
         </div>
       )}
+
+      {/* ── Pre-checkout location notice (G4) — passive, dismissible ──────────── */}
+      <LocationNotice
+        customerState={restaurant.customerState ?? null}
+        restaurantState={restaurant.restaurantState ?? null}
+      />
 
       {/* ── MENU EXPERIENCE REDESIGN (Phase 10B) ──────────────────────────────── */}
       {activeTab === "menu" && (

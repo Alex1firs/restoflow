@@ -95,6 +95,19 @@ test("href helpers deep-link into the existing storefront", () => {
   assert.equal(restaurantHref("tricias-kitchen"), "/r/tricias-kitchen");
 });
 
+test("href helpers carry customer state/city params only when provided (G4)", () => {
+  // no loc → unchanged (direct-visit safe)
+  assert.equal(dishHref(dish("a", true), undefined), "/r/r1#menu");
+  assert.equal(restaurantHref("tricias-kitchen", {}), "/r/tricias-kitchen");
+  // state only
+  assert.equal(dishHref(dish("a", true), { state: "Anambra" }), "/r/r1?cs=Anambra#menu");
+  assert.equal(restaurantHref("food-kapitol", { state: "Anambra" }), "/r/food-kapitol?cs=Anambra");
+  // state + city
+  assert.equal(restaurantHref("food-kapitol", { state: "Anambra", city: "Onitsha" }), "/r/food-kapitol?cs=Anambra&cc=Onitsha");
+  // blank/null state → no params
+  assert.equal(dishHref(dish("a", true), { state: null }), "/r/r1#menu");
+});
+
 // ── Location (G3) ──
 test("locationLabel: 'City, State' / 'State' / null; trims blanks", () => {
   assert.equal(locationLabel({ city: "Onitsha", state: "Anambra" }), "Onitsha, Anambra");

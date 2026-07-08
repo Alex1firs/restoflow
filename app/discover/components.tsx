@@ -65,11 +65,11 @@ function Thumb({ src, name, className }: { src: string | null; name: string; cla
   );
 }
 
-export function DishCard({ dish, outOfArea }: { dish: DishCardData; outOfArea?: boolean }) {
+export function DishCard({ dish, outOfArea, loc }: { dish: DishCardData; outOfArea?: boolean; loc?: { state?: string | null; city?: string | null } }) {
   const img = dish.image || dish.restaurant.coverImage || dish.restaurant.logo || null;
   const dist = formatDistance(dish.distanceKm, dish.approximate);
   return (
-    <Link href={dishHref(dish)} className={`group flex flex-col overflow-hidden ${CARD} shadow-sm hover:shadow-md transition-shadow`}>
+    <Link href={dishHref(dish, loc)} className={`group flex flex-col overflow-hidden ${CARD} shadow-sm hover:shadow-md transition-shadow`}>
       <div className="relative aspect-[4/3] overflow-hidden">
         <Thumb src={img} name={dish.name} className="w-full h-full group-hover:scale-105 transition-transform duration-300" />
         {dish.promo?.active && dish.promo.label && (
@@ -98,11 +98,11 @@ export function DishCard({ dish, outOfArea }: { dish: DishCardData; outOfArea?: 
   );
 }
 
-export function RestaurantCard({ restaurant, outOfArea }: { restaurant: RestaurantCardData; outOfArea?: boolean }) {
+export function RestaurantCard({ restaurant, outOfArea, loc }: { restaurant: RestaurantCardData; outOfArea?: boolean; loc?: { state?: string | null; city?: string | null } }) {
   const img = restaurant.coverImage || restaurant.logo || null;
   const dist = formatDistance(restaurant.distanceKm, restaurant.approximate);
   return (
-    <Link href={restaurantHref(restaurant.slug)} className={`flex items-center gap-3 p-3 ${CARD} shadow-sm hover:shadow-md transition-shadow`}>
+    <Link href={restaurantHref(restaurant.slug, loc)} className={`flex items-center gap-3 p-3 ${CARD} shadow-sm hover:shadow-md transition-shadow`}>
       <Thumb src={img} name={restaurant.name} className="w-14 h-14 rounded-xl shrink-0" />
       <div className="flex flex-col gap-1 min-w-0 flex-1">
         <h3 className="font-bold text-sm leading-tight truncate text-[#141412] dark:text-[#F5F3EF]">{restaurant.name}</h3>
