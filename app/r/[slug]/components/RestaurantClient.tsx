@@ -65,6 +65,7 @@ interface RestaurantClientProps {
     customerState?: string | null;
     customerCity?: string | null;
     campaignNote?: { name: string; prize: string; threshold: number } | null;
+    campaignId?: string | null;
   };
   menuItems: MenuItemData[];
   seo?: {
@@ -611,6 +612,7 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
     deliveryType,
     ...(deliveryType === "delivery" && selectedDeliveryZoneId ? { deliveryZoneId: selectedDeliveryZoneId } : {}),
     ...(deliveryType === "dine_in" ? { serviceMode: "dine_in", tableLabel } : {}),
+    ...(restaurant.campaignId ? { campaignId: restaurant.campaignId } : {}),
     items: items.map((i) => ({ id: i.id, quantity: i.quantity })),
   });
 

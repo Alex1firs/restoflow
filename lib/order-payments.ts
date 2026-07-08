@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import { getAdminDb } from "./firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { campaignPatch, pendingCampaignId } from "./campaigns/tagging";
 
 export async function createOrderFromPaymentReference(
   reference: string
@@ -30,6 +31,7 @@ export async function createOrderFromPaymentReference(
       paymentReference: reference,
       status: "pending",
       deliveryType: d.deliveryType ?? "delivery",
+      ...campaignPatch(pendingCampaignId(d)),
       trackingToken,
       createdAt: FieldValue.serverTimestamp(),
     });

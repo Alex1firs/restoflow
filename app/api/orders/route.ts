@@ -8,6 +8,8 @@ import { sendCustomerNotification } from "@/lib/customer-notifications";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { recordServerEvent } from "@/lib/analytics/rollup";
 import { GRACE_DAYS } from "@/lib/constants";
+import { getCampaign } from "@/lib/campaigns/store";
+import { resolveCampaignTag, campaignPatch } from "@/lib/campaigns/tagging";
 
 export async function POST(request: NextRequest) {
   const { allowed } = await checkRateLimit(`orders:${getClientIp(request)}`, 10, 60_000);
@@ -20,7 +22,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { restaurantId, customerName, phone, address, note, items, deliveryType, orderType, scheduledFor, serviceMode, tableLabel, deliveryZoneId, paymentMethod } =
+  const { restaurantId, customerName, phone, address, note, items, deliveryType, orderType, scheduledFor, serviceMode, tableLabel, deliveryZoneId, paymentMethod, campaignId } =
     body as Record<string, unknown>;
 
   if (
@@ -175,6 +177,14 @@ export async function POST(request: NextRequest) {
 
     const trackingToken = randomBytes(16).toString("hex");
 
+    // Optional promo tag (never blocks the order): store campaignId only if it
+    // resolves to an active campaign. Any read error → untagged.
+    let campaignTag: string | null = null;
+    if (typeof campaignId === "string" && campaignId.trim()) {
+      const camp = await getCampaign(db, campaignId.trim()).catch(() => null);
+      campaignTag = resolveCampaignTag(camp, Date.now());
+    }
+
     let orderNumber: number;
     const orderRef = db.collection("orders").doc();
     const orderId = orderRef.id;
@@ -208,6 +218,7 @@ export async function POST(request: NextRequest) {
         ...(isDineIn ? { serviceMode: "dine_in", tableLabel: typeof tableLabel === "string" ? tableLabel.trim() : "" } : {}),
         ...(deliveryZoneName ? { deliveryZoneName } : {}),
         ...(isScheduled ? { scheduledFor } : {}),
+        ...campaignPatch(campaignTag),
         trackingToken,
         createdAt: FieldValue.serverTimestamp(),
         orderNumber,

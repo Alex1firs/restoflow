@@ -15,11 +15,11 @@ import { isCampaignActive } from '@/lib/campaigns/logic';
 async function resolveCampaignNote(
   db: ReturnType<typeof getAdminDb>,
   campParam: string,
-): Promise<{ name: string; prize: string; threshold: number } | null> {
+): Promise<{ id: string; name: string; prize: string; threshold: number } | null> {
   if (!campParam) return null;
   const camp = await getCampaign(db, campParam).catch(() => null);
   if (!camp || !isCampaignActive(camp, Date.now())) return null;
-  return { name: camp.name, prize: camp.prize, threshold: camp.rule.threshold };
+  return { id: camp.id, name: camp.name, prize: camp.prize, threshold: camp.rule.threshold };
 }
 
 function formatTodayHours(from: string, to: string): string {
@@ -238,8 +238,9 @@ export default async function RestaurantPage({
     ? todayH.open ? formatTodayHours(todayH.from, todayH.to) : "Closed today"
     : null;
 
-  // Validate any ?camp param → a passive promo note (Slice 3). No order tagging.
-  const campaignNote = await resolveCampaignNote(adminDb, campParam);
+  // Validate any ?camp param → passive promo note + the id to tag orders with (Slice 4).
+  const activeCampaign = await resolveCampaignNote(adminDb, campParam);
+  const campaignNote = activeCampaign ? { name: activeCampaign.name, prize: activeCampaign.prize, threshold: activeCampaign.threshold } : null;
 
   const jsonLd = seoData ? buildJsonLd(seoData) : null;
 
@@ -281,6 +282,7 @@ export default async function RestaurantPage({
     customerState: customerState || null,
     customerCity: customerCity || null,
     campaignNote,
+    campaignId: activeCampaign?.id ?? null,
   };
 
   return (

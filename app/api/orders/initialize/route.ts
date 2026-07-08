@@ -5,6 +5,8 @@ import { checkIsOpen } from "@/lib/restaurant-utils";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { recordServerEvent } from "@/lib/analytics/rollup";
 import { GRACE_DAYS } from "@/lib/constants";
+import { getCampaign } from "@/lib/campaigns/store";
+import { resolveCampaignTag, campaignPatch } from "@/lib/campaigns/tagging";
 
 export async function POST(req: NextRequest) {
   const { allowed } = await checkRateLimit(`orders_init:${getClientIp(req)}`, 10, 60_000);
@@ -17,7 +19,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { restaurantId, customerName, phone, address, note, items, deliveryType, serviceMode, tableLabel, orderType, scheduledFor, deliveryZoneId } =
+  const { restaurantId, customerName, phone, address, note, items, deliveryType, serviceMode, tableLabel, orderType, scheduledFor, deliveryZoneId, campaignId } =
     body as Record<string, unknown>;
 
   if (
@@ -169,6 +171,14 @@ export async function POST(req: NextRequest) {
     const reference = paystackData.reference as string;
     const authorizationUrl = paystackData.authorization_url as string;
 
+    // Optional promo tag (never blocks): store on the pending payment only if it
+    // resolves to an active campaign; copied onto the final order at verify time.
+    let campaignTag: string | null = null;
+    if (typeof campaignId === "string" && campaignId.trim()) {
+      const camp = await getCampaign(db, campaignId.trim()).catch(() => null);
+      campaignTag = resolveCampaignTag(camp, Date.now());
+    }
+
     await db.collection("pending_payments").doc(reference).set({
       restaurantId: restaurantId.trim(),
       customerName: customerName.trim(),
@@ -184,6 +194,7 @@ export async function POST(req: NextRequest) {
       ...(deliveryZoneName ? { deliveryZoneName } : {}),
       orderType: orderType === "scheduled" ? "scheduled" : "normal",
       ...(orderType === "scheduled" ? { scheduledFor } : {}),
+      ...campaignPatch(campaignTag),
       createdAt: FieldValue.serverTimestamp(),
     });
 
