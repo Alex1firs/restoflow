@@ -24,6 +24,8 @@ export async function PUT(req: NextRequest) {
     coverVideo,
     phone,
     address,
+    state,
+    city,
     telegramChatId,
     notificationPhone,
     deliveryFee,
@@ -58,6 +60,8 @@ export async function PUT(req: NextRequest) {
     coverVideo?: string;
     phone?: string;
     address?: string;
+    state?: string;
+    city?: string;
     telegramChatId?: string;
     notificationPhone?: string;
     deliveryFee?: number;
@@ -105,6 +109,8 @@ export async function PUT(req: NextRequest) {
       coverVideo: (coverVideo ?? "").trim(),
       phone: (phone ?? "").trim(),
       address: (address ?? "").trim(),
+      state: (state ?? "").trim(),
+      city: (city ?? "").trim(),
       telegramChatId: (telegramChatId ?? "").trim(),
       notificationPhone: (notificationPhone ?? "").trim(),
       deliveryFee: typeof deliveryFee === "number" && deliveryFee >= 0 ? deliveryFee : 0,

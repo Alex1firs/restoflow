@@ -36,6 +36,8 @@ export default async function SettingsPage({ params }: Props) {
     coverVideo: (data.coverVideo as string) ?? "",
     phone: (data.phone as string) ?? "",
     address: (data.address as string) ?? "",
+    state: (data.state as string) ?? "",
+    city: (data.city as string) ?? "",
     telegramChatId: (data.telegramChatId as string) ?? "",
     notificationPhone: (data.notificationPhone as string) ?? "",
     deliveryFee: (data.deliveryFee as number) ?? 0,

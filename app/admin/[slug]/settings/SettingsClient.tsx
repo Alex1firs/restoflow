@@ -8,6 +8,7 @@ import AiTextHelper from "@/app/components/AiTextHelper";
 import { DAYS, DEFAULT_DAY_HOURS, defaultOpeningHours, type OpeningHours, type DeliveryZone } from "@/lib/restaurant-utils";
 import HeroCustomizationSection from "./HeroCustomizationSection";
 import { DEFAULT_HERO_SETTINGS, type HeroSettings } from "@/lib/hero-settings";
+import { NIGERIA_STATES } from "@/lib/nigeria-states";
 
 type AlertPreference = "telegram" | "sms" | "both";
 
@@ -22,6 +23,8 @@ type Props = {
     coverVideo?: string;
     phone: string;
     address: string;
+    state?: string;
+    city?: string;
     telegramChatId: string;
     notificationPhone: string;
     deliveryFee: number;
@@ -64,6 +67,8 @@ export default function SettingsClient({ restaurant, aiEnabled = false, menuItem
     coverVideo: restaurant.coverVideo || "",
     phone: restaurant.phone,
     address: restaurant.address,
+    state: restaurant.state ?? "",
+    city: restaurant.city ?? "",
     telegramChatId: restaurant.telegramChatId,
     notificationPhone: restaurant.notificationPhone,
     deliveryFee: restaurant.deliveryFee,
@@ -392,6 +397,30 @@ export default function SettingsClient({ restaurant, aiEnabled = false, menuItem
               className={inputCls}
             />
           </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="State">
+              <select
+                value={form.state}
+                onChange={(e) => setField("state", e.target.value)}
+                className={inputCls}
+              >
+                <option value="">Select a state…</option>
+                {NIGERIA_STATES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">Helps customers find restaurants near them</p>
+            </Field>
+            <Field label="City / Area">
+              <input
+                type="text"
+                value={form.city}
+                onChange={(e) => setField("city", e.target.value)}
+                placeholder="e.g. Ikeja"
+                className={inputCls}
+              />
+            </Field>
+          </div>
           <Field label="Phone Number">
             <input
               type="tel"
