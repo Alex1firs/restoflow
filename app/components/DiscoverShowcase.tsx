@@ -22,8 +22,9 @@ function initial(name: string) {
 // Premium promo banner for an active campaign. Renders only when the public
 // projection carries a bannerImageUrl (Slice A gates this on active + enabled).
 // The whole flyer is the clickable CTA — no overlay, so a self-contained promo
-// design shows in full. Layout-safe: the slot matches the flyer's own aspect
-// ratio (so object-cover crops nothing), lazy-loaded, and self-hides on error.
+// design shows in full. The flyer is a 4:3 poster: shown whole (object-cover on
+// a matching 4:3 slot = zero crop), centered at a capped width so it reads as a
+// premium poster rather than a page-dominating full-bleed. Full width on mobile.
 function CampaignBanner({ campaign }: { campaign: PublicCampaign }) {
   const [failed, setFailed] = useState(false);
   if (!campaign.bannerImageUrl || failed) return null;
@@ -37,9 +38,9 @@ function CampaignBanner({ campaign }: { campaign: PublicCampaign }) {
     <Link
       href={href}
       aria-label={alt}
-      className="group relative mb-12 block overflow-hidden rounded-2xl border border-white/10 hover:border-orange-500/50 transition-colors duration-300"
+      className="group relative mb-12 mx-auto block w-full max-w-3xl overflow-hidden rounded-2xl border border-white/10 shadow-2xl shadow-black/40 hover:border-orange-500/50 transition-colors duration-300"
     >
-      <div className="relative w-full aspect-[1842/886] bg-white/[0.03]">
+      <div className="relative w-full aspect-[4/3] bg-white/[0.03]">
         <picture>
           <source media="(max-width: 640px)" srcSet={mobile} />
           <img
