@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CategoriesResponse, CollectionsResponse, DishCardData, Facet, RestaurantCardData, RestaurantsResponse, SearchResponse } from "./types";
+import type { PublicCampaign } from "@/lib/campaigns/types";
 import { dishRequest, restaurantRequest, filterOpenNowDishes, filterOpenNowRestaurants, partitionByArea, normalizeStateParam } from "./lib";
 import { DishCard, RestaurantCard, CategoryChip, DishSkeleton, EmptyState, ErrorState } from "./components";
 import { NIGERIA_STATES } from "@/lib/nigeria-states";
@@ -33,6 +34,7 @@ export default function DiscoverClient() {
   const [facets, setFacets] = useState<Facet[]>([]);
   const [dishes, setDishes] = useState<DishCardData[]>([]);
   const [restaurants, setRestaurants] = useState<RestaurantCardData[]>([]);
+  const [campaign, setCampaign] = useState<PublicCampaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -57,6 +59,15 @@ export default function DiscoverClient() {
     getJSON<CategoriesResponse>("/api/discovery/categories", ac.signal)
       .then((r) => setFacets(r.facets))
       .catch(() => {/* non-fatal: chips just won't show */});
+    return () => ac.abort();
+  }, []);
+
+  // Active campaign for this entry point (promo messaging + ?camp carry). Non-fatal.
+  useEffect(() => {
+    const ac = new AbortController();
+    getJSON<{ campaign: PublicCampaign | null }>("/api/campaigns/active?entry=discover", ac.signal)
+      .then((r) => setCampaign(r.campaign))
+      .catch(() => {/* no campaign */});
     return () => ac.abort();
   }, []);
 
@@ -115,8 +126,8 @@ export default function DiscoverClient() {
   const otherCount = otherDishes.length + otherRestaurants.length;
   const isEmpty = !loading && !error && primaryCount === 0 && otherCount === 0;
 
-  // Carry the customer's selected state into storefront links for the G4 notice.
-  const loc = selectedState ? { state: selectedState } : undefined;
+  // Carry the customer's selected state (G4 notice) + active campaign tag into storefront links.
+  const loc = selectedState || campaign ? { state: selectedState ?? undefined, camp: campaign?.id } : undefined;
 
   const heading = query.trim()
     ? `Results for “${query.trim()}”`
@@ -197,6 +208,19 @@ export default function DiscoverClient() {
             </select>
           </div>
         </div>
+
+        {/* Active promo banner (lightweight; terms apply) */}
+        {campaign && (
+          <div className="max-w-6xl mx-auto px-4 pb-2">
+            <div className="flex items-center gap-2 rounded-xl border border-orange-500/20 bg-orange-500/10 px-3 py-2">
+              <span className="text-sm">🎁</span>
+              <p className="text-[11px] font-semibold text-orange-600 dark:text-orange-400">
+                {campaign.name} — order {campaign.threshold}× to qualify{campaign.prize ? ` for ${campaign.prize}` : ""}.
+                <span className="font-normal text-[#A19B91]"> Ordering may enter you into this promotion; terms apply.</span>
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Passive prompt when no state chosen (D5) */}
         {!selectedState && !promptDismissed && (

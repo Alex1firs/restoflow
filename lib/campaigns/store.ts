@@ -55,6 +55,15 @@ export async function listCampaigns(db: Firestore): Promise<Campaign[]> {
     .sort((a, b) => b.createdAtMs - a.createdAtMs);
 }
 
+/** READ-ONLY: campaigns that are live right now (status active + within window). */
+export async function listActiveCampaigns(db: Firestore, nowMs: number): Promise<Campaign[]> {
+  const snap = await db.collection(COL).where("status", "==", "active").get();
+  return snap.docs
+    .map((doc) => mapCampaign(doc.id, doc.data() as Record<string, unknown>))
+    .filter((c) => (c.startAtMs == null || nowMs >= c.startAtMs) && (c.endAtMs == null || nowMs <= c.endAtMs))
+    .sort((a, b) => b.createdAtMs - a.createdAtMs);
+}
+
 export async function getCampaign(db: Firestore, id: string): Promise<Campaign | null> {
   const doc = await db.collection(COL).doc(id).get();
   if (!doc.exists) return null;

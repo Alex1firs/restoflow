@@ -40,6 +40,20 @@ export type CampaignOrder = {
   createdAtMs: number;
 };
 
+/**
+ * PII-free public projection of a campaign — the ONLY shape exposed to
+ * unauthenticated clients (landing / discover / storefront). No participant,
+ * phone, or internal audit fields.
+ */
+export type PublicCampaign = {
+  id: string;
+  name: string;
+  description: string;
+  prize: string;
+  threshold: number;
+  entryPoints: CampaignEntryPoint[];
+};
+
 /** A derived (read-only) participant tally for a campaign. */
 export type CampaignParticipant = {
   phoneKey: string;      // normalized phone (grouping key)

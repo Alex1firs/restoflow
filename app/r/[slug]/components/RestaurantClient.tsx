@@ -9,6 +9,7 @@ import { configureAnalytics, track, trackVisitOnce, trackItemViewOnce } from "@/
 import { nextOpenTime, type OpeningHours } from "@/lib/restaurant-utils";
 import SEOSections from "./SEOSections";
 import LocationNotice from "./LocationNotice";
+import CampaignNote from "./CampaignNote";
 import LoyaltyCard from "@/app/components/LoyaltyCard";
 import { DEFAULT_HERO_SETTINGS, type HeroSettings } from "@/lib/hero-settings";
 
@@ -63,6 +64,7 @@ interface RestaurantClientProps {
     restaurantCity?: string | null;
     customerState?: string | null;
     customerCity?: string | null;
+    campaignNote?: { name: string; prize: string; threshold: number } | null;
   };
   menuItems: MenuItemData[];
   seo?: {
@@ -1422,6 +1424,15 @@ export default function RestaurantClient({ restaurant, menuItems, seo, isPreview
         customerState={restaurant.customerState ?? null}
         restaurantState={restaurant.restaurantState ?? null}
       />
+
+      {/* ── Promo/campaign note (Slice 3) — passive, dismissible; no order tagging ─ */}
+      {restaurant.campaignNote && (
+        <CampaignNote
+          name={restaurant.campaignNote.name}
+          prize={restaurant.campaignNote.prize}
+          threshold={restaurant.campaignNote.threshold}
+        />
+      )}
 
       {/* ── MENU EXPERIENCE REDESIGN (Phase 10B) ──────────────────────────────── */}
       {activeTab === "menu" && (

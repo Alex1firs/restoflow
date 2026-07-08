@@ -8,6 +8,19 @@ import { checkIsOpen, todayHours, type OpeningHours, type DeliveryZone } from '@
 import { buildPageTitle, buildPageDescription, buildJsonLd, buildCanonicalUrl, type RestaurantSEOData } from '@/lib/seo-utils';
 import { GRACE_DAYS } from '@/lib/constants';
 import { DEFAULT_HERO_SETTINGS, type HeroSettings } from '@/lib/hero-settings';
+import { getCampaign } from '@/lib/campaigns/store';
+import { isCampaignActive } from '@/lib/campaigns/logic';
+
+// Module-level (outside component render) so the time read stays pure per React rules.
+async function resolveCampaignNote(
+  db: ReturnType<typeof getAdminDb>,
+  campParam: string,
+): Promise<{ name: string; prize: string; threshold: number } | null> {
+  if (!campParam) return null;
+  const camp = await getCampaign(db, campParam).catch(() => null);
+  if (!camp || !isCampaignActive(camp, Date.now())) return null;
+  return { name: camp.name, prize: camp.prize, threshold: camp.rule.threshold };
+}
 
 function formatTodayHours(from: string, to: string): string {
   const fmt = (t: string) => {
@@ -121,7 +134,7 @@ export default async function RestaurantPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>,
-  searchParams: Promise<{ table?: string; cs?: string; cc?: string; dish?: string }>,
+  searchParams: Promise<{ table?: string; cs?: string; cc?: string; dish?: string; camp?: string }>,
 }) {
   const [resolvedParams, resolvedSearch] = await Promise.all([params, searchParams]);
   const slug = resolvedParams.slug;
@@ -131,6 +144,9 @@ export default async function RestaurantPage({
   const customerCity = (resolvedSearch.cc ?? "").trim();
   // Deep-linked dish id from /discover — scroll-to + highlight only (presentational).
   const initialDish = (resolvedSearch.dish ?? "").trim();
+  // Campaign carried from landing/discover (?camp) — validated below; used only for a
+  // passive promo note this slice. Order tagging is a later slice.
+  const campParam = (resolvedSearch.camp ?? "").trim();
 
   const adminDb = getAdminDb();
   const [seoData, docSnap] = await Promise.all([
@@ -222,6 +238,9 @@ export default async function RestaurantPage({
     ? todayH.open ? formatTodayHours(todayH.from, todayH.to) : "Closed today"
     : null;
 
+  // Validate any ?camp param → a passive promo note (Slice 3). No order tagging.
+  const campaignNote = await resolveCampaignNote(adminDb, campParam);
+
   const jsonLd = seoData ? buildJsonLd(seoData) : null;
 
   const restaurantProps = {
@@ -261,6 +280,7 @@ export default async function RestaurantPage({
     restaurantCity: rData.city ?? null,
     customerState: customerState || null,
     customerCity: customerCity || null,
+    campaignNote,
   };
 
   return (

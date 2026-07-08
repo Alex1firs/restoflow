@@ -2,7 +2,7 @@
 // Run: npx tsx lib/campaigns/__tests__/campaigns.test.ts
 
 import assert from "node:assert/strict";
-import { normalizePhone, maskPhone, isCampaignActive, isQualifyingOrder, tallyParticipants } from "../logic";
+import { normalizePhone, maskPhone, isCampaignActive, isQualifyingOrder, tallyParticipants, toPublicCampaign } from "../logic";
 import type { Campaign, CampaignOrder } from "../types";
 
 let passed = 0;
@@ -101,6 +101,16 @@ test("tallyParticipants: groups by normalized phone, flags qualified at threshol
 test("tallyParticipants: skips rows with unkeyable phone", () => {
   const parts = tallyParticipants([order({ phone: "" }), order({ phone: "   " })], campaign);
   assert.equal(parts.length, 0);
+});
+
+test("toPublicCampaign: exposes ONLY whitelisted fields (no createdBy/audit leak)", () => {
+  const pub = toPublicCampaign(campaign);
+  assert.deepEqual(Object.keys(pub).sort(), ["description", "entryPoints", "id", "name", "prize", "threshold"].sort());
+  assert.equal(pub.threshold, 5);
+  const blob = JSON.stringify(pub);
+  for (const secret of ["super-admin", "createdBy", "createdAt", "updatedAt", "status"]) {
+    assert.ok(!blob.includes(secret), `must not leak ${secret}`);
+  }
 });
 
 console.log(`\n${passed} checks passed`);

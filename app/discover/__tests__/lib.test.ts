@@ -112,6 +112,13 @@ test("restaurantHref carries only customer state/city (never a dish)", () => {
   assert.equal(restaurantHref("food-kapitol", { state: "Anambra", city: "Onitsha" }), "/r/food-kapitol?cs=Anambra&cc=Onitsha");
 });
 
+test("href helpers carry an optional campaign tag (?camp), preserving order + #menu", () => {
+  assert.equal(dishHref(dish("a", true), { camp: "camp1" }), "/r/r1?dish=a&camp=camp1#menu");
+  assert.equal(dishHref(dish("a", true), { state: "Anambra", camp: "camp1" }), "/r/r1?dish=a&cs=Anambra&camp=camp1#menu");
+  assert.equal(restaurantHref("food-kapitol", { camp: "camp1" }), "/r/food-kapitol?camp=camp1");
+  assert.equal(dishHref(dish("a", true), { camp: null }), "/r/r1?dish=a#menu"); // null → omitted
+});
+
 // ── Location (G3) ──
 test("locationLabel: 'City, State' / 'State' / null; trims blanks", () => {
   assert.equal(locationLabel({ city: "Onitsha", state: "Anambra" }), "Onitsha, Anambra");

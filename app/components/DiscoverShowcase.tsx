@@ -10,6 +10,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import type { DishCardData, SearchResponse } from "@/app/discover/types";
+import type { PublicCampaign } from "@/lib/campaigns/types";
 import { formatPrice, locationLabel, dishHref } from "@/app/discover/lib";
 import { serviceAreaLine } from "./discover-showcase-lib";
 
@@ -30,12 +31,12 @@ function Thumb({ src, name }: { src: string | null; name: string }) {
   );
 }
 
-function MealCard({ dish }: { dish: DishCardData }) {
+function MealCard({ dish, campId }: { dish: DishCardData; campId?: string }) {
   const img = dish.image || dish.restaurant.coverImage || dish.restaurant.logo || null;
   const loc = locationLabel({ state: dish.restaurant.state, city: dish.restaurant.city });
   return (
     <Link
-      href={dishHref(dish)}
+      href={dishHref(dish, campId ? { camp: campId } : undefined)}
       className="group snap-start shrink-0 w-[240px] sm:w-[260px] flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] hover:border-orange-500/40 hover:bg-white/[0.05] transition-all duration-300"
     >
       <div className="relative aspect-[4/3] overflow-hidden">
@@ -71,6 +72,7 @@ function SkeletonCard() {
 
 export default function DiscoverShowcase() {
   const [dishes, setDishes] = useState<DishCardData[]>([]);
+  const [campaign, setCampaign] = useState<PublicCampaign | null>(null);
   const [loading, setLoading] = useState(true);
   const scrollerRef = useRef<HTMLDivElement>(null);
 
@@ -83,6 +85,19 @@ export default function DiscoverShowcase() {
       .finally(() => setLoading(false));
     return () => ac.abort();
   }, []);
+
+  // Active campaign for the landing entry point — promo note + ?camp carry. Non-fatal.
+  useEffect(() => {
+    const ac = new AbortController();
+    fetch("/api/campaigns/active?entry=landing", { signal: ac.signal })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((data: { campaign: PublicCampaign | null }) => setCampaign(data.campaign))
+      .catch(() => {/* no campaign */});
+    return () => ac.abort();
+  }, []);
+
+  const campId = campaign?.id;
+  const discoverHref = campId ? `/discover?camp=${encodeURIComponent(campId)}` : "/discover";
 
   const scrollBy = (dir: 1 | -1) => {
     scrollerRef.current?.scrollBy({ left: dir * 560, behavior: "smooth" });
@@ -111,9 +126,20 @@ export default function DiscoverShowcase() {
           <p className="mt-4 text-white/60 text-base md:text-lg leading-relaxed font-light">
             Discover real dishes from restaurants across Nigeria — browse by your state, see what&apos;s open now, and order in a tap. Free to browse, no account needed.
           </p>
-          <Link href="/discover" className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-white/45 hover:text-orange-400 transition-colors">
+          <Link href={discoverHref} className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-white/45 hover:text-orange-400 transition-colors">
             <MapPin size={13} /> {areaLine}
           </Link>
+
+          {/* Active promo note (lightweight; terms apply) */}
+          {campaign && (
+            <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-orange-500/25 bg-orange-500/10 px-4 py-2">
+              <span>🎁</span>
+              <p className="text-xs font-bold text-orange-300">
+                {campaign.name} — order {campaign.threshold}× to qualify{campaign.prize ? ` for ${campaign.prize}` : ""}.
+                <span className="font-normal text-white/50"> Terms apply.</span>
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Carousel */}
@@ -139,7 +165,7 @@ export default function DiscoverShowcase() {
             >
               {loading
                 ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
-                : dishes.map((d) => <MealCard key={d.id} dish={d} />)}
+                : dishes.map((d) => <MealCard key={d.id} dish={d} campId={campId} />)}
             </div>
           </div>
         )}
@@ -147,7 +173,7 @@ export default function DiscoverShowcase() {
         {/* Primary CTA → /discover */}
         <div className="mt-12 flex justify-center">
           <Link
-            href="/discover"
+            href={discoverHref}
             className="group bg-orange-500 hover:bg-orange-400 text-white font-bold text-base px-8 py-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 glow-orange w-full sm:w-auto"
           >
             Explore restaurants

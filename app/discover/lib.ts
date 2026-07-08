@@ -118,18 +118,21 @@ export function normalizeStateParam(raw: string | null | undefined, allowed: rea
   return allowed.find((s) => s.toLowerCase() === v.toLowerCase()) ?? null;
 }
 
-/** Customer-location query (G4): only emitted when a state is selected. */
-function locParams(loc?: { state?: string | null; city?: string | null }): string {
-  return buildQuery({ cs: loc?.state ?? undefined, cc: loc?.city ?? undefined });
+/** Link options carried from discovery into the storefront. */
+export type LinkOpts = { state?: string | null; city?: string | null; camp?: string | null };
+
+/** Customer-location + campaign query: only emits params that are present. */
+function locParams(loc?: LinkOpts): string {
+  return buildQuery({ cs: loc?.state ?? undefined, cc: loc?.city ?? undefined, camp: loc?.camp ?? undefined });
 }
 
 /** Deep-link a dish into the existing storefront menu section (anchor already exists).
  * Carries ?dish=<id> so the storefront can scroll to + highlight that exact item,
- * plus the G4 location params; keeps #menu as a no-JS fallback. */
-export function dishHref(d: { id: string; restaurant: { slug: string } }, loc?: { state?: string | null; city?: string | null }): string {
-  const qs = buildQuery({ dish: d.id, cs: loc?.state ?? undefined, cc: loc?.city ?? undefined });
+ * plus the G4 location params and an optional campaign tag; keeps #menu as fallback. */
+export function dishHref(d: { id: string; restaurant: { slug: string } }, loc?: LinkOpts): string {
+  const qs = buildQuery({ dish: d.id, cs: loc?.state ?? undefined, cc: loc?.city ?? undefined, camp: loc?.camp ?? undefined });
   return `/r/${d.restaurant.slug}${qs}#menu`;
 }
-export function restaurantHref(slug: string, loc?: { state?: string | null; city?: string | null }): string {
+export function restaurantHref(slug: string, loc?: LinkOpts): string {
   return `/r/${slug}${locParams(loc)}`;
 }

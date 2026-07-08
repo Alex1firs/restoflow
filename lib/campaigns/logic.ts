@@ -2,7 +2,19 @@
 // qualifying-order test, and read-only participant tallying. No Firestore, no
 // React, no writes — unit-testable with tsx.
 
-import type { Campaign, CampaignOrder, CampaignParticipant } from "./types";
+import type { Campaign, CampaignOrder, CampaignParticipant, PublicCampaign } from "./types";
+
+/** Whitelist a campaign down to its PII-free public shape (structural guarantee). */
+export function toPublicCampaign(c: Campaign): PublicCampaign {
+  return {
+    id: c.id,
+    name: c.name,
+    description: c.description,
+    prize: c.prize,
+    threshold: c.rule.threshold,
+    entryPoints: c.entryPoints,
+  };
+}
 
 /**
  * Canonicalize a Nigerian phone number to a stable grouping key ("234…").

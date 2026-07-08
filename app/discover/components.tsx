@@ -5,7 +5,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { DishCardData, Facet, RestaurantCardData } from "./types";
-import { dishHref, restaurantHref, formatPrice, formatDistance, fulfillmentLabel, statusLabel, locationLabel } from "./lib";
+import { dishHref, restaurantHref, formatPrice, formatDistance, fulfillmentLabel, statusLabel, locationLabel, type LinkOpts } from "./lib";
 
 const CARD = "bg-white dark:bg-[#141412] border border-[#EFECE6] dark:border-[#1F1F1C] rounded-2xl";
 const MUTED = "text-[#7A7368] dark:text-[#A19B91]";
@@ -65,7 +65,7 @@ function Thumb({ src, name, className }: { src: string | null; name: string; cla
   );
 }
 
-export function DishCard({ dish, outOfArea, loc }: { dish: DishCardData; outOfArea?: boolean; loc?: { state?: string | null; city?: string | null } }) {
+export function DishCard({ dish, outOfArea, loc }: { dish: DishCardData; outOfArea?: boolean; loc?: LinkOpts }) {
   const img = dish.image || dish.restaurant.coverImage || dish.restaurant.logo || null;
   const dist = formatDistance(dish.distanceKm, dish.approximate);
   return (
@@ -98,7 +98,7 @@ export function DishCard({ dish, outOfArea, loc }: { dish: DishCardData; outOfAr
   );
 }
 
-export function RestaurantCard({ restaurant, outOfArea, loc }: { restaurant: RestaurantCardData; outOfArea?: boolean; loc?: { state?: string | null; city?: string | null } }) {
+export function RestaurantCard({ restaurant, outOfArea, loc }: { restaurant: RestaurantCardData; outOfArea?: boolean; loc?: LinkOpts }) {
   const img = restaurant.coverImage || restaurant.logo || null;
   const dist = formatDistance(restaurant.distanceKm, restaurant.approximate);
   return (
