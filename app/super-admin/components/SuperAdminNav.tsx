@@ -15,6 +15,7 @@ import {
   Wrench,
   HelpCircle,
   Star,
+  Gift,
   Menu as MenuIcon,
   X,
   LogOut,
@@ -48,6 +49,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Onboarding", href: "/super-admin/onboarding", Icon: Wrench },
       { label: "Assistance",  href: "/super-admin/assistance",  Icon: HelpCircle },
+      { label: "Campaigns",   href: "/super-admin/campaigns",   Icon: Gift },
     ],
   },
   {
