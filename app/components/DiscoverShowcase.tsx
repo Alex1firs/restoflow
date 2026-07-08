@@ -21,14 +21,15 @@ function initial(name: string) {
 
 // Premium promo banner for an active campaign. Renders only when the public
 // projection carries a bannerImageUrl (Slice A gates this on active + enabled).
-// Layout-safe: fixed aspect ratio, object-cover, lazy, and self-hides on load error.
+// The whole flyer is the clickable CTA — no overlay, so a self-contained promo
+// design shows in full. Layout-safe: the slot matches the flyer's own aspect
+// ratio (so object-cover crops nothing), lazy-loaded, and self-hides on error.
 function CampaignBanner({ campaign }: { campaign: PublicCampaign }) {
   const [failed, setFailed] = useState(false);
   if (!campaign.bannerImageUrl || failed) return null;
 
   const href = resolveBannerHref(campaign.id, campaign.bannerCtaHref);
   const alt = campaign.bannerAlt || campaign.name;
-  const cta = campaign.bannerCtaLabel || "See the promo";
   const desktop = campaign.bannerImageUrl;
   const mobile = campaign.bannerMobileImageUrl || desktop;
 
@@ -36,9 +37,9 @@ function CampaignBanner({ campaign }: { campaign: PublicCampaign }) {
     <Link
       href={href}
       aria-label={alt}
-      className="group relative mb-12 block overflow-hidden rounded-2xl border border-white/10 hover:border-orange-500/40 transition-colors duration-300"
+      className="group relative mb-12 block overflow-hidden rounded-2xl border border-white/10 hover:border-orange-500/50 transition-colors duration-300"
     >
-      <div className="relative w-full aspect-[16/7] sm:aspect-[16/5] bg-white/[0.03]">
+      <div className="relative w-full aspect-[1842/886] bg-white/[0.03]">
         <picture>
           <source media="(max-width: 640px)" srcSet={mobile} />
           <img
@@ -46,15 +47,9 @@ function CampaignBanner({ campaign }: { campaign: PublicCampaign }) {
             alt={alt}
             loading="lazy"
             onError={() => setFailed(true)}
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.01]"
           />
         </picture>
-        {/* readability scrim + CTA chip */}
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-        <span className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-4 py-2 text-xs font-bold text-white shadow-lg group-hover:bg-orange-400 transition-colors">
-          {cta}
-          <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
-        </span>
       </div>
     </Link>
   );
