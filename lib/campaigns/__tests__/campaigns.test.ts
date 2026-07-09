@@ -97,11 +97,32 @@ test("tallyParticipants: groups by normalized phone, flags qualified at threshol
   assert.equal(ada.qualified, true);          // 5 >= 5
   assert.equal(ada.name, "Ada A.");           // most-recent name
   assert.equal(ada.maskedPhone, "2348••••567");
+  assert.equal(ada.fullPhone, "2348031234567"); // super-admin gets the COMPLETE number
   const bola = parts.find((p) => p.name === "Bola")!;
   assert.equal(bola.count, 1);
   assert.equal(bola.qualified, false);
   // sorted by count desc
   assert.deepEqual(parts.map((p) => p.count), [5, 1]);
+});
+
+test("tallyParticipants: fullPhone is the complete number and maskedPhone masks that same value", () => {
+  const parts = tallyParticipants([order({ phone: "08031234567", customerName: "Ada" })], campaign);
+  const p = parts[0];
+  assert.equal(p.fullPhone, "2348031234567");   // full, dialable — for manual winner contact
+  assert.equal(p.maskedPhone, "2348••••567");    // masked form of the SAME number
+  assert.notEqual(p.fullPhone, p.maskedPhone);
+  assert.ok(!p.fullPhone.includes("•"), "fullPhone must not be masked");
+});
+
+test("public projection stays PII-free: no participant/phone fields leak into PublicCampaign", () => {
+  // Even with participants present, toPublicCampaign exposes ONLY campaign fields.
+  const pub = toPublicCampaign(campaign);
+  for (const k of ["phone", "fullPhone", "maskedPhone", "phoneKey", "participants"]) {
+    assert.ok(!(k in (pub as Record<string, unknown>)), `PublicCampaign must not include ${k}`);
+  }
+  const blob = JSON.stringify(pub);
+  assert.ok(!blob.includes("•"), "no masked-phone artifact in public projection");
+  assert.ok(!/\b234\d{7,}\b/.test(blob), "no full phone digits in public projection");
 });
 
 test("tallyParticipants: skips rows with unkeyable phone", () => {

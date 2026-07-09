@@ -53,7 +53,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
               {participants.map((p) => (
                 <tr key={p.phoneKey} className="border-t border-gray-100">
                   <td className="px-4 py-3 font-medium text-gray-800">{p.name || "—"}</td>
-                  <td className="px-4 py-3 font-mono text-gray-500">{p.maskedPhone}</td>
+                  <td className="px-4 py-3 font-mono text-gray-800">{p.fullPhone || "—"}</td>
                   <td className="px-4 py-3 text-gray-800">{p.count} / {campaign.rule.threshold}</td>
                   <td className="px-4 py-3">
                     {p.qualified
@@ -68,7 +68,8 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
       )}
 
       <p className="text-xs text-gray-400 mt-4">
-        Phone numbers are masked. Winner selection is manual — review qualified participants and contact them directly. No prizes are awarded automatically.
+        Full phone numbers are shown here for winner contact (super-admin only — never exposed on public/customer surfaces).
+        Winner selection is manual — review qualified participants and contact them directly. No prizes are awarded automatically.
       </p>
     </div>
   );

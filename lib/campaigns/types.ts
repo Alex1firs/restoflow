@@ -76,10 +76,16 @@ export type PublicCampaign = {
   bannerCtaHref: string | null;
 };
 
-/** A derived (read-only) participant tally for a campaign. */
+/**
+ * A derived (read-only) participant tally for a campaign. Produced ONLY by
+ * super-admin-gated code paths (campaign detail page/API) — never projected to
+ * any public/customer surface. `fullPhone` is included so a super-admin can
+ * contact winners manually; `maskedPhone` is kept for any masked display.
+ */
 export type CampaignParticipant = {
   phoneKey: string;      // normalized phone (grouping key)
-  maskedPhone: string;   // for display
+  fullPhone: string;     // complete number — SUPER-ADMIN ONLY (winner contact)
+  maskedPhone: string;   // masked form (privacy-safe display)
   name: string;          // most-recent customer name seen
   count: number;         // qualifying orders
   qualified: boolean;    // count >= threshold

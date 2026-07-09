@@ -126,6 +126,7 @@ export function tallyParticipants(orders: CampaignOrder[], campaign: Campaign): 
   for (const [phoneKey, v] of byPhone) {
     out.push({
       phoneKey,
+      fullPhone: phoneKey, // complete number (super-admin only); maskedPhone masks this same value
       maskedPhone: maskPhone(phoneKey),
       name: v.name,
       count: v.count,
