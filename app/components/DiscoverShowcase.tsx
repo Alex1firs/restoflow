@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, MapPin, Pause, Play } from "lucide-react";
 import type { DishCardData, SearchResponse } from "@/app/discover/types";
 import type { PublicCampaign } from "@/lib/campaigns/types";
 import { formatPrice, locationLabel, dishHref } from "@/app/discover/lib";
@@ -109,11 +109,16 @@ function SkeletonCard() {
   );
 }
 
+const AUTOPLAY_MS = 4000;
+
 export default function DiscoverShowcase() {
   const [dishes, setDishes] = useState<DishCardData[]>([]);
   const [campaign, setCampaign] = useState<PublicCampaign | null>(null);
   const [loading, setLoading] = useState(true);
+  const [playing, setPlaying] = useState(true);
+  const [reduced, setReduced] = useState(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const hoverRef = useRef(false); // pause-on-hover without restarting the timer
 
   useEffect(() => {
     const ac = new AbortController();
@@ -135,29 +140,68 @@ export default function DiscoverShowcase() {
     return () => ac.abort();
   }, []);
 
+  // Respect reduced-motion: no autoplay when the user asked for less motion.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const apply = () => setReduced(mq.matches);
+    apply();
+    mq.addEventListener?.("change", apply);
+    return () => mq.removeEventListener?.("change", apply);
+  }, []);
+
   const campId = campaign?.id;
   const discoverHref = campId ? `/discover?camp=${encodeURIComponent(campId)}` : "/discover";
-
-  const scrollBy = (dir: 1 | -1) => {
-    scrollerRef.current?.scrollBy({ left: dir * 560, behavior: "smooth" });
-  };
 
   const areaLine = serviceAreaLine(dishes.map((d) => d.restaurant.state));
   const hasCards = loading || dishes.length > 0;
   const hasBanner = Boolean(campaign?.bannerImageUrl);
+  const canAutoplay = playing && !reduced && !loading && dishes.length > 1;
+
+  const scrollBy = (dir: 1 | -1) => {
+    scrollerRef.current?.scrollBy({ left: dir * 560, behavior: "smooth" });
+  };
+  // Prev/next is a manual interaction → stop autoplay (user can resume via play).
+  const manualScroll = (dir: 1 | -1) => { setPlaying(false); scrollBy(dir); };
+  const pauseAutoplay = () => setPlaying(false);
+
+  // Smooth auto-advance by one card; loops back to the start at the end.
+  // Hover skips ticks (via hoverRef) without tearing down the interval.
+  useEffect(() => {
+    if (!canAutoplay) return;
+    const id = window.setInterval(() => {
+      const el = scrollerRef.current;
+      if (!el || hoverRef.current) return;
+      const first = el.firstElementChild as HTMLElement | null;
+      const step = first ? first.offsetWidth + 16 : Math.round(el.clientWidth * 0.8);
+      if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 8) {
+        el.scrollTo({ left: 0, behavior: "smooth" });
+      } else {
+        el.scrollBy({ left: step, behavior: "smooth" });
+      }
+    }, AUTOPLAY_MS);
+    return () => window.clearInterval(id);
+  }, [canAutoplay, dishes.length]);
 
   // Horizontal meal carousel — identical in both layouts; parent controls spacing.
+  // Auto-slides smoothly (loops), pauses on hover and on manual interaction, and
+  // supports native touch swipe. Autoplay is disabled under prefers-reduced-motion.
+  const showAutoControl = !reduced && !loading && dishes.length > 1;
   const carousel = hasCards ? (
-    <div className="relative">
+    <div
+      className="relative"
+      onMouseEnter={() => { hoverRef.current = true; }}
+      onMouseLeave={() => { hoverRef.current = false; }}
+    >
       {/* desktop arrows */}
       <button
-        type="button" aria-label="Scroll left" onClick={() => scrollBy(-1)}
+        type="button" aria-label="Scroll left" onClick={() => manualScroll(-1)}
         className="hidden md:flex absolute -left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-white backdrop-blur transition"
       >
         <ChevronLeft size={18} />
       </button>
       <button
-        type="button" aria-label="Scroll right" onClick={() => scrollBy(1)}
+        type="button" aria-label="Scroll right" onClick={() => manualScroll(1)}
         className="hidden md:flex absolute -right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-white backdrop-blur transition"
       >
         <ChevronRight size={18} />
@@ -165,12 +209,29 @@ export default function DiscoverShowcase() {
 
       <div
         ref={scrollerRef}
+        onPointerDown={pauseAutoplay}
         className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch]"
       >
         {loading
           ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
           : dishes.map((d) => <MealCard key={d.id} dish={d} campId={campId} />)}
       </div>
+
+      {/* subtle pause/play toggle (hidden under reduced-motion) */}
+      {showAutoControl && (
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setPlaying((p) => !p)}
+            aria-label={playing ? "Pause auto-scroll" : "Play auto-scroll"}
+            aria-pressed={!playing}
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-white/60 hover:text-white px-3 py-1.5 text-[11px] font-bold transition"
+          >
+            {playing ? <Pause size={12} /> : <Play size={12} />}
+            {playing ? "Pause" : "Play"}
+          </button>
+        </div>
+      )}
     </div>
   ) : null;
 
