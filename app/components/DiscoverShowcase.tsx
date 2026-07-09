@@ -19,12 +19,13 @@ function initial(name: string) {
   return (name || "?").trim().charAt(0).toUpperCase();
 }
 
-// Premium promo banner for an active campaign. Renders only when the public
+// Promo banner card for an active campaign — a tile inside the discovery
+// showcase (not a standalone full-width block). Renders only when the public
 // projection carries a bannerImageUrl (Slice A gates this on active + enabled).
 // The whole flyer is the clickable CTA — no overlay, so a self-contained promo
 // design shows in full. The flyer is a 4:3 poster: shown whole (object-cover on
-// a matching 4:3 slot = zero crop), centered at a capped width so it reads as a
-// premium poster rather than a page-dominating full-bleed. Full width on mobile.
+// a matching 4:3 slot = zero crop). Layout-neutral: fills its parent column and
+// self-hides on load error so the surrounding section stays intact.
 function CampaignBanner({ campaign }: { campaign: PublicCampaign }) {
   const [failed, setFailed] = useState(false);
   if (!campaign.bannerImageUrl || failed) return null;
@@ -38,7 +39,7 @@ function CampaignBanner({ campaign }: { campaign: PublicCampaign }) {
     <Link
       href={href}
       aria-label={alt}
-      className="group relative mb-12 mx-auto block w-full max-w-3xl overflow-hidden rounded-2xl border border-white/10 shadow-2xl shadow-black/40 hover:border-orange-500/50 transition-colors duration-300"
+      className="group relative block w-full overflow-hidden rounded-2xl border border-white/10 shadow-2xl shadow-black/40 hover:border-orange-500/50 transition-colors duration-300"
     >
       <div className="relative w-full aspect-[4/3] bg-white/[0.03]">
         <picture>
@@ -143,6 +144,45 @@ export default function DiscoverShowcase() {
 
   const areaLine = serviceAreaLine(dishes.map((d) => d.restaurant.state));
   const hasCards = loading || dishes.length > 0;
+  const hasBanner = Boolean(campaign?.bannerImageUrl);
+
+  // Horizontal meal carousel — identical in both layouts; parent controls spacing.
+  const carousel = hasCards ? (
+    <div className="relative">
+      {/* desktop arrows */}
+      <button
+        type="button" aria-label="Scroll left" onClick={() => scrollBy(-1)}
+        className="hidden md:flex absolute -left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-white backdrop-blur transition"
+      >
+        <ChevronLeft size={18} />
+      </button>
+      <button
+        type="button" aria-label="Scroll right" onClick={() => scrollBy(1)}
+        className="hidden md:flex absolute -right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-white backdrop-blur transition"
+      >
+        <ChevronRight size={18} />
+      </button>
+
+      <div
+        ref={scrollerRef}
+        className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch]"
+      >
+        {loading
+          ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
+          : dishes.map((d) => <MealCard key={d.id} dish={d} campId={campId} />)}
+      </div>
+    </div>
+  ) : null;
+
+  const ctaLink = (
+    <Link
+      href={discoverHref}
+      className="group bg-orange-500 hover:bg-orange-400 text-white font-bold text-base px-8 py-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 glow-orange w-full sm:w-auto"
+    >
+      Explore restaurants
+      <ArrowRight className="group-hover:translate-x-1 transition-transform" size={18} />
+    </Link>
+  );
 
   return (
     <section className="relative py-20 md:py-24 px-4 border-t border-white/5 overflow-hidden">
@@ -156,9 +196,6 @@ export default function DiscoverShowcase() {
         transition={{ duration: 0.7 }}
         className="max-w-7xl mx-auto relative z-10"
       >
-        {/* Active campaign promo banner (renders only when one is configured) */}
-        {campaign?.bannerImageUrl && <CampaignBanner campaign={campaign} />}
-
         <div className="text-center max-w-2xl mx-auto">
           <span className="text-[11px] font-black uppercase tracking-widest text-orange-400">For Food Lovers</span>
           <h2 className="mt-3 text-3xl md:text-5xl font-black uppercase tracking-tighter text-white">
@@ -171,8 +208,9 @@ export default function DiscoverShowcase() {
             <MapPin size={13} /> {areaLine}
           </Link>
 
-          {/* Active promo note (lightweight; terms apply) */}
-          {campaign && (
+          {/* Lightweight promo note — only when a campaign is active but has no banner
+              (with a banner, the promo tile below carries the message). */}
+          {campaign && !hasBanner && (
             <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-orange-500/25 bg-orange-500/10 px-4 py-2">
               <span>🎁</span>
               <p className="text-xs font-bold text-orange-300">
@@ -183,44 +221,36 @@ export default function DiscoverShowcase() {
           )}
         </div>
 
-        {/* Carousel */}
-        {hasCards && (
-          <div className="relative mt-12">
-            {/* desktop arrows */}
-            <button
-              type="button" aria-label="Scroll left" onClick={() => scrollBy(-1)}
-              className="hidden md:flex absolute -left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-white backdrop-blur transition"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <button
-              type="button" aria-label="Scroll right" onClick={() => scrollBy(1)}
-              className="hidden md:flex absolute -right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-white backdrop-blur transition"
-            >
-              <ChevronRight size={18} />
-            </button>
+        {hasBanner && campaign ? (
+          // Integrated two-column composition: promo tile beside the meal carousel
+          // on desktop; stacked (banner above carousel) on mobile.
+          <div className="mt-12 grid gap-8 lg:gap-10 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] lg:items-center">
+            {/* Promo tile */}
+            <div>
+              <div className="mb-3 flex items-center justify-center lg:justify-start gap-2">
+                <span aria-hidden className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
+                <span className="text-[11px] font-black uppercase tracking-widest text-orange-400">Live promo</span>
+              </div>
+              <CampaignBanner campaign={campaign} />
+              <p className="mt-3 text-center lg:text-left text-xs text-white/50">
+                {campaign.name} — order {campaign.threshold}× to qualify{campaign.prize ? ` for ${campaign.prize}` : ""}.
+                <span className="text-white/35"> Terms apply.</span>
+              </p>
+            </div>
 
-            <div
-              ref={scrollerRef}
-              className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch]"
-            >
-              {loading
-                ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
-                : dishes.map((d) => <MealCard key={d.id} dish={d} campId={campId} />)}
+            {/* Meals to order now + CTA */}
+            <div className="min-w-0">
+              {carousel}
+              <div className={`flex justify-center lg:justify-start ${carousel ? "mt-8" : ""}`}>{ctaLink}</div>
             </div>
           </div>
+        ) : (
+          // Clean discovery showcase (no active banner) — original single-column flow.
+          <>
+            {carousel && <div className="mt-12">{carousel}</div>}
+            <div className="mt-12 flex justify-center">{ctaLink}</div>
+          </>
         )}
-
-        {/* Primary CTA → /discover */}
-        <div className="mt-12 flex justify-center">
-          <Link
-            href={discoverHref}
-            className="group bg-orange-500 hover:bg-orange-400 text-white font-bold text-base px-8 py-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 glow-orange w-full sm:w-auto"
-          >
-            Explore restaurants
-            <ArrowRight className="group-hover:translate-x-1 transition-transform" size={18} />
-          </Link>
-        </div>
       </motion.div>
     </section>
   );
