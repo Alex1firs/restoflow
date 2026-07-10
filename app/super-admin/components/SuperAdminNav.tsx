@@ -16,6 +16,7 @@ import {
   HelpCircle,
   Star,
   Gift,
+  ClipboardList,
   Menu as MenuIcon,
   X,
   LogOut,
@@ -47,6 +48,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Operations",
     items: [
+      { label: "Live Orders", href: "/super-admin/orders", Icon: ClipboardList },
       { label: "Onboarding", href: "/super-admin/onboarding", Icon: Wrench },
       { label: "Assistance",  href: "/super-admin/assistance",  Icon: HelpCircle },
       { label: "Campaigns",   href: "/super-admin/campaigns",   Icon: Gift },
