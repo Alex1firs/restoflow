@@ -2,7 +2,7 @@
 // Run: npx tsx lib/orders/__tests__/admin-view.test.ts
 
 import assert from "node:assert/strict";
-import { toOrderRow, orderMatchesFilters, itemsSummary, toMillis } from "../admin-view";
+import { toOrderRow, orderMatchesFilters, itemsSummary, toMillis, toOrderDetail, toLineItems, buildTimeline } from "../admin-view";
 import { toPublicCampaign } from "../../campaigns/logic";
 import type { Campaign } from "../../campaigns/types";
 
@@ -114,6 +114,47 @@ test("filters: phone uses EXACT normalized match (formats converge)", () => {
   assert.equal(orderMatchesFilters(row, { phone: "2348031234567" }), true);   // same number, 234 form
   assert.equal(orderMatchesFilters(row, { phone: "+234 803 123 4567" }), true); // spaced +234 form
   assert.equal(orderMatchesFilters(row, { phone: "08039999999" }), false);      // different number
+});
+
+// ── detail view (Slice 3) ──
+test("toLineItems: unit price + line total per item; resilient to missing price", () => {
+  const lines = toLineItems([{ name: "Prime Rib", price: 35.99, quantity: 2 }, { name: "Mystery", quantity: 3 }]);
+  assert.deepEqual(lines[0], { name: "Prime Rib", quantity: 2, unitPrice: 35.99, lineTotal: 71.98 });
+  assert.deepEqual(lines[1], { name: "Mystery", quantity: 3, unitPrice: null, lineTotal: null });
+  assert.deepEqual(toLineItems(undefined), []);
+});
+
+test("buildTimeline: ordered lifecycle events from present timestamps only", () => {
+  const tl = buildTimeline({ createdAt: ts(NOW), preparingAt: ts(NOW + 2000), completedAt: ts(NOW + 5000) });
+  assert.deepEqual(tl.map((e) => e.key), ["createdAt", "preparingAt", "completedAt"]);
+  assert.deepEqual(tl.map((e) => e.atMs), [NOW, NOW + 2000, NOW + 5000]);
+  assert.equal(buildTimeline({}).length, 0); // no timestamps → empty
+});
+
+test("toOrderDetail: full phone + totals + joined campaign + timeline", () => {
+  const detail = toOrderDetail(
+    "ORD_D",
+    { ...baseOrder, address: "12 Test St", note: "extra sauce", itemsTotal: 78.48, deliveryFee: 0, campaignId: "CAMP_1", preparingAt: ts(NOW + 1000) },
+    "Grills Capitol",
+    { id: "CAMP_1", name: "Win a Kettle", rule: { threshold: 2 } },
+  );
+  assert.equal(detail.phone, "08000000001");          // full phone (super-admin)
+  assert.equal(detail.restaurantName, "Grills Capitol");
+  assert.equal(detail.address, "12 Test St");
+  assert.equal(detail.note, "extra sauce");
+  assert.equal(detail.items.length, 2);
+  assert.equal(detail.itemsTotal, 78.48);
+  assert.equal(detail.deliveryFee, 0);
+  assert.equal(detail.total, 78.48);
+  assert.deepEqual(detail.campaign, { id: "CAMP_1", name: "Win a Kettle", threshold: 2 });
+  assert.deepEqual(detail.timeline.map((e) => e.key), ["createdAt", "preparingAt"]);
+  assert.equal(detail.orderId, "ORD_D");              // canonical key preserved
+});
+
+test("toOrderDetail: campaign null when not attributed", () => {
+  const detail = toOrderDetail("ORD_D", baseOrder, null, null);
+  assert.equal(detail.campaign, null);
+  assert.equal(detail.source, null);
 });
 
 // ── PII guard: nothing here leaks into the public campaign projection ──

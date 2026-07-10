@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Search, RotateCcw, Loader2, AlertTriangle, Gift } from "lucide-react";
 import type { SuperAdminOrderRow } from "@/lib/orders/admin-view";
 import { buildOrdersQuery, dayRangeMs, filterRowsByOrderId, formatAmount, formatWhen, type OrdersUiFilters } from "./orders-ui-lib";
@@ -209,13 +210,12 @@ export default function OrdersClient({ restaurants }: { restaurants: Restaurant[
                           : <span className="text-gray-300">—</span>}
                       </td>
                       <td className="px-3 py-3">
-                        <button
-                          disabled
-                          title="Detail view coming soon"
-                          className="text-xs font-bold text-gray-300 cursor-not-allowed px-2 py-1 rounded-lg"
+                        <Link
+                          href={`/super-admin/orders/${o.orderId}`}
+                          className="text-xs font-bold text-orange-600 hover:bg-orange-50 px-2 py-1 rounded-lg"
                         >
                           View
-                        </button>
+                        </Link>
                       </td>
                     </tr>
                   ))}

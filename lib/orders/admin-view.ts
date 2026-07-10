@@ -99,6 +99,91 @@ export function toOrderRow(orderId: string, data: RawOrder, restaurantName: stri
   };
 }
 
+// ── Detail view (Slice 3) ─────────────────────────────────────────────────
+
+export type OrderLineItem = { name: string; quantity: number; unitPrice: number | null; lineTotal: number | null };
+export type TimelineEvent = { key: string; label: string; atMs: number };
+
+/** Full super-admin order detail: the row + line items, totals, fulfilment, a
+ *  joined campaign summary, and a derived timeline. `phone` is the full number. */
+export type SuperAdminOrderDetail = SuperAdminOrderRow & {
+  address: string;
+  note: string;
+  deliveryType: string;
+  serviceMode: string | null;
+  tableLabel: string | null;
+  deliveryZoneName: string | null;
+  orderType: string | null;
+  scheduledFor: string | null;
+  paymentReference: string | null;
+  items: OrderLineItem[];
+  itemsTotal: number | null;
+  deliveryFee: number | null;
+  campaign: { id: string; name: string; threshold: number } | null;
+  timeline: TimelineEvent[];
+};
+
+function str(v: unknown): string { return typeof v === "string" ? v : ""; }
+function strOrNull(v: unknown): string | null { const s = typeof v === "string" ? v.trim() : ""; return s ? s : null; }
+function numOrNull(v: unknown): number | null { return typeof v === "number" && Number.isFinite(v) ? v : null; }
+
+/** Map order items into per-line rows with unit price and line total. */
+export function toLineItems(items: unknown): OrderLineItem[] {
+  if (!Array.isArray(items)) return [];
+  return items.map((it) => {
+    const i = (it ?? {}) as { name?: unknown; quantity?: unknown; price?: unknown };
+    const quantity = typeof i.quantity === "number" && Number.isFinite(i.quantity) ? i.quantity : 1;
+    const unitPrice = typeof i.price === "number" && Number.isFinite(i.price) ? i.price : null;
+    const name = typeof i.name === "string" && i.name.trim() ? i.name.trim() : "item";
+    return { name, quantity, unitPrice, lineTotal: unitPrice != null ? unitPrice * quantity : null };
+  });
+}
+
+/** Derive an ordered lifecycle timeline from whatever status timestamps exist. */
+export function buildTimeline(data: RawOrder): TimelineEvent[] {
+  const defs: Array<[string, string]> = [
+    ["createdAt", "Order placed"],
+    ["preparingAt", "Marked preparing"],
+    ["readyAt", "Marked ready"],
+    ["completedAt", "Completed"],
+    ["rejectedAt", "Rejected"],
+  ];
+  const out: TimelineEvent[] = [];
+  for (const [key, label] of defs) {
+    const ms = toMillis(data[key]);
+    if (ms != null) out.push({ key, label, atMs: ms });
+  }
+  out.sort((a, b) => a.atMs - b.atMs);
+  return out;
+}
+
+/** Map a raw order doc → full super-admin detail DTO (optionally with a joined campaign). */
+export function toOrderDetail(
+  orderId: string,
+  data: RawOrder,
+  restaurantName: string | null = null,
+  campaign: { id: string; name: string; rule: { threshold: number } } | null = null,
+): SuperAdminOrderDetail {
+  const row = toOrderRow(orderId, data, restaurantName);
+  return {
+    ...row,
+    address: str(data.address),
+    note: str(data.note),
+    deliveryType: str(data.deliveryType),
+    serviceMode: strOrNull(data.serviceMode),
+    tableLabel: strOrNull(data.tableLabel),
+    deliveryZoneName: strOrNull(data.deliveryZoneName),
+    orderType: strOrNull(data.orderType),
+    scheduledFor: strOrNull(data.scheduledFor),
+    paymentReference: strOrNull(data.paymentReference),
+    items: toLineItems(data.items),
+    itemsTotal: numOrNull(data.itemsTotal),
+    deliveryFee: numOrNull(data.deliveryFee),
+    campaign: campaign ? { id: campaign.id, name: campaign.name, threshold: campaign.rule.threshold } : null,
+    timeline: buildTimeline(data),
+  };
+}
+
 /** True when a row passes all provided filters. Phone uses exact normalized match. */
 export function orderMatchesFilters(row: SuperAdminOrderRow, f: OrderFilters): boolean {
   if (f.restaurantId && row.restaurantId !== f.restaurantId) return false;
