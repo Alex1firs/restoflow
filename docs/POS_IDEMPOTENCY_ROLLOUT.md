@@ -273,3 +273,227 @@ Manual two-tab check: open `multi-tab.html` in two tabs and use the buttons —
 `set-cart` → `mount` in both (ids must differ), reload both (ids must persist),
 `handoff` in one (the other's id must not change), then `release` →
 `new-session` → `mount` (the id must come back as `adopted`).
+
+---
+
+# Part 2 — POS reliability (Fix 3, Fix 5, Fix 4)
+
+## 9. Fix 3 — bounded submission
+
+`POS_SUBMIT_TIMEOUT_MS = 20_000`, `POS_SYNC_TIMEOUT_MS = 30_000` (`lib/pos/submit.ts`).
+
+**Why 20s.** Sized for real Nigerian networks, not a lab. Tills run on mobile
+broadband and tethered 3G/4G where a slow-but-working request takes many seconds,
+and the server side of one order is itself several round trips (Firebase session
+verification → subscription read → menu query → transaction). A short timeout
+would abort requests that were about to succeed, and every false timeout pushes an
+order into the queue and delays the kitchen ticket. 20s is roughly 4–6× a healthy
+submission and still short enough that a cashier never sits guessing. The sync
+timeout is longer because no cashier is waiting on it.
+
+**Lifecycle.** Every submission reaches exactly one state:
+
+The governing question is never "did the request fail?" but **"do we KNOW whether
+the server committed?"**
+
+| Classification | Preserved? | Queue state | Why |
+|---|---|---|---|
+| `timeout` | yes | `pending` | outcome UNKNOWN — the order may already exist |
+| `network` | yes | `pending` | connection died mid-flight, outcome unknown |
+| `offline` | yes | `pending` | never reached the server |
+| `server-retryable` (408/425/429/500/502/503/504) | yes | `pending` | **may have committed** — see §9a |
+| `auth-required` (401/403) | yes | `auth_required` | preserved but PAUSED — see §9b |
+| `server-permanent` (501/505) | yes | `attention` | preserved, but repetition cannot fix it |
+| `teardown` | **no** | — | unmount/navigation; cart + key are still persisted, so the cashier resubmits under the same key and the server replays |
+| `validation` (4xx) | **no** | — | payload rejected before any write |
+| `conflict` (409) | **no** | — | this key already belongs to a different order |
+
+### 9a. Why a 5xx is uncertain, not a failure
+
+An earlier revision of this work classified 5xx as "definitely not committed".
+**That was wrong.** `app/api/admin/pos/route.ts` wraps the whole handler in a catch
+that returns 500, and there is real work *after* the Firestore transaction commits:
+
+- the replay branch re-reads the order document (`orders.doc(id).get()`), a network
+  call that can throw once the order already exists
+- response serialisation runs inside the same try
+- a proxy or serverless layer can return 502/504 after the function returned
+
+So a 500 cannot be read as "no order was created". Retryable 5xx responses are
+therefore preserved under the **same** `localOrderId` and retried, and the cashier
+is told *"We could not confirm the server response. Your order has been preserved
+and can be retried safely."* — never "order not created".
+
+### 9b. 401 / 403 handling
+
+A 401 is **not** an ordinary network failure. Retrying it on every reconnect is an
+authentication loop that can never succeed.
+
+- The order, its `localOrderId`, cart, `customPrice`, item notes, order note,
+  pricing mode, modifiers, service mode and table are all preserved untouched.
+- The record is parked as `auth_required`, with **no** `nextRetryAt` — it waits for
+  a sign-in, not a timer, and is skipped by every automatic sync run.
+- Cashier message: *"Your session has expired. This order is safely preserved.
+  Please sign in again to complete synchronisation."* It deliberately does **not**
+  claim the order reached the restaurant server.
+- `resumeAuthRequiredRecords()` un-parks records **only after a request has
+  actually succeeded**, which is proof the session works. Resumed records reuse the
+  original key, so the server replays if it had already accepted the order.
+- Parked records remain in the cashier-visible attention count.
+
+A timeout **never** mints a new key. The queued copy carries the same
+`localOrderId`, so synchronisation returns the canonical existing order.
+
+**Ordered hand-off.** `await dbPut` → `finishActiveDraft()` → clear cart. If the
+IndexedDB write throws, none of that runs: the cart and the transaction identity
+are both preserved and the cashier sees *"Could not save this order on the device.
+The cart has been kept — please try again."* It never claims the order was saved.
+
+**Double-submit.** A synchronous `submitInFlightRef` blocks re-entry within the
+same tick, which React state alone cannot. The server remains the real barrier.
+
+## 9c. Retry backoff
+
+Bounded exponential backoff with ±20% jitter (`RETRY_SCHEDULE_MS`), on
+`nextRetryAt` / `lastAttemptAt` / `lastErrorCode` / `lastErrorCategory`:
+
+| Failure | Delay before next attempt |
+|---|---|
+| 1st | ~12s |
+| 2nd | ~30s |
+| 3rd | ~60s |
+| 4th | ~2.5 min |
+| 5th and beyond | ~5 min (cap) |
+
+Quick enough that a brief drop-out resolves while the customer is still at the
+counter; slow enough that a weak link is not hammered. Jitter stops many terminals
+reconnecting in lockstep. Delays are clamped, so they can never be negative or
+exceed the cap.
+
+- A reconnect retries only when `nextRetryAt` has arrived.
+- **Never applied** to `synced` records, live leases, 409 conflicts,
+  `auth_required` records, or anything parked as non-retryable.
+- A **recovered stranded** record is due immediately — it was interrupted, not
+  rejected, so it does not inherit a backoff window it never earned.
+- After `MAX_AUTO_ATTEMPTS` (8) the record is parked as `attention`. It is
+  **never deleted** and stays visible.
+- Success clears the schedule and the diagnostics.
+- **Manual "Sync now"** clears the wait for waiting records, but still goes
+  through the atomic claim — so it cannot steal an in-flight attempt, two tabs
+  cannot both retry the same record, and no second queue record is created. It
+  deliberately skips parked records.
+
+## 9d. 409 conflicts — operational state
+
+- Parked as `attention`; **never** retried automatically.
+- Full order contents and identity preserved; nothing deleted.
+- Counted in the cashier-visible "N orders need attention" indicator.
+- Cashier-safe wording only: *"Could not be matched to an existing order — needs
+  review"*. No fingerprints, claim ids, or internal identifiers are exposed.
+- Safe actions are to check Open Bills or ask a manager to review. There is
+  deliberately **no** button that re-submits the same cart under a new identity.
+
+## 10. Fix 5 — stranded-record recovery
+
+Lease fields on each queue record: `syncOwnerId`, `syncAttemptId`, `syncStartedAt`,
+`leaseExpiresAt`, `attemptCount`, `lastErrorAt`, plus `syncedOrderId` /
+`syncedOrderNumber` on success.
+
+- A record is `syncing` **only** via an atomic claim, and only if not already held.
+- Startup and every sync run first recover records whose lease has lapsed, and
+  records left `syncing` by an older app version with **no lease metadata at all**
+  (treated as having no credible owner).
+- Recovery is idempotent, never deletes anything, and never re-mints an identity.
+  `localOrderId`, items, `customPrice` and notes are all preserved.
+- Stranded records are now counted in the cashier-visible pending badge and appear
+  in Open Bills. Their absence from those filters is what made a lost order
+  invisible.
+- On recovery the cashier sees *"N unsynced orders were recovered and will sync
+  automatically"* — no internals.
+
+## 11. Fix 4 — cross-tab ownership
+
+`dbUpdateAtomic` (`lib/offline-db.ts`) performs read-modify-write inside **one**
+IndexedDB transaction. IndexedDB serialises transactions per origin, so no other
+tab can interleave — this is the authoritative claim.
+
+**Web Locks is deliberately unused.** It is not available in every context this POS
+runs in, and a lock some context silently lacks is not a lock. BroadcastChannel
+(`lib/pos/sync-channel.ts`) is advisory only: it lets a non-syncing tab refresh its
+counts, and is guarded so a missing API degrades to a no-op. The receiver **only**
+refreshes counts — never prints a ticket, opens a receipt, clears a cart or ends a
+draft, so a second tab cannot duplicate completion effects.
+
+`LEASE_DURATION_MS = 120_000`: comfortably longer than the 30s sync timeout and
+longer than background-tab timer throttling (~1/min), so a live-but-backgrounded
+till is never robbed of its record.
+
+**Timeout / lease relationship (verified in `sync-lease.test.ts` [T1]):** the 30s
+sync request cannot outlive the 120s lease — a 4x margin. A request that returns
+before expiry releases the lease immediately rather than holding it for the rest of
+the window. A dead tab's lease is still respected past the request timeout (so a
+slow-but-alive request is never stolen) and becomes reclaimable once it lapses.
+Backoff is scheduled from `lastAttemptAt`, i.e. from the completed attempt, so
+attempts can never overlap. A manual retry refuses to touch a live lease.
+
+## 12. The remaining hard-crash gap
+
+**Sequence.** Cashier submits → server commits → acknowledgement lost → the
+renderer or device dies *without* firing `pagehide`/`beforeunload` (an "Aw, Snap!"
+crash, a kernel panic, or power loss) → the browser is reopened and the cart
+restored **within 90 seconds** → the cashier resubmits. The orphaned draft still
+looks live, so a new identity is minted and a second order can be created.
+
+**Probability.** Low. It needs a hard crash (clean closes, browser quit and OS
+shutdown all fire `pagehide`, which releases the draft for immediate recovery),
+*and* a reopen-and-resubmit inside 90s, *and* the first request to have actually
+committed. Reopening a browser and re-keying an order typically takes longer than
+the window on its own.
+
+**Why it was not eliminated.** Evaluated and rejected:
+- *Shorten the staleness window.* Would let a second tab adopt a live
+  background-throttled till's draft — two cashiers sharing one identity, with the
+  second genuine order refused as a conflicting replay. Strictly worse.
+- *Persist a "submission in flight" marker and adopt it immediately.* The draft
+  cart lives in shared localStorage, so two tabs can hold the same cart; immediate
+  adoption without a liveness check reintroduces exactly the cross-tab sharing the
+  requirement forbids.
+- *Cart-fingerprint matching.* Resolves *which* orphan to adopt, but still cannot
+  bypass the liveness check, so it does not close this window.
+
+**Mitigation in place.** `pagehide` **and** `beforeunload` both release, so only a
+true crash reaches the staleness path. If a duplicate does occur it is immediately
+visible: both orders appear in Open Bills / the dashboard with sequential order
+numbers, rather than being silent.
+
+**Cashier recovery procedure.** After any crash-and-reopen, check Open Bills
+before re-ringing. If two identical orders appear, void the later one (the higher
+order number) using the existing void flow — do not delete anything by hand.
+
+## 13. Playwright
+
+Added as a **devDependency** (`@playwright/test`), with `playwright.config.ts`
+scoped to `lib/pos/__tests__/browser`.
+
+- **Why:** the multi-tab guarantees (separate identities per tab, per-record
+  claims, restart recovery) can only be proven in a real browser with real
+  IndexedDB and real sessionStorage semantics. Without an automated test they can
+  regress silently.
+- **Production impact: none.** It is dev-only and no application code imports it,
+  so it cannot enter the client bundle. `next build` never sees the specs —
+  `testDir` is scoped and `tsconfig.json` excludes that folder.
+- **Vercel:** installs devDependencies at build time, but browsers download only
+  on an explicit `playwright install`, which Vercel never runs. No change to
+  deploy size or time. Do not add `playwright install` to the Vercel build.
+- **CI:** run `npx playwright install --with-deps chromium` in a dedicated job,
+  then `npm run test:pos:browser:build && npm run test:pos:browser`. Playwright's
+  `webServer` starts and stops the static harness itself.
+
+## 14. Test commands (all)
+
+```bash
+npm run test:pos                                    # 79 unit checks, 6 suites
+npm run test:pos:emulator                           # real Firestore + real route handlers (JDK 21)
+npm run test:pos:browser:build && npm run test:pos:browser   # 7 real-browser multi-tab checks
+npx tsc --noEmit && npm run build
+```

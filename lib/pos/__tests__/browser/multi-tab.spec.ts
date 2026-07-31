@@ -9,18 +9,13 @@
  *   5. a restored draft after a browser-session restart reuses the ORIGINAL id
  *   6. the key is never kept in a browser-wide localStorage singleton
  *
- * NOT WIRED INTO CI — Playwright is not a dependency of this repo. To run:
+ * Run with:
  *
- *   npm i -D @playwright/test
- *   npx playwright install chromium
- *   npx esbuild lib/pos/draft.ts --bundle --format=iife --global-name=PosDraft \
- *     --outfile=lib/pos/__tests__/browser/draft.bundle.js
- *   npx http-server lib/pos/__tests__/browser -p 8098 &
- *   npx playwright test lib/pos/__tests__/browser/multi-tab.spec.ts
+ *   npm run test:pos:browser:build && npm run test:pos:browser
  *
- * Override the URL with POS_HARNESS_URL if the browser cannot reach loopback
- * (see docs/POS_IDEMPOTENCY_ROLLOUT.md — that was the case in one sandbox, where
- * the machine's LAN address worked instead).
+ * Playwright's webServer starts and stops the static harness server itself.
+ * Override with POS_HARNESS_URL if a browser cannot reach loopback (that was the
+ * case in one sandbox, where the machine's LAN address worked instead).
  *
  * The harness page drives the REAL lib/pos/draft.ts bundle, so this exercises
  * production identity logic. The Node-level equivalents, including the crash and
@@ -29,7 +24,8 @@
 
 import { expect, test, type Page } from "@playwright/test";
 
-const HARNESS = process.env.POS_HARNESS_URL ?? "http://127.0.0.1:8098/multi-tab.html";
+// Relative to the baseURL in playwright.config.ts, which also starts the server.
+const HARNESS = process.env.POS_HARNESS_URL ?? "/multi-tab.html";
 
 interface HarnessState {
   kind: string | null;

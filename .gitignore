@@ -49,3 +49,9 @@ next-env.d.ts
 # generated POS browser-harness bundle (rebuild with the esbuild command in
 # lib/pos/__tests__/browser/multi-tab.spec.ts)
 /lib/pos/__tests__/browser/draft.bundle.js
+
+# playwright (dev-only browser tests)
+/test-results/
+/playwright-report/
+/blob-report/
+/lib/pos/__tests__/browser/queue.bundle.js

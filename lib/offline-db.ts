@@ -220,6 +220,62 @@ export async function dbPut<T>(storeName: string, item: T): Promise<void> {
   });
 }
 
+/**
+ * Atomic read-modify-write on a single record, inside ONE IndexedDB transaction.
+ *
+ * This is the authoritative cross-tab claim primitive. IndexedDB serialises
+ * transactions per origin, so no other tab can interleave between the `get` and
+ * the `put` here — unlike `dbGetAll` followed by `dbPut`, which is two separate
+ * transactions and is exactly the time-of-check/time-of-use gap that let two tabs
+ * synchronise the same queued order.
+ *
+ * `updater` receives the current record (or undefined) and returns the record to
+ * write, or `null` to leave it untouched. Resolves with what was written, or null
+ * if the updater declined — so a caller can tell "I claimed it" from "someone
+ * else holds it" without a second read.
+ *
+ * Chosen over the Web Locks API as the source of truth because Web Locks is not
+ * available in every context this POS runs in, and a lock that is silently absent
+ * is not a lock. Web Locks and BroadcastChannel are used only as advisory signals
+ * on top of this.
+ */
+export async function dbUpdateAtomic<T>(
+  storeName: string,
+  key: string,
+  updater: (current: T | undefined) => T | null
+): Promise<T | null> {
+  const db = await openOfflineDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, "readwrite");
+    const store = tx.objectStore(storeName);
+    const getReq = store.get(key);
+
+    getReq.onerror = () => reject(getReq.error);
+    getReq.onsuccess = () => {
+      let next: T | null;
+      try {
+        next = updater(getReq.result as T | undefined);
+      } catch (err) {
+        try { tx.abort(); } catch { /* already finishing */ }
+        reject(err);
+        return;
+      }
+
+      if (next === null) {
+        // Nothing to write. Let the transaction close on its own.
+        resolve(null);
+        return;
+      }
+
+      const putReq = store.put(next);
+      putReq.onerror = () => reject(putReq.error);
+      putReq.onsuccess = () => resolve(next);
+    };
+
+    tx.onabort = () => reject(tx.error ?? new Error("IndexedDB transaction aborted"));
+  });
+}
+
 // Generic get all helper
 export async function dbGetAll<T>(storeName: string): Promise<T[]> {
   const db = await openOfflineDB();
