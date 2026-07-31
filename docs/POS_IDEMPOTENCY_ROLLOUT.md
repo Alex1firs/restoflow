@@ -497,3 +497,165 @@ npm run test:pos:emulator                           # real Firestore + real rout
 npm run test:pos:browser:build && npm run test:pos:browser   # 7 real-browser multi-tab checks
 npx tsc --noEmit && npm run build
 ```
+
+---
+
+# Part 3 — Release runbook
+
+Branch `fix/pos-order-idempotency`, three reviewed commits:
+
+| SHA | Scope |
+|---|---|
+| `481c723` | Fix 1 + Fix 2 — durable `localOrderId`, atomic server idempotency |
+| `bb334b4` | Fix 3 — bounded submissions, 401/5xx preservation |
+| `f88500b` | Fix 5 + Fix 4 — stranded-record recovery, cross-tab leases, backoff |
+
+Pushed to `origin/fix/pos-order-idempotency`. `main` remains at `8614fd0`.
+
+## 15. BLOCKER: no isolated Preview environment
+
+A Vercel Preview for this branch **inherits Production environment variables unless
+they are overridden at Preview scope**, and `DEPLOYMENT.md` describes Preview
+configuration as optional. There is no `.firebaserc`, no staging-prefixed
+variables, and only one Firebase credential set in the repo. So a Preview build
+would point at the **live Firestore that restaurants are using**, and a smoke test
+against it would write real orders.
+
+Do not proceed to the Preview smoke test until §16 is complete. Never substitute
+production credentials into Preview.
+
+## 16. Creating an isolated staging environment
+
+### 16a. Create the Firebase project
+1. Firebase console → add a project, e.g. `restoflow-staging`.
+2. Enable **Firestore** (same region as production) and **Authentication →
+   Email/Password**.
+3. Project settings → Service accounts → **Generate new private key**.
+4. Project settings → General → Web app → copy the client config.
+
+### 16b. Override the project-scoped variables at PREVIEW scope only
+
+These nine decide which database the app talks to. Every one must be the staging
+value in Preview:
+
+```
+FIREBASE_ADMIN_PROJECT_ID
+FIREBASE_ADMIN_CLIENT_EMAIL
+FIREBASE_ADMIN_PRIVATE_KEY
+NEXT_PUBLIC_FIREBASE_PROJECT_ID
+NEXT_PUBLIC_FIREBASE_API_KEY
+NEXT_PUBLIC_FIREBASE_APP_ID
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+```
+
+`FIREBASE_ADMIN_*` is the critical set: that is the credential that writes orders.
+
+```bash
+vercel link                      # once, to the real production project
+vercel env add FIREBASE_ADMIN_PROJECT_ID preview
+# ...repeat for each of the nine
+vercel env ls preview            # verify NONE still resolve to the production project
+```
+
+Also override at Preview scope, so a Preview cannot reach real customers or money:
+
+```
+PAYSTACK_SECRET_KEY      (test key)
+TERMII_API_KEY           (test/blank)
+TELEGRAM_BOT_TOKEN       (test/blank)
+WEBHOOK_URL_REST / _DISPATCHER / _KEKEV   (blank or a sink)
+NEXT_PUBLIC_APP_URL      (the preview URL)
+```
+
+The POS create and sync routes trigger **no** external integrations — verified,
+they import only auth, db and the subscription guard — so a POS-only smoke test
+cannot send a WhatsApp message or call Paystack. The overrides above matter because
+other areas of the app (storefront checkout, payments) do.
+
+### 16c. Point Firestore rules and data at staging
+```bash
+firebase deploy --only firestore:rules --project restoflow-staging
+FIREBASE_ADMIN_PROJECT_ID=restoflow-staging ... npx tsx scripts/seed-tricias-kitchen.ts
+FIREBASE_ADMIN_PROJECT_ID=restoflow-staging ... npx tsx scripts/create-admin.ts
+```
+
+Then hand-create the synthetic fixtures the smoke test needs:
+- one **unsettled** counter bill with **no** `localOrderId` (a pre-fix order)
+- one **paid/completed** order with no `localOrderId`
+- one order carrying a `localOrderId` but **no** claim document (written by the old
+  sync route)
+
+These are the three shapes that must keep working; they mirror the fixtures in
+`lib/pos/__tests__/live-compat.test.ts`.
+
+### 16d. Confirm the Preview
+`vercel ls` / the dashboard → the Preview for `fix/pos-order-idempotency` must be
+**Ready** and its commit must be `f88500b`.
+
+## 17. Preview smoke test
+
+| # | Check | Already automated by |
+|---|---|---|
+| 1 | Old unsettled order opens, prints, settles | `live-compat` [1] — **manual UI check still required** |
+| 2 | Normal online order creates exactly one | `routes` [R1] |
+| 3 | Offline order syncs into exactly one | `routes` [R4], `emulator` [E9] |
+| 4 | Lost response then sync → one canonical order | `routes` [R4], `submit` [8][13] |
+| 5 | customPrice / notes / modifiers / table / mode survive | `routes` [R6], `sync-lease` [L6] |
+| 6 | Two tabs never sync the same record | `queue-lease.spec` (real browser) |
+| 7 | Stranded record becomes visible and retries | `queue-lease.spec`, `sync-lease` [L5] |
+| 8 | Order IDs and numbers unchanged | `live-compat` [1][2], `idempotency` [12] |
+| 9 | No new logout / login / session-expiry behaviour | no auth file touched — **manual confirm** |
+| 10 | Leave POS open, return, continue as before | **manual confirm** |
+
+Items 1, 9 and 10 need a human at the Preview UI; the rest are covered by suites
+that already pass. Use an obviously identifiable test order (e.g. customer name
+"ZZ TEST").
+
+## 18. Merge and production deploy
+
+Only after §17 passes.
+
+```bash
+git checkout main
+git pull --ff-only origin main
+git merge --no-ff fix/pos-order-idempotency     # keeps all three commits
+npm run test:pos && npx tsc --noEmit && npm run build
+git push origin main
+```
+
+Stop on any non-trivial conflict rather than guessing. Watch the Vercel production
+deployment to **Ready**, then record the deployment ID and deployed SHA.
+
+**Leave `POS_REQUIRE_IDEMPOTENCY_KEY` unset.** Cached clients keep working; do not
+force-refresh a terminal with an active cart.
+
+## 19. Firestore rules (production) — after the deploy is healthy
+
+Verified again at release time: the diff is **+10 lines**, one new
+`pos_order_claims` deny-all block, and the `orders` block is **byte-identical** to
+`main`.
+
+```bash
+firebase deploy --only firestore:rules --project <PRODUCTION_FIREBASE_PROJECT_ID>
+```
+
+Never a bare `firebase deploy`. No hosting, indexes, storage rules or functions —
+`firebase.json` declares only `firestore.rules`, and `firestore.indexes` is
+deliberately absent so existing indexes cannot be overwritten.
+
+## 20. Live verification and rollback
+
+Quiet period, one terminal, never interrupting a live customer order: existing
+unsettled bills open; IDs and numbers unchanged; a new order succeeds; a controlled
+offline test syncs once; no duplicate; nothing deleted or rewritten; no new logout
+or repeated login; normal use through the day.
+
+Monitor: duplicate reports, replay responses, `orderCounter` increments, records
+waiting to sync, records needing attention, `POS INTEGRITY:` errors, 409s, repeated
+server failures, `POS legacy client` warnings.
+
+Rollback = promote the previous healthy Vercel deployment, or revert the merge
+commit. **Never** delete new orders, `pos_order_claims`, or restaurant IndexedDB
+records, and never rewrite existing orders — preserve everything for reconciliation.
