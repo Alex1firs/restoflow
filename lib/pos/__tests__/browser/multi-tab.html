@@ -1,0 +1,101 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>POS draft identity — multi-tab harness</title>
+<style>
+  body { font: 13px ui-monospace, monospace; padding: 20px; max-width: 860px; }
+  h1 { font-size: 15px; }
+  #state { background: #f4f4f5; padding: 12px; overflow-x: auto; white-space: pre-wrap; }
+  button { font: inherit; padding: 5px 9px; margin: 2px 4px 2px 0; }
+</style>
+<h1>POS draft identity — multi-tab harness</h1>
+<p>
+  Drives the real <code>lib/pos/draft.ts</code>. Durable records live in
+  <code>localStorage["rf_pos_drafts"]</code>; per-tab ownership in
+  <code>sessionStorage["rf_pos_draft_id"]</code>.
+</p>
+<div>
+  <button id="set-cart">put cart in localStorage</button>
+  <button id="clear-cart">clear cart</button>
+  <button id="mount">mount() / re-resolve</button>
+  <button id="heartbeat">heartbeat</button>
+  <button id="release">release (pagehide)</button>
+  <button id="new-session">new browser session (clear sessionStorage)</button>
+  <button id="handoff">offline hand-off (queue + finish)</button>
+  <button id="finish">finish transaction</button>
+</div>
+<pre id="state">…</pre>
+<script src="./draft.bundle.js"></script>
+<script>
+  const CART_KEY = "rf_pos_draft_cart";
+  const D = PosDraft;
+  let last = null;
+
+  const storages = () => D.posDraftStorages();
+  const hasCart = () => {
+    try { return (JSON.parse(localStorage.getItem(CART_KEY) || "[]") || []).length > 0; }
+    catch { return false; }
+  };
+
+  function mount() {
+    const { local, session } = storages();
+    last = D.resolveDraft({ local, session, now: Date.now(), hasPersistedCart: hasCart() });
+    return last;
+  }
+
+  function render() {
+    const { local, session } = storages();
+    const drafts = D.readDrafts(local);
+    const state = {
+      kind: last ? last.kind : null,
+      localOrderId: last && last.draft ? last.draft.localOrderId : null,
+      draftId: last && last.draft ? last.draft.draftId : null,
+      candidates: last && last.candidates ? last.candidates.map((c) => c.localOrderId) : undefined,
+      ownedDraftId: session.getItem(D.OWNED_DRAFT_KEY),
+      hasCart: hasCart(),
+      durableDraftCount: Object.keys(drafts).length,
+      durableKeys: Object.values(drafts).map((d) => d.localOrderId),
+      // Stand-in for the IndexedDB queue: what an offline hand-off wrote.
+      queuedKeys: JSON.parse(localStorage.getItem("harness_queue") || "[]"),
+    };
+    document.getElementById("state").textContent = JSON.stringify(state, null, 2);
+  }
+
+  const on = (id, fn) => (document.getElementById(id).onclick = () => { fn(); render(); });
+
+  on("set-cart", () => localStorage.setItem(CART_KEY, JSON.stringify([{ id: "m-1", quantity: 2 }])));
+  on("clear-cart", () => localStorage.setItem(CART_KEY, "[]"));
+  on("mount", mount);
+  on("heartbeat", () => {
+    if (last && last.draft) D.touchDraft(storages().local, last.draft.draftId, Date.now());
+  });
+  on("release", () => {
+    if (last && last.draft) D.releaseDraft(storages().local, last.draft.draftId, Date.now());
+  });
+  on("new-session", () => {
+    // Exactly what closing and reopening the browser does to a tab: sessionStorage
+    // is gone, localStorage survives.
+    sessionStorage.removeItem(D.OWNED_DRAFT_KEY);
+    last = null;
+  });
+  on("handoff", () => {
+    // The offline fallback: the queue record takes its own copy of the key, then
+    // the draft is retired so the next order starts fresh.
+    if (!last || !last.draft) return;
+    const queue = JSON.parse(localStorage.getItem("harness_queue") || "[]");
+    queue.push(last.draft.localOrderId);
+    localStorage.setItem("harness_queue", JSON.stringify(queue));
+    const { local, session } = storages();
+    D.endDraft(local, session, last.draft.draftId);
+    localStorage.setItem(CART_KEY, "[]");
+    last = null;
+  });
+  on("finish", () => {
+    if (!last || !last.draft) return;
+    const { local, session } = storages();
+    D.endDraft(local, session, last.draft.draftId);
+    last = null;
+  });
+
+  mount();
+  render();
+</script>

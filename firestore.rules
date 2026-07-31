@@ -185,5 +185,15 @@ service cloud.firestore {
       allow read:  if false;
       allow write: if false;
     }
+
+    // ─── POS order idempotency claims ────────────────────────────────────────────
+    // One document per (restaurant, localOrderId) cashier transaction, written
+    // ONLY by the server (Admin SDK, which bypasses these rules) inside the same
+    // transaction that creates the order. This is what makes a duplicate POS
+    // submission impossible. Never read or written directly by any client.
+    match /pos_order_claims/{claimId} {
+      allow read:  if false;
+      allow write: if false;
+    }
   }
 }

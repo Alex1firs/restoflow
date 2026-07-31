@@ -1,0 +1,12 @@
+{
+  "extends": "../../../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "../../../..",
+    "paths": {
+      "server-only": ["./lib/pos/__tests__/route-harness/server-only.ts"],
+      "@/lib/auth-server": ["./lib/pos/__tests__/route-harness/auth-server.ts"],
+      "@/lib/subscription-guard": ["./lib/pos/__tests__/route-harness/subscription-guard.ts"],
+      "@/*": ["./*"]
+    }
+  }
+}

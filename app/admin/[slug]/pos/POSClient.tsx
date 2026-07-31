@@ -29,6 +29,17 @@ import {
   OfflineMenuItem,
   OfflineOrder
 } from "@/lib/offline-db";
+import { normalizeQueuedOrderKey, classifyOfflineHandoff } from "@/lib/pos/idempotency";
+import { newPosTxnId } from "@/lib/pos/txn-id";
+import {
+  HEARTBEAT_MS,
+  endDraft,
+  posDraftStorages,
+  releaseDraft,
+  resolveDraft,
+  touchDraft,
+  type PosDraft,
+} from "@/lib/pos/draft";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -862,6 +873,10 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   // Ref-based guard for triggerBackgroundSync so the function stays stable
   // and doesn't force the mount useEffect to re-run on every sync cycle.
   const syncingOfflineRef = useRef(false);
+  // This tab's durable draft record; holds the transaction's localOrderId.
+  const draftRef = useRef<PosDraft | null>(null);
+  // Set when several recoverable drafts exist and we refuse to guess between them.
+  const [draftBlocked, setDraftBlocked] = useState(false);
 
   useEffect(() => {
     mutedRef.current = alertMuted;
@@ -870,6 +885,24 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   useEffect(() => {
     syncingOfflineRef.current = syncingOffline;
   }, [syncingOffline]);
+
+  // The active transaction's idempotency key. Stable across reload, browser
+  // restart and every retry until the transaction ends.
+  const activeLocalOrderId = useCallback((): string | null => {
+    return draftRef.current?.localOrderId ?? null;
+  }, []);
+
+  // Ends THIS tab's transaction once it is genuinely finished — committed on the
+  // server, safely written to the offline queue, or abandoned. Removes only this
+  // draft, so another tab's in-progress order is untouched. The next order lazily
+  // resolves a brand new draft.
+  const finishActiveDraft = useCallback(() => {
+    const id = draftRef.current?.draftId;
+    if (!id) return;
+    const { local, session } = posDraftStorages();
+    endDraft(local, session, id);
+    draftRef.current = null;
+  }, []);
 
   // Convert an IDB offline order into a TodayOrder-shaped object for Open Bills
   const loadOfflineQueueBills = useCallback(async () => {
@@ -957,7 +990,20 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
         return;
       }
 
-      for (const order of pendingOrders) {
+      for (const queued of pendingOrders) {
+        // Backward compatibility for records written before this fix. The store's
+        // keyPath is localOrderId so this should not occur, but a record with a
+        // blank key would otherwise be handed a fresh id on EVERY retry — the
+        // exact duplicate-generating behaviour being removed. Mint one id, write
+        // it back to IndexedDB, then reuse it for all later attempts.
+        const { record: order, previousKey, changed } = normalizeQueuedOrderKey(queued, newPosTxnId);
+        if (changed) {
+          await dbPut("ordersQueue", order);
+          if (typeof previousKey === "string") {
+            await dbDelete("ordersQueue", previousKey).catch(() => {});
+          }
+        }
+
         const syncingOrder = { ...order, syncStatus: "syncing" as const };
         await dbPut("ordersQueue", syncingOrder);
 
@@ -968,19 +1014,33 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
             body: JSON.stringify(order),
           });
 
+          const data = await res.json().catch(() => ({}));
+
           if (!res.ok) {
-            const data = await res.json();
+            // 409: this key already belongs to a materially different order, so
+            // retrying cannot help. Keep the record — it holds real transaction
+            // data — and surface it for a human to reconcile.
+            if (res.status === 409) {
+              await dbPut("ordersQueue", {
+                ...order,
+                syncStatus: "failed" as const,
+                syncError: "Already recorded under a different order — needs review",
+              });
+              setSyncFailed(true);
+              continue;
+            }
             throw new Error(data.error || "Sync failed on server");
           }
 
-          // Remove from local IndexedDB on successful sync to avoid bloated data
+          // Created or replayed — both mean one canonical order now exists on the
+          // server, so the queued copy is safe to drop.
           await dbDelete("ordersQueue", order.localOrderId);
         } catch (err: any) {
           console.error(`Failed to sync offline order ${order.localOrderId}:`, err);
-          const failedOrder = { 
-            ...order, 
-            syncStatus: "failed" as const, 
-            syncError: err.message || "Unknown error" 
+          const failedOrder = {
+            ...order,
+            syncStatus: "failed" as const,
+            syncError: err.message || "Unknown error"
           };
           await dbPut("ordersQueue", failedOrder);
           setSyncFailed(true);
@@ -1008,8 +1068,40 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   // is stable across re-renders (it comes from the server component).
   useEffect(() => {
     const draft = localStorage.getItem("rf_pos_draft_cart");
+    let restoredCartCount = 0;
     if (draft) {
-      try { setCart(JSON.parse(draft)); } catch (_) {}
+      try {
+        const parsed = JSON.parse(draft);
+        if (Array.isArray(parsed)) {
+          restoredCartCount = parsed.length;
+          setCart(parsed);
+        }
+      } catch (_) {}
+    }
+
+    // Resolve this tab's transaction identity. A restored cart means there may be
+    // an in-flight transaction to recover, so its original localOrderId is
+    // adopted rather than replaced — that is what stops a browser restart from
+    // resubmitting the same order under a new key and duplicating it.
+    const { local, session } = posDraftStorages();
+    const resolution = resolveDraft({
+      local,
+      session,
+      now: Date.now(),
+      hasPersistedCart: restoredCartCount > 0,
+    });
+    if (resolution.kind === "ambiguous") {
+      // Never guess between recoverable transactions. Block submission and let a
+      // human decide, instead of minting an identity that could duplicate.
+      draftRef.current = null;
+      setDraftBlocked(true);
+      console.error(
+        `POS draft recovery ambiguous: ${resolution.candidates.length} recoverable drafts`,
+        resolution.candidates.map((c) => c.localOrderId)
+      );
+    } else {
+      draftRef.current = resolution.draft;
+      setDraftBlocked(false);
     }
 
     const devId = getDeviceId();
@@ -1359,7 +1451,39 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   // Persist draft cart changes
   useEffect(() => {
     localStorage.setItem("rf_pos_draft_cart", JSON.stringify(cart));
+    // Editing the cart is also proof this tab is alive and still owns its draft,
+    // which is what keeps another tab from adopting it.
+    const id = draftRef.current?.draftId;
+    if (id) touchDraft(posDraftStorages().local, id, Date.now());
   }, [cart]);
+
+  // Liveness: advertise that this tab still holds its draft, and release it on
+  // pagehide so a cleanly closed browser can recover the identity immediately
+  // rather than waiting for the staleness window.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const beat = () => {
+      const id = draftRef.current?.draftId;
+      if (id) touchDraft(posDraftStorages().local, id, Date.now());
+    };
+    const interval = setInterval(beat, HEARTBEAT_MS);
+    const onHide = () => {
+      const id = draftRef.current?.draftId;
+      if (id) releaseDraft(posDraftStorages().local, id, Date.now());
+    };
+    // pagehide covers tab close, navigation and browser quit; beforeunload is a
+    // belt-and-braces duplicate for browsers that skip pagehide. Deliberately NOT
+    // visibilitychange — merely switching tabs must not release a live draft, or
+    // another tab could adopt the till's in-progress transaction.
+    window.addEventListener("pagehide", onHide);
+    window.addEventListener("beforeunload", onHide);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("pagehide", onHide);
+      window.removeEventListener("beforeunload", onHide);
+      onHide();
+    };
+  }, []);
 
   // Save offline sync queue changes
   useEffect(() => {
@@ -1895,6 +2019,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
         batchIndex: data.batchIndex,
       });
       localStorage.removeItem("rf_pos_draft_cart");
+      finishActiveDraft();
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -1925,6 +2050,9 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
     setPricingMode("regular");
     setPrintCopies(2);
     localStorage.removeItem("rf_pos_draft_cart");
+    // Abandoning the cart must retire the key too: reusing it for a different
+    // set of items is exactly what the server reports as a conflict.
+    finishActiveDraft();
   };
 
   const handleEditOrder = useCallback((bill: TodayOrder) => {
@@ -1986,6 +2114,24 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
       return;
     }
 
+    // Stable identity for THIS cashier transaction. It was minted and persisted
+    // before the first request left the terminal and survives reload AND browser
+    // restart, so every retry — a lost response, a restored cart, the offline
+    // queue draining later — carries the same key. That is what lets the server
+    // collapse them into one order. Re-opening an offline bill keeps its identity.
+    if (draftBlocked && !editingOrderId) {
+      setError(
+        "Couldn't tell which unfinished order this cart belongs to. Please check Open Bills, then clear the cart and ring it up again."
+      );
+      return;
+    }
+    const draftKey = activeLocalOrderId();
+    if (!draftKey && !editingOrderId) {
+      setError("Couldn't start this order safely. Please reload the page and try again.");
+      return;
+    }
+    const txnId = editingOrderId || draftKey!;
+
     const orderPayload = {
       items: cart.map((c) => ({
         id: c.id,
@@ -2007,6 +2153,8 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
       waiterName: selectedWaiterName,
       pricingMode,
       auditLog,
+      // Only on create — the PATCH edit route has its own identity (the order id).
+      ...(editingOrderId ? {} : { localOrderId: txnId }),
     };
 
     setSubmitting(true);
@@ -2031,10 +2179,19 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
         // For new counter/dine-in orders, fall through to the offline queue so the order
         // isn't lost. For edits, show the error — we can't safely queue an edit offline.
         if (res.status === 401 && !editingOrderId) throw new Error("offline");
+        // 409: this transaction key already belongs to a different order, so the
+        // earlier attempt did land. Retire the key so the terminal isn't stuck,
+        // and point the cashier at the order that exists rather than at the
+        // mechanism. Deliberately does not clear the cart.
+        if (res.status === 409) {
+          finishActiveDraft();
+          setError("This order was already recorded. Please check Open Bills before ringing it up again.");
+          return;
+        }
         setError(res.status === 401 ? "Session expired — please sign out and back in." : (data.error ?? "Failed to save order"));
         return;
       }
-      
+
       const completed = {
         orderId: data.orderId,
         orderNumber: data.orderNumber,
@@ -2053,6 +2210,9 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
       };
       
       localStorage.removeItem("rf_pos_draft_cart");
+      // Committed server-side (created or replayed) — retire the key so the next
+      // order starts a new identity.
+      finishActiveDraft();
 
       // New unpaid counter order → print kitchen slip, stay in Open Bills
       if (!editingOrderId && serviceMode === "counter" && paymentStatus === "unpaid") {
@@ -2072,10 +2232,35 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
       openPOSReceiptWindow(completed, restaurant.name, activeCashierName, printCopies);
     } catch (err) {
       // Robust Offline Fallback: Write complete audit stamped transaction into IndexedDB.
-      // If we are editing an existing offline order, reuse its localOrderId to overwrite/update it,
-      // avoiding duplicate order creation in IndexedDB.
-      const mockOfflineId = editingOrderId || `offline-${Math.random().toString(36).substring(2, 9)}-${Date.now()}`;
-      
+      //
+      // Reuses the SAME key the online attempt carried. This is the fix for the
+      // duplicate-order bug: if the request actually reached the server and
+      // committed but the response was lost, the queued copy arrives later under
+      // this key and the server recognises it as a replay instead of creating a
+      // second order. Minting a new id here is what caused the duplicates.
+      const existingQueue = await dbGetAll<{ localOrderId?: string }>("ordersQueue").catch(() => []);
+      const handoff = classifyOfflineHandoff({
+        editingOrderId,
+        queuedLocalOrderIds: existingQueue
+          .map((o) => o.localOrderId)
+          .filter((id): id is string => typeof id === "string" && id.length > 0),
+        draftTxnId: txnId,
+      });
+
+      // An edit to an order that already exists on the server must never enter
+      // the creation queue — the sync route would mint a SECOND order with a new
+      // order number. Offline editing of a committed order is not supported, so
+      // fail closed with a message the cashier can act on. The original order is
+      // untouched and the cart is left intact so nothing is lost.
+      if (handoff.kind === "reject-server-edit") {
+        setError(
+          "Changes to an order that's already saved can't be made while offline. The original order is unchanged — reconnect and try again."
+        );
+        return;
+      }
+
+      const mockOfflineId = handoff.localOrderId;
+
       const offlineOrderRecord = {
         localOrderId: mockOfflineId,
         items: cart.map((c) => ({
@@ -2085,6 +2270,10 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
           quantity: c.quantity,
           selectedSize: c.selectedSize,
           selectedModifiers: c.selectedModifiers,
+          // Required for the sync route to reprice correctly AND to fingerprint
+          // the order — without it a custom-priced item silently reverted to the
+          // catalogue price on sync.
+          customPrice: c.customPrice ?? null,
           itemNote: c.itemNote,
         })),
         total: cartTotal,
@@ -2108,7 +2297,11 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
 
       try {
         await dbPut("ordersQueue", offlineOrderRecord);
-        
+        // Safely handed off: the key now lives in IndexedDB with the order, so
+        // the next transaction can start a new identity. Only after the put
+        // succeeds — if it threw, the cart is still live and must keep its key.
+        finishActiveDraft();
+
         // Update count of pending orders
         const queue = await dbGetAll("ordersQueue");
         setPendingOfflineCount(queue.filter((o: any) => o.syncStatus === "pending" || o.syncStatus === "failed").length);
@@ -3207,7 +3400,14 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                     {cart.length > 0 && (
                       <button
                         type="button"
-                        onClick={() => setCart([])}
+                        onClick={() => {
+                          setCart([]);
+                          // Emptying the cart abandons this transaction. Retire its
+                          // key so the next order gets a fresh identity — reusing it
+                          // for different items is what the server reports as a
+                          // conflict.
+                          finishActiveDraft();
+                        }}
                         className="text-xs font-bold text-red-400 hover:text-red-600 transition-colors"
                       >
                         Clear all
