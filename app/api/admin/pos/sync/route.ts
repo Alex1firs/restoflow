@@ -3,6 +3,15 @@ import { getAuthenticatedUser } from "@/lib/auth-server";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { checkSubscriptionAccess } from "@/lib/subscription-guard";
+import {
+  backfillClaim,
+  commitPosOrder,
+  orderFingerprint,
+  readPosClaim,
+  type FingerprintItem,
+  validateLocalOrderId,
+  type FirestoreLike,
+} from "@/lib/pos/idempotency";
 
 const VALID_PAYMENT_METHODS = ["cash", "bank_transfer", "card", "unpaid"] as const;
 const VALID_PAYMENT_STATUSES = ["paid", "unpaid", "part_paid", "cancelled"] as const;
@@ -48,8 +57,9 @@ export async function POST(request: NextRequest) {
     createdAt,
   } = body;
 
-  if (!localOrderId) {
-    return NextResponse.json({ error: "Missing unique localOrderId" }, { status: 400 });
+  const keyError = validateLocalOrderId(localOrderId);
+  if (keyError) {
+    return NextResponse.json({ error: keyError }, { status: 400 });
   }
 
   if (!Array.isArray(items) || items.length === 0) {
@@ -59,22 +69,75 @@ export async function POST(request: NextRequest) {
   const db = getAdminDb();
   const restaurantSlug = user.restaurantSlug;
 
-  try {
-    // ── 1. DUPLICATE CHECK ───────────────────────────────────────────────────
-    const dupSnap = await db
-      .collection("orders")
-      .where("restaurantId", "==", restaurantSlug)
-      .where("localOrderId", "==", localOrderId)
-      .limit(1)
-      .get();
+  const resolvedServiceMode: ServiceMode = VALID_SERVICE_MODES.includes(serviceMode as ServiceMode)
+    ? (serviceMode as ServiceMode)
+    : "counter";
 
-    if (!dupSnap.empty) {
+  const resolvedTableLabel = resolvedServiceMode === "dine_in" && typeof tableLabel === "string"
+    ? tableLabel.trim()
+    : "";
+
+  const isDineIn = resolvedServiceMode === "dine_in";
+
+  // Computed from the resolved values so this route and /api/admin/pos produce
+  // an identical fingerprint for the same cart.
+  const fingerprint = orderFingerprint({
+    items: items as FingerprintItem[],
+    serviceMode: resolvedServiceMode,
+    tableLabel: resolvedTableLabel,
+    note: typeof note === "string" ? note.trim() : "",
+    pricingMode: typeof pricingMode === "string" ? pricingMode : "regular",
+  });
+
+  try {
+    // ── 1. PRE-FIX SAFETY NET ────────────────────────────────────────────────
+    // Orders created by the PREVIOUS version of this route carry a localOrderId
+    // but have no claim document. A queue record in flight across the deploy
+    // would otherwise look brand new and duplicate. Look it up and back-fill a
+    // claim so every later retry takes the atomic path.
+    //
+    // Gated on the claim being absent. Running this lookup unconditionally would
+    // short-circuit an ordinary replay before `commitPosOrder` ever sees it, and
+    // because the lookup matches on the key alone it cannot compare fingerprints
+    // — a re-priced order under a reused key would silently replay instead of
+    // conflicting. Once a claim exists, the atomic path is the only path.
+    const existingClaim = await readPosClaim(
+      db as unknown as FirestoreLike,
+      restaurantSlug,
+      localOrderId
+    );
+
+    const dupSnap = existingClaim
+      ? null
+      : await db
+          .collection("orders")
+          .where("restaurantId", "==", restaurantSlug)
+          .where("localOrderId", "==", localOrderId)
+          .limit(1)
+          .get();
+
+    if (dupSnap && !dupSnap.empty) {
       const existingDoc = dupSnap.docs[0];
+      const existingData = existingDoc.data();
+      await backfillClaim({
+        db: db as unknown as FirestoreLike,
+        restaurantId: restaurantSlug,
+        localOrderId,
+        orderId: existingDoc.id,
+        orderNumber: typeof existingData.orderNumber === "number" ? existingData.orderNumber : null,
+        fingerprint,
+      }).catch((err) => {
+        // Non-fatal: the claim is an optimisation here, the response is already correct.
+        console.error("POS claim backfill failed:", err);
+      });
+
       return NextResponse.json({
         success: true,
         duplicated: true,
+        replayed: true,
         orderId: existingDoc.id,
-        total: existingDoc.data().total,
+        orderNumber: existingData.orderNumber ?? null,
+        total: existingData.total,
       }, { status: 200 });
     }
 
@@ -175,73 +238,94 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const resolvedServiceMode: ServiceMode = VALID_SERVICE_MODES.includes(serviceMode as ServiceMode)
-      ? (serviceMode as ServiceMode)
-      : "counter";
-
-    const resolvedTableLabel = resolvedServiceMode === "dine_in" && typeof tableLabel === "string"
-      ? tableLabel.trim()
-      : "";
-
-    const isDineIn = resolvedServiceMode === "dine_in";
-
-    let orderNumber = 0;
-    const orderRef = db.collection("orders").doc();
-
-    await db.runTransaction(async (transaction) => {
-      const rRef = db.collection("restaurants").doc(restaurantSlug);
-      const rDoc = await transaction.get(rRef);
-      if (!rDoc.exists) {
-        throw new Error("Restaurant not found");
-      }
-      const rDataObj = rDoc.data()!;
-      const currentCounter = (rDataObj.orderCounter as number | undefined) ?? 99;
-      orderNumber = currentCounter + 1;
-
-      transaction.update(rRef, { orderCounter: orderNumber });
-      transaction.set(orderRef, {
-        restaurantId: restaurantSlug,
-        localOrderId,
-        customerName: typeof customerName === "string" && customerName.trim()
-          ? customerName.trim()
-          : isDineIn ? resolvedTableLabel : "Walk-in Customer",
-        phone: "",
-        address: "",
-        note: typeof note === "string" ? note.trim() : "",
-        items: validatedItems,
-        itemsTotal,
-        deliveryFee: 0,
-        total: itemsTotal,
-        paymentMethod: VALID_PAYMENT_METHODS.includes(paymentMethod as PaymentMethod) ? paymentMethod : "cash",
-        paymentStatus: VALID_PAYMENT_STATUSES.includes(paymentStatus as PaymentStatus) ? paymentStatus : "paid",
-        status: "pending",
-        deliveryType: isDineIn ? "dine_in" : "counter",
-        orderType: "normal",
-        orderSource: "counter",
-        serviceMode: resolvedServiceMode,
-        ...(isDineIn ? { tableLabel: resolvedTableLabel } : {}),
-        waiterName: typeof waiterName === "string" ? waiterName.trim() : null,
-        pricingMode: typeof pricingMode === "string" ? pricingMode : "regular",
-        staffId: cashierId || user.uid,
-        staffName: cashierName || "Offline Staff",
-        deviceId: deviceId || "unknown",
-        terminalName: terminalName || "Terminal",
-        createdAt: createdAt ? new Date(createdAt) : new Date(),
-        syncedAt: FieldValue.serverTimestamp(),
-        priceAuditAlert,
-        auditLog,
-        orderNumber,
-      });
+    const buildOrderData = (orderNumber: number) => ({
+      restaurantId: restaurantSlug,
+      localOrderId,
+      customerName: typeof customerName === "string" && customerName.trim()
+        ? customerName.trim()
+        : isDineIn ? resolvedTableLabel : "Walk-in Customer",
+      phone: "",
+      address: "",
+      note: typeof note === "string" ? note.trim() : "",
+      items: validatedItems,
+      itemsTotal,
+      deliveryFee: 0,
+      total: itemsTotal,
+      paymentMethod: VALID_PAYMENT_METHODS.includes(paymentMethod as PaymentMethod) ? paymentMethod : "cash",
+      paymentStatus: VALID_PAYMENT_STATUSES.includes(paymentStatus as PaymentStatus) ? paymentStatus : "paid",
+      status: "pending",
+      deliveryType: isDineIn ? "dine_in" : "counter",
+      orderType: "normal",
+      orderSource: "counter",
+      serviceMode: resolvedServiceMode,
+      ...(isDineIn ? { tableLabel: resolvedTableLabel } : {}),
+      waiterName: typeof waiterName === "string" ? waiterName.trim() : null,
+      pricingMode: typeof pricingMode === "string" ? pricingMode : "regular",
+      staffId: cashierId || user.uid,
+      staffName: cashierName || "Offline Staff",
+      deviceId: deviceId || "unknown",
+      terminalName: terminalName || "Terminal",
+      createdAt: createdAt ? new Date(createdAt) : new Date(),
+      syncedAt: FieldValue.serverTimestamp(),
+      priceAuditAlert,
+      auditLog,
+      orderNumber,
     });
+
+    // ── 3. ATOMIC IDEMPOTENT COMMIT ──────────────────────────────────────────
+    const result = await commitPosOrder({
+      db: db as unknown as FirestoreLike,
+      restaurantId: restaurantSlug,
+      localOrderId,
+      fingerprint,
+      source: "sync",
+      buildOrderData,
+    });
+
+    if (result.outcome === "missing_order") {
+      console.error(
+        `POS INTEGRITY: claim resolves to a missing order on sync. restaurant=${restaurantSlug} localOrderId=${localOrderId} orderId=${result.orderId || "(empty)"}`
+      );
+      return NextResponse.json(
+        { error: "Sync could not complete. Please contact support." },
+        { status: 500 }
+      );
+    }
+
+    if (result.outcome === "conflict") {
+      console.error(
+        `POS idempotency conflict on sync: restaurant=${restaurantSlug} localOrderId=${localOrderId} existingOrderId=${result.orderId}`
+      );
+      return NextResponse.json(
+        { error: "This order reference is already in use for a different order.", conflict: true },
+        { status: 409 }
+      );
+    }
+
+    if (result.outcome === "replayed") {
+      const existing = await db.collection("orders").doc(result.orderId).get();
+      const data = existing.data() ?? {};
+      return NextResponse.json({
+        success: true,
+        duplicated: true,
+        replayed: true,
+        orderId: result.orderId,
+        items: data.items ?? validatedItems,
+        itemsTotal: data.itemsTotal ?? itemsTotal,
+        total: data.total ?? itemsTotal,
+        priceAuditAlert: data.priceAuditAlert ?? priceAuditAlert,
+        orderNumber: data.orderNumber ?? result.orderNumber,
+      }, { status: 200 });
+    }
 
     return NextResponse.json({
       success: true,
-      orderId: orderRef.id,
+      orderId: result.orderId,
       items: validatedItems,
       itemsTotal,
       total: itemsTotal,
       priceAuditAlert,
-      orderNumber,
+      orderNumber: result.orderNumber,
     }, { status: 201 });
   } catch (error) {
     console.error("POS offline sync failed:", error);

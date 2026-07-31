@@ -1,0 +1,99 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>POS queue lease — two-tab harness</title>
+<style>
+  body { font: 13px ui-monospace, monospace; padding: 20px; max-width: 900px; }
+  #state { background: #f4f4f5; padding: 12px; white-space: pre-wrap; overflow-x: auto; }
+  button { font: inherit; padding: 5px 9px; margin: 2px 4px 2px 0; }
+</style>
+<h1 style="font-size:15px">POS queue lease — two-tab harness</h1>
+<p>Real IndexedDB, real <code>dbUpdateAtomic</code>, real lease logic.</p>
+<div>
+  <button id="seed">seed 5 pending records</button>
+  <button id="claim-all">claim + sync all (this tab)</button>
+  <button id="claim-hold">claim one and HOLD (simulate in-flight)</button>
+  <button id="recover">recover stranded</button>
+  <button id="refresh">refresh</button>
+  <button id="wipe">wipe queue</button>
+</div>
+<pre id="state">…</pre>
+<script src="./queue.bundle.js"></script>
+<script>
+  const Q = PosQueue;
+  const OWNER = Q.syncOwnerId();
+  const log = [];
+
+  async function all() { return Q.dbGetAll("ordersQueue"); }
+
+  async function render() {
+    const rows = await all();
+    const now = Date.now();
+    document.getElementById("state").textContent = JSON.stringify({
+      ownerId: OWNER,
+      total: rows.length,
+      outstanding: Q.outstandingRecords(rows, now).length,
+      claimable: Q.claimableRecords(rows, now).map(r => r.localOrderId),
+      records: rows.map(r => ({
+        id: r.localOrderId, status: r.syncStatus, owner: r.syncOwnerId || null,
+        attempts: r.attemptCount || 0, customPrice: r.items && r.items[0] && r.items[0].customPrice,
+      })),
+      log,
+    }, null, 2);
+  }
+
+  const on = (id, fn) => (document.getElementById(id).onclick = async () => { await fn(); await render(); });
+
+  on("seed", async () => {
+    for (let i = 1; i <= 5; i++) {
+      await Q.dbPut("ordersQueue", {
+        localOrderId: "txn-" + i, syncStatus: "pending", attemptCount: 0,
+        items: [{ id: "m-1", quantity: 2, customPrice: 4500, itemNote: "no pepper" }],
+        total: 9000, paymentStatus: "unpaid", createdAt: Date.now(),
+      });
+    }
+    log.length = 0;
+  });
+
+  on("claim-all", async () => {
+    const now = Date.now();
+    const claimed = [];
+    for (const cand of Q.claimableRecords(await all(), now)) {
+      const got = await Q.dbUpdateAtomic("ordersQueue", cand.localOrderId, (cur) =>
+        cur ? Q.claimTransition(cur, { ownerId: OWNER, attemptId: Q.newAttemptId(), now: Date.now() }) : null);
+      if (!got) continue;
+      claimed.push(cand.localOrderId);
+      // "server responded OK" -> complete then remove, as the client does
+      await Q.dbUpdateAtomic("ordersQueue", cand.localOrderId, (cur) =>
+        cur ? Q.completeTransition(cur, { orderId: "ORD_" + cand.localOrderId, orderNumber: 900, now: Date.now() }) : null);
+      await Q.dbDelete("ordersQueue", cand.localOrderId);
+    }
+    log.push({ tab: OWNER.slice(-6), claimed });
+    window.__CLAIMED__ = claimed;
+  });
+
+  on("claim-hold", async () => {
+    const now = Date.now();
+    const cand = Q.claimableRecords(await all(), now)[0];
+    if (!cand) { log.push("nothing claimable"); return; }
+    const got = await Q.dbUpdateAtomic("ordersQueue", cand.localOrderId, (cur) =>
+      cur ? Q.claimTransition(cur, { ownerId: OWNER, attemptId: Q.newAttemptId(), now: Date.now() }) : null);
+    log.push({ heldByThisTab: got ? cand.localOrderId : null });
+  });
+
+  on("recover", async () => {
+    const now = Date.now();
+    let n = 0;
+    for (const r of await all()) {
+      if (!Q.isStranded(r, now)) continue;
+      const w = await Q.dbUpdateAtomic("ordersQueue", r.localOrderId, (cur) =>
+        cur && Q.isStranded(cur, now) ? Q.recoverTransition(cur, now) : null);
+      if (w) n++;
+    }
+    log.push({ recovered: n });
+  });
+
+  on("refresh", async () => {});
+  on("wipe", async () => { for (const r of await all()) await Q.dbDelete("ordersQueue", r.localOrderId); log.length = 0; });
+
+  render();
+</script>

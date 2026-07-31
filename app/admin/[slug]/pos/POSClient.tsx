@@ -25,12 +25,71 @@ import {
   dbGetAll,
   dbDelete,
   dbClear,
+  dbUpdateAtomic,
   OfflineStaff,
   OfflineMenuItem,
   OfflineOrder
 } from "@/lib/offline-db";
+import { normalizeQueuedOrderKey, classifyOfflineHandoff } from "@/lib/pos/idempotency";
+import { newPosTxnId } from "@/lib/pos/txn-id";
+import {
+  POS_SUBMIT_TIMEOUT_MS,
+  POS_SYNC_TIMEOUT_MS,
+  HANDOFF_FAILED_MESSAGE,
+  classifyResponseFailure,
+  classifyThrownFailure,
+  createBoundedRequest,
+  errorCategoryOf,
+  errorCodeOf,
+  messageForFailure,
+  messageForQueuedHandoff,
+  planHandoff,
+  type SubmitFailure,
+} from "@/lib/pos/submit";
+import { announceQueueSynced, subscribeQueueChanges } from "@/lib/pos/sync-channel";
+import {
+  claimTransition,
+  claimableRecords,
+  completeTransition,
+  failTransition,
+  isStranded,
+  isWaitingForRetry,
+  needsAttention,
+  newAttemptId,
+  outstandingRecords,
+  recoverTransition,
+  recoveryReasonFor,
+  syncOwnerId,
+  attentionRecords,
+  authRequiredRecords,
+  manualRetryTransition,
+  resumeAuthTransition,
+  type SyncLeaseFields,
+} from "@/lib/pos/sync-lease";
+import {
+  HEARTBEAT_MS,
+  endDraft,
+  posDraftStorages,
+  releaseDraft,
+  resolveDraft,
+  touchDraft,
+  type PosDraft,
+} from "@/lib/pos/draft";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+/**
+ * A record in the `ordersQueue` IndexedDB store, including synchronisation lease
+ * fields. Deliberately permissive about the payload: records written by older
+ * app versions may be missing fields, and they must be normalised rather than
+ * rejected.
+ */
+type QueuedOrderRecord = OfflineOrder &
+  SyncLeaseFields & {
+    localOrderId: string;
+    attemptCount?: number;
+    settlementNote?: string;
+  };
 
 type MenuItem = {
   id: string;
@@ -862,6 +921,21 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   // Ref-based guard for triggerBackgroundSync so the function stays stable
   // and doesn't force the mount useEffect to re-run on every sync cycle.
   const syncingOfflineRef = useRef(false);
+  // Synchronous double-submit guard. React state is committed asynchronously, so
+  // `submitting` alone can be read as false by a second click in the same tick.
+  // The server remains the real duplicate barrier; this stops the UI inviting
+  // pointless extra requests.
+  const submitInFlightRef = useRef(false);
+  // The in-flight bounded request, so unmount/navigation can abort it and be
+  // distinguished from our own deadline firing.
+  const inFlightRequestRef = useRef<{ teardown: () => void } | null>(null);
+  // This tab's durable draft record; holds the transaction's localOrderId.
+  const draftRef = useRef<PosDraft | null>(null);
+  // Set when several recoverable drafts exist and we refuse to guess between them.
+  const [draftBlocked, setDraftBlocked] = useState(false);
+  // Records parked for a human (409 conflicts, permanent failures, exhausted
+  // retries) or awaiting sign-in. Visible so nothing sits stuck in silence.
+  const [attentionCount, setAttentionCount] = useState(0);
 
   useEffect(() => {
     mutedRef.current = alertMuted;
@@ -871,13 +945,33 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
     syncingOfflineRef.current = syncingOffline;
   }, [syncingOffline]);
 
+  // The active transaction's idempotency key. Stable across reload, browser
+  // restart and every retry until the transaction ends.
+  const activeLocalOrderId = useCallback((): string | null => {
+    return draftRef.current?.localOrderId ?? null;
+  }, []);
+
+  // Ends THIS tab's transaction once it is genuinely finished — committed on the
+  // server, safely written to the offline queue, or abandoned. Removes only this
+  // draft, so another tab's in-progress order is untouched. The next order lazily
+  // resolves a brand new draft.
+  const finishActiveDraft = useCallback(() => {
+    const id = draftRef.current?.draftId;
+    if (!id) return;
+    const { local, session } = posDraftStorages();
+    endDraft(local, session, id);
+    draftRef.current = null;
+  }, []);
+
   // Convert an IDB offline order into a TodayOrder-shaped object for Open Bills
   const loadOfflineQueueBills = useCallback(async () => {
     try {
-      const queue = await dbGetAll<any>("ordersQueue");
+      const queue = outstandingRecords(await dbGetAll<QueuedOrderRecord>("ordersQueue"), Date.now());
       const bills: TodayOrder[] = queue
-        .filter((o: any) => (o.syncStatus === "pending" || o.syncStatus === "failed") && o.paymentStatus !== "paid")
-        .map((o: any) => ({
+        // outstandingRecords also surfaces records stranded in `syncing`, which
+        // previously vanished from Open Bills entirely — the lost-order bug.
+        .filter((o) => o.paymentStatus !== "paid")
+        .map((o) => ({
           id: o.localOrderId,
           localOrderId: o.localOrderId,
           customerName: o.customerName || "Walk-in Guest",
@@ -911,7 +1005,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
     cashierName: string,
   ) => {
     try {
-      const queue = await dbGetAll<any>("ordersQueue");
+      const queue = await dbGetAll<QueuedOrderRecord>("ordersQueue");
       const order = queue.find((o: any) => o.localOrderId === localOrderId);
       if (!order) return;
 
@@ -942,48 +1036,221 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
     }
   }, [loadOfflineQueueBills]);
 
+  /**
+   * Returns stranded `syncing` records to a retryable state (Fix 5).
+   *
+   * A record flipped to `syncing` whose owner died — tab closed, browser reloaded,
+   * power lost, request hung — was previously invisible to every queue filter and
+   * never retried: a silently LOST order. Recovery is idempotent, never deletes a
+   * record, and never touches the transaction's identity or its immutable data.
+   */
+  const recoverStrandedQueueRecords = useCallback(async (): Promise<number> => {
+    const now = Date.now();
+    let recovered = 0;
+    try {
+      const queue = await dbGetAll<QueuedOrderRecord>("ordersQueue");
+      for (const record of queue) {
+        if (!isStranded(record, now)) continue;
+        // Re-check inside the transaction: another tab may have recovered it in
+        // the meantime, and two recoveries must not fight.
+        const written = await dbUpdateAtomic<QueuedOrderRecord>("ordersQueue", record.localOrderId, (current) => {
+          if (!current || !isStranded(current, now)) return null;
+          return recoverTransition(current, now);
+        });
+        if (written) {
+          recovered++;
+          console.warn(
+            `POS queue recovery: ${record.localOrderId} returned to retry (${recoveryReasonFor(record)})`
+          );
+        }
+      }
+    } catch (err) {
+      console.error("POS queue recovery scan failed:", err);
+    }
+    return recovered;
+  }, []);
+
+  /**
+   * Returns records parked on authentication to the ordinary retry path.
+   *
+   * Called only after a request has actually succeeded, which is proof the session
+   * works — never speculatively, or a failing session would retry forever.
+   */
+  const resumeAuthRequiredRecords = useCallback(async (): Promise<number> => {
+    const now = Date.now();
+    let resumed = 0;
+    try {
+      const queue = await dbGetAll<QueuedOrderRecord>("ordersQueue");
+      for (const record of authRequiredRecords(queue)) {
+        const written = await dbUpdateAtomic<QueuedOrderRecord>("ordersQueue", record.localOrderId, (current) =>
+          current ? resumeAuthTransition(current, now) : null
+        );
+        if (written) resumed++;
+      }
+    } catch (err) {
+      console.error("POS auth-resume scan failed:", err);
+    }
+    return resumed;
+  }, []);
+
+  // Lets manualSyncAll kick a sync without a circular dependency.
+  const triggerBackgroundSyncRef = useRef<(() => Promise<void>) | null>(null);
+
+  /**
+   * "Sync now" — a cashier-initiated retry of everything currently waiting.
+   *
+   * Clears the backoff wait for records that are merely waiting, then runs an
+   * ordinary sync. Deliberately skips parked records (a 409 or a permanent failure
+   * needs a human, and an auth-required record needs a sign-in) and never touches
+   * a record with a live lease, so it cannot steal an in-flight attempt or create a
+   * second queue record.
+   */
+  const manualSyncAll = useCallback(async () => {
+    const now = Date.now();
+    try {
+      const queue = await dbGetAll<QueuedOrderRecord>("ordersQueue");
+      for (const record of queue) {
+        if (needsAttention(record)) continue;
+        if ((record.syncStatus ?? "pending") === "synced") continue;
+        if (!isWaitingForRetry(record, now)) continue;
+        await dbUpdateAtomic<QueuedOrderRecord>("ordersQueue", record.localOrderId, (current) =>
+          current ? manualRetryTransition(current, now) : null
+        );
+      }
+    } catch (err) {
+      console.error("POS manual retry scan failed:", err);
+    }
+    await triggerBackgroundSyncRef.current?.();
+  }, []);
+
   const triggerBackgroundSync = useCallback(async () => {
     if (typeof window === "undefined" || !navigator.onLine || syncingOfflineRef.current) return;
-    
+
     setSyncingOffline(true);
     setSyncFailed(false);
 
     try {
-      const queue = await dbGetAll<any>("ordersQueue");
-      const pendingOrders = queue.filter(o => o.syncStatus === "pending" || o.syncStatus === "failed");
+      // Recover anything stranded by a previous crash before deciding what to send.
+      await recoverStrandedQueueRecords();
 
-      if (pendingOrders.length === 0) {
+      const queue = await dbGetAll<QueuedOrderRecord>("ordersQueue");
+      const candidates = claimableRecords(queue, Date.now());
+
+      if (candidates.length === 0) {
         setSyncingOffline(false);
         return;
       }
 
-      for (const order of pendingOrders) {
-        const syncingOrder = { ...order, syncStatus: "syncing" as const };
-        await dbPut("ordersQueue", syncingOrder);
+      const ownerId = syncOwnerId();
 
+      for (const queued of candidates) {
+        // Backward compatibility for records written before this fix. The store's
+        // keyPath is localOrderId so this should not occur, but a record with a
+        // blank key would otherwise be handed a fresh id on EVERY retry — the
+        // exact duplicate-generating behaviour being removed. Mint one id, write
+        // it back to IndexedDB, then reuse it for all later attempts.
+        const { record: normalized, previousKey, changed } = normalizeQueuedOrderKey(queued, newPosTxnId);
+        if (changed) {
+          await dbPut("ordersQueue", normalized);
+          if (typeof previousKey === "string") {
+            await dbDelete("ordersQueue", previousKey).catch(() => {});
+          }
+        }
+
+        // Claim the record ATOMICALLY (Fix 4). Read-and-write in one IndexedDB
+        // transaction, which IndexedDB serialises per origin — so a second tab or
+        // PWA window cannot interleave and send the same record. A null result
+        // means somebody else holds a live lease; skip it rather than racing.
+        const attemptId = newAttemptId();
+        const claimed = await dbUpdateAtomic<QueuedOrderRecord>("ordersQueue", normalized.localOrderId, (current) => {
+          if (!current) return null;
+          return claimTransition(current, { ownerId, attemptId, now: Date.now() });
+        });
+        if (!claimed) continue;
+
+        const bounded = createBoundedRequest(POS_SYNC_TIMEOUT_MS);
         try {
           const res = await fetch(`/api/admin/pos/sync`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(order),
+            body: JSON.stringify(claimed),
+            signal: bounded.signal,
           });
 
+          const data = await res.json().catch(() => ({}));
+
           if (!res.ok) {
-            const data = await res.json();
-            throw new Error(data.error || "Sync failed on server");
+            const failure = classifyResponseFailure(res.status, String(data.error ?? ""));
+            // A conflict or a permanent server failure cannot be fixed by
+            // repetition, so the record is parked for a human rather than looped.
+            // A 401 is parked until sign-in. Everything else gets backoff.
+            const message =
+              failure.kind === "conflict"
+                ? "Could not be matched to an existing order — needs review"
+                : failure.kind === "auth-required"
+                ? "Waiting for sign-in"
+                : String(data.error ?? "") || "Could not confirm the server response";
+            await dbUpdateAtomic<QueuedOrderRecord>("ordersQueue", claimed.localOrderId, (current) =>
+              current
+                ? failTransition(current, {
+                    error: message,
+                    now: Date.now(),
+                    retryable: failure.kind === "server-retryable",
+                    authRequired: failure.kind === "auth-required",
+                    code: errorCodeOf(failure),
+                    category: errorCategoryOf(failure),
+                  })
+                : null
+            );
+            setSyncFailed(true);
+            continue;
           }
 
-          // Remove from local IndexedDB on successful sync to avoid bloated data
-          await dbDelete("ordersQueue", order.localOrderId);
+          // Created or replayed — either way exactly one canonical order now
+          // exists on the server. Record which one, then drop the queued copy.
+          await dbUpdateAtomic<QueuedOrderRecord>("ordersQueue", claimed.localOrderId, (current) =>
+            current
+              ? completeTransition(current, {
+                  orderId: String(data.orderId ?? ""),
+                  orderNumber: typeof data.orderNumber === "number" ? data.orderNumber : null,
+                  now: Date.now(),
+                })
+              : null
+          );
+          await dbDelete("ordersQueue", claimed.localOrderId);
+          // Tell other contexts so they refresh rather than re-processing.
+          // The session demonstrably works, so anything parked on authentication
+          // can rejoin the ordinary retry path.
+          await resumeAuthRequiredRecords();
+          announceQueueSynced({
+            localOrderId: claimed.localOrderId,
+            orderId: String(data.orderId ?? ""),
+            ownerId,
+          });
         } catch (err: any) {
-          console.error(`Failed to sync offline order ${order.localOrderId}:`, err);
-          const failedOrder = { 
-            ...order, 
-            syncStatus: "failed" as const, 
-            syncError: err.message || "Unknown error" 
-          };
-          await dbPut("ordersQueue", failedOrder);
+          const failure = classifyThrownFailure(err, {
+            online: navigator.onLine,
+            timedOut: bounded.timedOut(),
+            tornDown: bounded.tornDown(),
+          });
+          console.error(`Failed to sync offline order ${claimed.localOrderId}:`, failure.kind, err);
+          // Release the lease so this record is retryable again rather than
+          // stranded. The identity and all transaction data are preserved.
+          await dbUpdateAtomic<QueuedOrderRecord>("ordersQueue", claimed.localOrderId, (current) =>
+            current
+              ? failTransition(current, {
+                  error: err?.message || failure.kind,
+                  now: Date.now(),
+                  retryable: failure.kind !== "auth-required",
+                  authRequired: failure.kind === "auth-required",
+                  code: errorCodeOf(failure),
+                  category: errorCategoryOf(failure),
+                })
+              : null
+          );
           setSyncFailed(true);
+        } finally {
+          bounded.dispose();
         }
       }
 
@@ -995,12 +1262,17 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
       console.error("Offline sync manager crashed:", err);
       setSyncFailed(true);
     } finally {
-      const updatedQueue = await dbGetAll<any>("ordersQueue");
-      setPendingOfflineCount(updatedQueue.filter(o => o.syncStatus === "pending" || o.syncStatus === "failed").length);
+      const updatedQueue = await dbGetAll<QueuedOrderRecord>("ordersQueue");
+      setPendingOfflineCount(outstandingRecords(updatedQueue, Date.now()).length);
+      setAttentionCount(attentionRecords(updatedQueue).length);
       loadOfflineQueueBills();
       setSyncingOffline(false);
     }
-  }, [loadOfflineQueueBills]);
+  }, [loadOfflineQueueBills, recoverStrandedQueueRecords, resumeAuthRequiredRecords]);
+
+  useEffect(() => {
+    triggerBackgroundSyncRef.current = triggerBackgroundSync;
+  }, [triggerBackgroundSync]);
 
   // Load PWA states — runs exactly once on mount (empty deps).
   // Staff-sync and menu cache are here intentionally: they must not re-run
@@ -1008,8 +1280,40 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   // is stable across re-renders (it comes from the server component).
   useEffect(() => {
     const draft = localStorage.getItem("rf_pos_draft_cart");
+    let restoredCartCount = 0;
     if (draft) {
-      try { setCart(JSON.parse(draft)); } catch (_) {}
+      try {
+        const parsed = JSON.parse(draft);
+        if (Array.isArray(parsed)) {
+          restoredCartCount = parsed.length;
+          setCart(parsed);
+        }
+      } catch (_) {}
+    }
+
+    // Resolve this tab's transaction identity. A restored cart means there may be
+    // an in-flight transaction to recover, so its original localOrderId is
+    // adopted rather than replaced — that is what stops a browser restart from
+    // resubmitting the same order under a new key and duplicating it.
+    const { local, session } = posDraftStorages();
+    const resolution = resolveDraft({
+      local,
+      session,
+      now: Date.now(),
+      hasPersistedCart: restoredCartCount > 0,
+    });
+    if (resolution.kind === "ambiguous") {
+      // Never guess between recoverable transactions. Block submission and let a
+      // human decide, instead of minting an identity that could duplicate.
+      draftRef.current = null;
+      setDraftBlocked(true);
+      console.error(
+        `POS draft recovery ambiguous: ${resolution.candidates.length} recoverable drafts`,
+        resolution.candidates.map((c) => c.localOrderId)
+      );
+    } else {
+      draftRef.current = resolution.draft;
+      setDraftBlocked(false);
     }
 
     const devId = getDeviceId();
@@ -1024,9 +1328,30 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
     }
 
     setLastSyncText(getLastSyncTime());
-    dbGetAll("ordersQueue").then((queue: any[]) => {
-      const count = queue.filter((o: any) => o.syncStatus === "pending" || o.syncStatus === "failed").length;
-      setPendingOfflineCount(count);
+    // Startup recovery: anything a previous session left stranded in `syncing`
+    // (tab closed, crash, power loss) comes back as retryable and reappears in the
+    // pending count and Open Bills, instead of being silently lost. Idempotent —
+    // repeated startups cannot duplicate a record.
+    recoverStrandedQueueRecords()
+      .then((recovered) => {
+        if (recovered > 0) {
+          showSystemToast(
+            recovered === 1
+              ? "1 unsynced order was recovered and will sync automatically"
+              : `${recovered} unsynced orders were recovered and will sync automatically`
+          );
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        dbGetAll<QueuedOrderRecord>("ordersQueue")
+          .then((queue) => setPendingOfflineCount(outstandingRecords(queue, Date.now()).length))
+          .catch(() => {});
+        loadOfflineQueueBills();
+      });
+    dbGetAll<QueuedOrderRecord>("ordersQueue").then((queue) => {
+      setPendingOfflineCount(outstandingRecords(queue, Date.now()).length);
+      setAttentionCount(attentionRecords(queue).length);
     });
     loadOfflineQueueBills();
 
@@ -1359,7 +1684,62 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   // Persist draft cart changes
   useEffect(() => {
     localStorage.setItem("rf_pos_draft_cart", JSON.stringify(cart));
+    // Editing the cart is also proof this tab is alive and still owns its draft,
+    // which is what keeps another tab from adopting it.
+    const id = draftRef.current?.draftId;
+    if (id) touchDraft(posDraftStorages().local, id, Date.now());
   }, [cart]);
+
+  // Abort any in-flight submission when this component goes away, and mark it as
+  // teardown rather than a timeout so it is NOT mistaken for an unknown outcome
+  // and queued behind the cashier's back.
+  useEffect(() => {
+    return () => {
+      inFlightRequestRef.current?.teardown();
+      inFlightRequestRef.current = null;
+    };
+  }, []);
+
+  // Another context finished syncing a queued order. Refresh this tab's view
+  // only: no receipt, no kitchen ticket, no cart change, no draft change. Purely
+  // advisory — the IndexedDB lease is what keeps the queue correct if this API is
+  // unavailable.
+  useEffect(() => {
+    return subscribeQueueChanges(syncOwnerId(), () => {
+      dbGetAll<QueuedOrderRecord>("ordersQueue")
+        .then((queue) => setPendingOfflineCount(outstandingRecords(queue, Date.now()).length))
+        .catch(() => {});
+      loadOfflineQueueBills();
+    });
+  }, [loadOfflineQueueBills]);
+
+  // Liveness: advertise that this tab still holds its draft, and release it on
+  // pagehide so a cleanly closed browser can recover the identity immediately
+  // rather than waiting for the staleness window.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const beat = () => {
+      const id = draftRef.current?.draftId;
+      if (id) touchDraft(posDraftStorages().local, id, Date.now());
+    };
+    const interval = setInterval(beat, HEARTBEAT_MS);
+    const onHide = () => {
+      const id = draftRef.current?.draftId;
+      if (id) releaseDraft(posDraftStorages().local, id, Date.now());
+    };
+    // pagehide covers tab close, navigation and browser quit; beforeunload is a
+    // belt-and-braces duplicate for browsers that skip pagehide. Deliberately NOT
+    // visibilitychange — merely switching tabs must not release a live draft, or
+    // another tab could adopt the till's in-progress transaction.
+    window.addEventListener("pagehide", onHide);
+    window.addEventListener("beforeunload", onHide);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("pagehide", onHide);
+      window.removeEventListener("beforeunload", onHide);
+      onHide();
+    };
+  }, []);
 
   // Save offline sync queue changes
   useEffect(() => {
@@ -1895,6 +2275,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
         batchIndex: data.batchIndex,
       });
       localStorage.removeItem("rf_pos_draft_cart");
+      finishActiveDraft();
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -1925,6 +2306,9 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
     setPricingMode("regular");
     setPrintCopies(2);
     localStorage.removeItem("rf_pos_draft_cart");
+    // Abandoning the cart must retire the key too: reusing it for a different
+    // set of items is exactly what the server reports as a conflict.
+    finishActiveDraft();
   };
 
   const handleEditOrder = useCallback((bill: TodayOrder) => {
@@ -1973,7 +2357,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   }, []);
 
   const handleSubmit = async () => {
-    if (cart.length === 0 || submitting) return;
+    if (cart.length === 0 || submitting || submitInFlightRef.current) return;
 
     if (tabMode === "continue" && activeTab) {
       return handleAddToTab();
@@ -1985,6 +2369,24 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
       setError("Please select or enter a table number for dine-in orders.");
       return;
     }
+
+    // Stable identity for THIS cashier transaction. It was minted and persisted
+    // before the first request left the terminal and survives reload AND browser
+    // restart, so every retry — a lost response, a restored cart, the offline
+    // queue draining later — carries the same key. That is what lets the server
+    // collapse them into one order. Re-opening an offline bill keeps its identity.
+    if (draftBlocked && !editingOrderId) {
+      setError(
+        "Couldn't tell which unfinished order this cart belongs to. Please check Open Bills, then clear the cart and ring it up again."
+      );
+      return;
+    }
+    const draftKey = activeLocalOrderId();
+    if (!draftKey && !editingOrderId) {
+      setError("Couldn't start this order safely. Please reload the page and try again.");
+      return;
+    }
+    const txnId = editingOrderId || draftKey!;
 
     const orderPayload = {
       items: cart.map((c) => ({
@@ -2007,15 +2409,26 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
       waiterName: selectedWaiterName,
       pricingMode,
       auditLog,
+      // Only on create — the PATCH edit route has its own identity (the order id).
+      ...(editingOrderId ? {} : { localOrderId: txnId }),
     };
 
     setSubmitting(true);
+    submitInFlightRef.current = true;
     setError(null);
+    // Bounded from here on: this submission WILL reach a definite state within
+    // POS_SUBMIT_TIMEOUT_MS instead of spinning forever on a stalled connection.
+    const bounded = createBoundedRequest(POS_SUBMIT_TIMEOUT_MS);
+    inFlightRequestRef.current = bounded;
+    let failure: SubmitFailure | null = null;
     try {
       // When offline, skip the API entirely and go straight to the IndexedDB queue.
       // The API route verifies the session cookie against Firebase (checkRevoked: true),
       // which requires internet — so it returns 401 even for valid sessions when offline.
-      if (!navigator.onLine) throw new Error("offline");
+      if (!navigator.onLine) {
+        failure = { kind: "offline" };
+        throw new Error("offline");
+      }
 
       const url = editingOrderId ? `/api/admin/pos/${editingOrderId}` : "/api/admin/pos";
       const method = editingOrderId ? "PATCH" : "POST";
@@ -2024,17 +2437,37 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(orderPayload),
+        signal: bounded.signal,
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        // 401 means Firebase couldn't verify the session (network flaky or session expired).
-        // For new counter/dine-in orders, fall through to the offline queue so the order
-        // isn't lost. For edits, show the error — we can't safely queue an edit offline.
-        if (res.status === 401 && !editingOrderId) throw new Error("offline");
-        setError(res.status === 401 ? "Session expired — please sign out and back in." : (data.error ?? "Failed to save order"));
+        const responseFailure = classifyResponseFailure(res.status, String(data.error ?? ""));
+        // 401/403: the session could not be verified. The order is PRESERVED but
+        // parked — it must not be retried on every reconnect, which would be an
+        // authentication loop. For edits we cannot queue safely, so show the error.
+        if (responseFailure.kind === "auth-required" && !editingOrderId) {
+          failure = responseFailure;
+          throw new Error("auth-required");
+        }
+        // A retryable 5xx may have committed AFTER the transaction (this API turns
+        // any late throw into a 500, and a proxy can 502/504 post-commit), so it is
+        // an UNCERTAIN outcome: preserve it and retry under the same key.
+        if (responseFailure.kind === "server-retryable" || responseFailure.kind === "server-permanent") {
+          failure = responseFailure;
+          throw new Error(responseFailure.kind);
+        }
+        // A definite server answer must NOT be queued. 409 in particular means the
+        // earlier attempt did land, so retire the key to unstick the terminal and
+        // point the cashier at the order that exists. The cart is left intact.
+        if (responseFailure.kind === "conflict") {
+          finishActiveDraft();
+          setError(messageForFailure(responseFailure));
+          return;
+        }
+        setError(messageForFailure(responseFailure) || String(data.error ?? "Failed to save order"));
         return;
       }
-      
+
       const completed = {
         orderId: data.orderId,
         orderNumber: data.orderNumber,
@@ -2053,6 +2486,9 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
       };
       
       localStorage.removeItem("rf_pos_draft_cart");
+      // Committed server-side (created or replayed) — retire the key so the next
+      // order starts a new identity.
+      finishActiveDraft();
 
       // New unpaid counter order → print kitchen slip, stay in Open Bills
       if (!editingOrderId && serviceMode === "counter" && paymentStatus === "unpaid") {
@@ -2071,11 +2507,58 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
       setCompletedOrder(completed);
       openPOSReceiptWindow(completed, restaurant.name, activeCashierName, printCopies);
     } catch (err) {
+      // Classify before deciding anything. A timeout, a dropped connection or an
+      // unverifiable session leaves the server's outcome UNKNOWN — the order may
+      // already be committed — so those hand off to the queue under the SAME key
+      // and synchronisation resolves them to the canonical order. A definite
+      // server answer, or a teardown nobody is watching, must not be queued.
+      const classified: SubmitFailure =
+        failure ??
+        classifyThrownFailure(err, {
+          online: navigator.onLine,
+          timedOut: bounded.timedOut(),
+          tornDown: bounded.tornDown(),
+        });
+
+      const plan = planHandoff(classified);
+      if (!plan.handoff) {
+        // Teardown: the cart and the draft key are both still persisted, so the
+        // cashier resubmits under the same identity and the server replays.
+        const message = messageForFailure(classified);
+        if (message) setError(message);
+        return;
+      }
+
       // Robust Offline Fallback: Write complete audit stamped transaction into IndexedDB.
-      // If we are editing an existing offline order, reuse its localOrderId to overwrite/update it,
-      // avoiding duplicate order creation in IndexedDB.
-      const mockOfflineId = editingOrderId || `offline-${Math.random().toString(36).substring(2, 9)}-${Date.now()}`;
-      
+      //
+      // Reuses the SAME key the online attempt carried. This is the fix for the
+      // duplicate-order bug: if the request actually reached the server and
+      // committed but the response was lost, the queued copy arrives later under
+      // this key and the server recognises it as a replay instead of creating a
+      // second order. Minting a new id here is what caused the duplicates.
+      const existingQueue = await dbGetAll<{ localOrderId?: string }>("ordersQueue").catch(() => []);
+      const handoff = classifyOfflineHandoff({
+        editingOrderId,
+        queuedLocalOrderIds: existingQueue
+          .map((o) => o.localOrderId)
+          .filter((id): id is string => typeof id === "string" && id.length > 0),
+        draftTxnId: txnId,
+      });
+
+      // An edit to an order that already exists on the server must never enter
+      // the creation queue — the sync route would mint a SECOND order with a new
+      // order number. Offline editing of a committed order is not supported, so
+      // fail closed with a message the cashier can act on. The original order is
+      // untouched and the cart is left intact so nothing is lost.
+      if (handoff.kind === "reject-server-edit") {
+        setError(
+          "Changes to an order that's already saved can't be made while offline. The original order is unchanged — reconnect and try again."
+        );
+        return;
+      }
+
+      const mockOfflineId = handoff.localOrderId;
+
       const offlineOrderRecord = {
         localOrderId: mockOfflineId,
         items: cart.map((c) => ({
@@ -2085,6 +2568,10 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
           quantity: c.quantity,
           selectedSize: c.selectedSize,
           selectedModifiers: c.selectedModifiers,
+          // Required for the sync route to reprice correctly AND to fingerprint
+          // the order — without it a custom-priced item silently reverted to the
+          // catalogue price on sync.
+          customPrice: c.customPrice ?? null,
           itemNote: c.itemNote,
         })),
         total: cartTotal,
@@ -2092,7 +2579,12 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
         cashierName: activeCashierName,
         deviceId: terminalId,
         terminalName: termName,
-        syncStatus: "pending" as const,
+        // Parked states (auth_required / attention) keep the order safe without
+        // entering the automatic retry path.
+        syncStatus: plan.queueState,
+        attemptCount: 0,
+        lastErrorCode: errorCodeOf(classified),
+        lastErrorCategory: errorCategoryOf(classified),
         createdAt: Date.now(),
         orderSource: "counter" as const,
         // Full context so the order can be displayed and settled while offline
@@ -2108,10 +2600,14 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
 
       try {
         await dbPut("ordersQueue", offlineOrderRecord);
-        
+        // Safely handed off: the key now lives in IndexedDB with the order, so
+        // the next transaction can start a new identity. Only after the put
+        // succeeds — if it threw, the cart is still live and must keep its key.
+        finishActiveDraft();
+
         // Update count of pending orders
-        const queue = await dbGetAll("ordersQueue");
-        setPendingOfflineCount(queue.filter((o: any) => o.syncStatus === "pending" || o.syncStatus === "failed").length);
+        const queue = await dbGetAll<QueuedOrderRecord>("ordersQueue");
+        setPendingOfflineCount(outstandingRecords(queue, Date.now()).length);
 
         const completed = {
           orderId: mockOfflineId,
@@ -2141,18 +2637,24 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
           setNote("");
           setEditingOrderId(null);
           setRightTab("bills");
-          showSystemToast(`Order #${mockOfflineId.slice(-6).toUpperCase()} saved offline — awaiting payment`);
+          showSystemToast(messageForQueuedHandoff(classified));
         } else {
           setCompletedOrder(completed);
           openPOSReceiptWindow(completed, restaurant.name, activeCashierName, printCopies);
-          showSystemToast("Internet offline. Order stored locally.");
+          showSystemToast(messageForQueuedHandoff(classified));
         }
         localStorage.removeItem("rf_pos_draft_cart");
       } catch (dbErr) {
-        console.error("IndexedDB write failed:", dbErr);
-        setError("Failed to save offline order to local database storage");
+        // The order is NOT saved. Keep the cart and the transaction identity so
+        // the cashier can retry under the same key, and say so plainly rather
+        // than implying it was stored.
+        console.error("POS offline hand-off failed:", dbErr);
+        setError(HANDOFF_FAILED_MESSAGE);
       }
     } finally {
+      inFlightRequestRef.current = null;
+      bounded.dispose();
+      submitInFlightRef.current = false;
       setSubmitting(false);
     }
   };
@@ -2748,10 +3250,21 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                 </span>
               </div>
 
+              {/* Orders that cannot sync on their own — never left silent */}
+              {attentionCount > 0 && (
+                <div
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 text-[10px] font-black uppercase tracking-wider text-amber-800 shrink-0"
+                  title="These orders are saved but could not be synced automatically. Check Open Bills, or ask a manager to review."
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  {attentionCount === 1 ? "1 order needs attention" : `${attentionCount} orders need attention`}
+                </div>
+              )}
+
               {/* Sync status indicators */}
               {pendingOfflineCount > 0 && (
                 <button
-                  onClick={triggerBackgroundSync}
+                  onClick={manualSyncAll}
                   disabled={syncingOffline || !isOnline}
                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full font-black text-[10px] uppercase tracking-wider transition-all border shrink-0 ${
                     syncFailed 
@@ -3207,7 +3720,14 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                     {cart.length > 0 && (
                       <button
                         type="button"
-                        onClick={() => setCart([])}
+                        onClick={() => {
+                          setCart([]);
+                          // Emptying the cart abandons this transaction. Retire its
+                          // key so the next order gets a fresh identity — reusing it
+                          // for different items is what the server reports as a
+                          // conflict.
+                          finishActiveDraft();
+                        }}
                         className="text-xs font-bold text-red-400 hover:text-red-600 transition-colors"
                       >
                         Clear all
