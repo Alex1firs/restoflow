@@ -72,8 +72,23 @@ export const HEARTBEAT_MS = 5_000;
  * long and `released` carries the common recovery case instead.
  */
 export const STALE_MS = 90_000;
-/** Released/stale drafts with no cart behind them are pruned after this. */
-export const PRUNE_AFTER_MS = 7 * 24 * 60 * 60 * 1_000;
+/**
+ * How long an orphaned draft stays eligible for recovery.
+ *
+ * A cart is only recoverable while it plausibly belongs to the shift it was rung
+ * up in. Anything older is stale bookkeeping, not an in-flight transaction, and
+ * treating it as a candidate is what made ordinary accumulated orphans look like
+ * a genuine ambiguity on a busy terminal.
+ */
+export const RECOVERY_WINDOW_MS = 12 * 60 * 60 * 1_000;
+
+/**
+ * Draft records are disposable ownership metadata — never orders. They are pruned
+ * aggressively so a terminal that has been opened and closed all week does not
+ * accumulate a pile of candidates. Order queue records live in IndexedDB and are
+ * NEVER touched by this module.
+ */
+export const PRUNE_AFTER_MS = 48 * 60 * 60 * 1_000;
 
 export interface PosDraft {
   draftId: string;
@@ -85,6 +100,53 @@ export interface PosDraft {
   heartbeatAt: number;
   /** Set on pagehide so a clean close is adoptable without waiting for staleness. */
   released?: boolean;
+  /**
+   * Fingerprint of the cart this draft was last seen holding.
+   *
+   * This is what makes recovery *matching* possible rather than guessing: a
+   * restored cart is only ever adopted by the draft that was actually holding
+   * that cart. Covers only item-level intent (id, quantity, size, modifiers,
+   * custom price, item note) because that is exactly what `rf_pos_draft_cart`
+   * persists and restores.
+   */
+  cartFingerprint?: string;
+  /** Item count, so a draft that never held anything is not a candidate. */
+  cartCount?: number;
+}
+
+/** Minimal shape needed to fingerprint a cart line. */
+export interface DraftCartItem {
+  id?: unknown;
+  quantity?: unknown;
+  customPrice?: unknown;
+  itemNote?: unknown;
+  selectedSize?: { name?: unknown } | null;
+  selectedModifiers?: Array<{ name?: unknown }> | null;
+}
+
+/**
+ * Stable fingerprint of a persisted cart, used only to match a restored cart to
+ * the draft that was holding it. Lines are sorted so ordering is not identity.
+ */
+export function cartFingerprint(cart: readonly DraftCartItem[]): string {
+  if (!Array.isArray(cart) || cart.length === 0) return "";
+  const lines = cart.map((item) => {
+    const id = String(item?.id ?? "");
+    const qty = Number(item?.quantity ?? 0);
+    const size = String(item?.selectedSize?.name ?? "");
+    const mods = (Array.isArray(item?.selectedModifiers) ? item.selectedModifiers : [])
+      .map((m: { name?: unknown }) => String(m?.name ?? ""))
+      .sort()
+      .join(",");
+    const custom =
+      item?.customPrice === null || item?.customPrice === undefined || item?.customPrice === ""
+        ? ""
+        : String(Number(item.customPrice));
+    const note = String(item?.itemNote ?? "").trim();
+    return `${id}:${qty}:${size}:${mods}:${custom}:${note}`;
+  });
+  lines.sort();
+  return `c1|${lines.join(";")}`;
 }
 
 export type DraftResolution =
@@ -127,6 +189,10 @@ export function readDrafts(local: KeyValueStorage): Record<string, PosDraft> {
           lastUpdatedAt: Number(d.lastUpdatedAt ?? 0),
           heartbeatAt: Number(d.heartbeatAt ?? 0),
           ...(d.released ? { released: true as const } : {}),
+          // Carried through so a restored cart can be matched to its own draft.
+          // Omitting these here silently disables recovery matching entirely.
+          ...(typeof d.cartFingerprint === "string" ? { cartFingerprint: d.cartFingerprint } : {}),
+          ...(typeof d.cartCount === "number" ? { cartCount: d.cartCount } : {}),
         };
       }
     }
@@ -153,7 +219,40 @@ export interface ResolveDraftInput {
   now: number;
   /** Whether a cart was restored from `rf_pos_draft_cart`. */
   hasPersistedCart: boolean;
+  /** Fingerprint of the restored cart, used to match it to its own draft. */
+  cartFingerprint?: string;
+  /**
+   * localOrderIds already present in the offline queue. Those transactions are
+   * owned by their queue record now, so their draft is vestigial and must not be
+   * offered as a recovery candidate.
+   */
+  queuedLocalOrderIds?: readonly string[];
   mint?: () => string;
+}
+
+/**
+ * Can this draft plausibly be the one holding the restored cart?
+ *
+ * Every clause here exists because its absence caused the production regression:
+ * an orphan was a candidate purely for being adoptable, so ordinary accumulated
+ * drafts from past sessions looked like a genuine ambiguity and blocked the till.
+ */
+export function isRecoveryCandidate(
+  draft: PosDraft,
+  input: { now: number; cartFingerprint?: string; queued?: readonly string[] }
+): boolean {
+  const { now, cartFingerprint: fp, queued } = input;
+  // Held by a live tab — never steal it.
+  if (!isAdoptable(draft, now)) return false;
+  // Too old to be an in-flight transaction.
+  if (now - Math.max(draft.lastUpdatedAt, draft.heartbeatAt) > RECOVERY_WINDOW_MS) return false;
+  // Its transaction already lives in the offline queue, which owns it now.
+  if (queued && queued.includes(draft.localOrderId)) return false;
+  // Never held a cart, so it cannot be the owner of this one.
+  if (!draft.cartFingerprint || (draft.cartCount ?? 0) === 0) return false;
+  // Must actually match the cart we are trying to place.
+  if (!fp) return false;
+  return draft.cartFingerprint === fp;
 }
 
 /**
@@ -182,9 +281,20 @@ export function resolveDraft(input: ResolveDraftInput): DraftResolution {
     return { kind: "created", draft: createDraft(local, session, drafts, now, mint) };
   }
 
-  // 3. A cart came back but this tab owns nothing: look for an orphan to adopt.
+  // 3. A cart came back but this tab owns nothing: look for the draft that was
+  //    actually holding THIS cart. Matching on cart identity — rather than merely
+  //    counting adoptable orphans — is what stops routine leftovers from reading
+  //    as an ambiguity and blocking the terminal.
   const candidates = Object.values(drafts)
-    .filter((d) => d.draftId !== ownedId && isAdoptable(d, now))
+    .filter(
+      (d) =>
+        d.draftId !== ownedId &&
+        isRecoveryCandidate(d, {
+          now,
+          cartFingerprint: input.cartFingerprint,
+          queued: input.queuedLocalOrderIds,
+        })
+    )
     .sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt);
 
   if (candidates.length === 1) {
@@ -197,12 +307,14 @@ export function resolveDraft(input: ResolveDraftInput): DraftResolution {
   }
 
   if (candidates.length > 1) {
-    // Never merge and never guess — see the module comment.
+    // Several drafts genuinely held an identical cart. Never merge, never guess —
+    // the caller preserves the cart and asks a human. This is now rare: it needs
+    // two recent drafts with byte-identical carts, not merely two leftovers.
     return { kind: "ambiguous", candidates };
   }
 
-  // A cart is present but every draft is held by a live tab (or there are none,
-  // e.g. a cart persisted by a client that predates this model). Mint once and
+  // No draft matches this cart, so it was never associated with a recoverable
+  // transaction: an unrelated orphan must NOT be adopted for it. Mint once and
   // persist immediately.
   return { kind: "created", draft: createDraft(local, session, drafts, now, mint) };
 }
@@ -227,14 +339,43 @@ function createDraft(
   return draft;
 }
 
-/** Refreshes liveness (and the change timestamp) for the draft this tab holds. */
-export function touchDraft(local: KeyValueStorage, draftId: string, now: number): void {
+/**
+ * Refreshes liveness for the draft this tab holds, and records what cart it is
+ * holding so a later restore can be matched to it rather than guessed at.
+ */
+export function touchDraft(
+  local: KeyValueStorage,
+  draftId: string,
+  now: number,
+  cart?: readonly DraftCartItem[]
+): void {
   const drafts = readDrafts(local);
   const draft = drafts[draftId];
   if (!draft) return;
-  drafts[draftId] = { ...draft, heartbeatAt: now, lastUpdatedAt: now };
-  delete (drafts[draftId] as Partial<PosDraft>).released;
+  const next: PosDraft = { ...draft, heartbeatAt: now, lastUpdatedAt: now };
+  if (cart) {
+    next.cartFingerprint = cartFingerprint(cart);
+    next.cartCount = cart.length;
+  }
+  delete (next as Partial<PosDraft>).released;
+  drafts[draftId] = next;
   writeDrafts(local, drafts);
+}
+
+/**
+ * Begins a deliberately new transaction in this tab.
+ *
+ * Used when the previous transaction has ended and the cashier is starting the
+ * next one, and when they explicitly choose to abandon an unmatched cart. Always
+ * mints — it never adopts, so it cannot inherit an unrelated identity.
+ */
+export function startNewDraft(
+  local: KeyValueStorage,
+  session: KeyValueStorage,
+  now: number,
+  mint: () => string = mintTxnId
+): PosDraft {
+  return createDraft(local, session, readDrafts(local), now, mint);
 }
 
 /**

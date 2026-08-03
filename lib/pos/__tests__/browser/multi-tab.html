@@ -31,14 +31,26 @@
   let last = null;
 
   const storages = () => D.posDraftStorages();
-  const hasCart = () => {
-    try { return (JSON.parse(localStorage.getItem(CART_KEY) || "[]") || []).length > 0; }
-    catch { return false; }
+  const cartItems = () => {
+    try { return JSON.parse(localStorage.getItem(CART_KEY) || "[]") || []; }
+    catch { return []; }
   };
+  const hasCart = () => cartItems().length > 0;
 
   function mount() {
     const { local, session } = storages();
-    last = D.resolveDraft({ local, session, now: Date.now(), hasPersistedCart: hasCart() });
+    const cart = cartItems();
+    last = D.resolveDraft({
+      local, session, now: Date.now(),
+      hasPersistedCart: cart.length > 0,
+      // Match the restored cart to the draft that was actually holding it.
+      cartFingerprint: D.cartFingerprint(cart),
+      queuedLocalOrderIds: JSON.parse(localStorage.getItem("harness_queue") || "[]"),
+    });
+    // The cart-persist effect then records which cart this draft holds.
+    if (last.kind !== "ambiguous" && cart.length > 0) {
+      D.touchDraft(local, last.draft.draftId, Date.now(), cart);
+    }
     return last;
   }
 
@@ -66,7 +78,7 @@
   on("clear-cart", () => localStorage.setItem(CART_KEY, "[]"));
   on("mount", mount);
   on("heartbeat", () => {
-    if (last && last.draft) D.touchDraft(storages().local, last.draft.draftId, Date.now());
+    if (last && last.draft) D.touchDraft(storages().local, last.draft.draftId, Date.now(), cartItems());
   });
   on("release", () => {
     if (last && last.draft) D.releaseDraft(storages().local, last.draft.draftId, Date.now());

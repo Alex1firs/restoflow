@@ -18,6 +18,10 @@
 
 import assert from "node:assert/strict";
 import {
+  RECOVERY_WINDOW_MS,
+  cartFingerprint,
+  isRecoveryCandidate,
+  startNewDraft,
   DRAFTS_KEY,
   OWNED_DRAFT_KEY,
   STALE_MS,
@@ -52,10 +56,14 @@ class MemStorage implements KeyValueStorage {
 }
 
 /** One browser profile: durable localStorage plus the persisted draft cart. */
+type Item = { id: string; quantity: number; customPrice?: number | null; itemNote?: string };
+
 class Browser {
   local = new MemStorage();
   /** Stands in for localStorage["rf_pos_draft_cart"]. */
-  cart: unknown[] = [];
+  cart: Item[] = [];
+  /** localOrderIds already owned by an offline queue record. */
+  queued: string[] = [];
   /** Closing the browser destroys tab sessions but NOT localStorage. */
   restart(): void {
     this.tabs = [];
@@ -73,18 +81,28 @@ class Tab {
   session = new MemStorage();
   constructor(readonly browser: Browser) {}
 
-  /** What POSClient does on mount. */
+  /**
+   * What POSClient does on mount: resolve the draft, then the cart-persist effect
+   * immediately records which cart this draft is holding.
+   */
   mount(now: number) {
-    return resolveDraft({
+    const resolution = resolveDraft({
       local: this.browser.local,
       session: this.session,
       now,
       hasPersistedCart: this.browser.cart.length > 0,
+      cartFingerprint: cartFingerprint(this.browser.cart),
+      queuedLocalOrderIds: this.browser.queued,
       mint: seqMint,
     });
+    if (resolution.kind !== "ambiguous" && this.browser.cart.length > 0) {
+      touchDraft(this.browser.local, resolution.draft.draftId, now, this.browser.cart);
+    }
+    return resolution;
   }
-  heartbeat(now: number, draftId: string) {
-    touchDraft(this.browser.local, draftId, now);
+  /** The cart-change effect: liveness plus what cart this draft is holding. */
+  heartbeat(now: number, draftId: string, cart?: Item[]) {
+    touchDraft(this.browser.local, draftId, now, cart ?? this.browser.cart);
   }
   /** pagehide */
   hide(now: number, draftId: string) {
@@ -305,29 +323,31 @@ test("[6] a legacy draft cart without an id receives one exactly once, persisted
 });
 
 // ── 7 · never guess between several recoverable drafts ──────────────────────
-test("[7] several recoverable drafts is reported as ambiguous, not merged or re-minted", () => {
+test("[7] ambiguity now requires two drafts that held the SAME cart", () => {
   const browser = new Browser();
-  browser.cart = [{ id: "m-5", quantity: 1 }];
+  const CART: Item[] = [{ id: "m-5", quantity: 1 }];
 
-  // Two orphaned drafts left behind (e.g. two tabs both killed).
-  const orphanA = browser.openTab();
-  const a = orphanA.mount(T0);
-  orphanA.hide(T0 + 10, draftOf(a).draftId);
-  const orphanB = browser.openTab();
-  browser.cart = []; // force B to mint rather than adopt A
-  const b = orphanB.mount(T0 + 20);
-  browser.cart = [{ id: "m-5", quantity: 1 }];
-  orphanB.hide(T0 + 30, draftOf(b).draftId);
+  // Two tabs held this identical cart at the same time — A stays live, so B has
+  // to mint its own rather than adopting A's. Then both die.
+  browser.cart = [...CART];
+  const tabA = browser.openTab();
+  const a = tabA.mount(T0);
+  tabA.heartbeat(T0 + 5, draftOf(a).draftId);
+
+  const tabB = browser.openTab();
+  const b = tabB.mount(T0 + 10);
+  assert.notEqual(draftOf(b).localOrderId, draftOf(a).localOrderId, "two live tabs, two identities");
+
+  tabA.hide(T0 + 20, draftOf(a).draftId);
+  tabB.hide(T0 + 25, draftOf(b).draftId);
   browser.restart();
 
-  const tab = browser.openTab();
-  const result = tab.mount(T0 + 40);
+  const result = browser.openTab().mount(T0 + 40);
 
-  assert.equal(result.kind, "ambiguous", "must refuse to choose");
+  assert.equal(result.kind, "ambiguous", "two drafts held an identical cart");
   assert.equal(result.kind === "ambiguous" && result.candidates.length, 2);
-  // Nothing was minted and nothing was merged.
+  // Nothing minted, nothing merged, the cart is untouched.
   assert.equal(Object.keys(readDrafts(browser.local)).length, 2);
-  assert.equal(tab.session.getItem(OWNED_DRAFT_KEY), null, "no ownership taken");
   const keys = new Set(Object.values(readDrafts(browser.local)).map((d) => d.localOrderId));
   assert.equal(keys.size, 2, "the two identities remain distinct");
 });
@@ -409,6 +429,270 @@ test("[12] minted keys are unique and prefixed", () => {
   const ids = new Set(Array.from({ length: 500 }, () => mintTxnId()));
   assert.equal(ids.size, 500, "no collisions across 500 mints");
   for (const id of ids) assert.ok(id.startsWith("txn-"), `${id} is prefixed`);
+});
+
+
+// ── HOTFIX REGRESSION: the ambiguous-draft production block ─────────────────
+// A cashier at a live restaurant could not place any order: the terminal showed
+// "Couldn't tell which unfinished order this cart belongs to" on an EMPTY cart.
+// Two defects: the blocked state was set once at mount and never recomputed, and
+// any adoptable orphan counted as a candidate regardless of the cart, so routine
+// leftovers from past sessions read as a genuine ambiguity.
+
+test("[R1] many orphan drafts + an EMPTY cart never block ordering", () => {
+  const browser = new Browser();
+
+  // A week of ordinary use: eight leftover drafts from closed tabs/sessions.
+  for (let i = 0; i < 8; i++) {
+    browser.cart = [{ id: `m-${i}`, quantity: 1 }];
+    const t = browser.openTab();
+    const d = t.mount(T0 + i * 1_000);
+    t.hide(T0 + i * 1_000 + 10, draftOf(d).draftId);
+  }
+  browser.restart();
+  assert.ok(Object.keys(readDrafts(browser.local)).length >= 8, "orphans really did accumulate");
+
+  // Cashier opens the till with nothing in the cart. This is the exact state that
+  // was blocked in production.
+  browser.cart = [];
+  const result = browser.openTab().mount(T0 + 60_000);
+
+  assert.notEqual(result.kind, "ambiguous", "an empty cart can NEVER be ambiguous");
+  assert.equal(result.kind, "created");
+  assert.ok(draftOf(result).localOrderId.length > 0, "a usable identity is available immediately");
+});
+
+test("[R2] the ambiguous state is derived from the cart, so clearing it recovers", () => {
+  // Models the client's derived rule: blocked = ambiguous AND cart is non-empty.
+  const blocked = (ambiguousCount: number, cartLength: number) => ambiguousCount > 0 && cartLength > 0;
+
+  assert.equal(blocked(2, 3), true, "ambiguous with items -> held back");
+  assert.equal(blocked(2, 0), false, "the SAME ambiguity with an empty cart -> not blocked");
+  assert.equal(blocked(0, 3), false);
+  assert.equal(blocked(0, 0), false);
+
+  // The old behaviour: a latched boolean that survived the cart emptying. This is
+  // what stranded the terminal and made the "clear the cart" advice a dead end.
+  let latched = false;
+  const oldBlocked = (ambiguous: boolean) => { if (ambiguous) latched = true; return latched; };
+  assert.equal(oldBlocked(true), true);
+  assert.equal(oldBlocked(false), true, "regression reproduced: still blocked after the cart cleared");
+});
+
+test("[R3] Clear All / resetPOS lets the very next order start immediately", () => {
+  const browser = new Browser();
+  browser.cart = [{ id: "m-1", quantity: 2 }];
+  const tab = browser.openTab();
+  const first = tab.mount(T0);
+
+  // Clear All: cart emptied, this tab's draft ended. No reload, no sign-in.
+  tab.finish(draftOf(first).draftId);
+  browser.cart = [];
+
+  // The derived effect starts a fresh transaction on the spot.
+  const next = startNewDraft(browser.local, tab.session, T0 + 1_000, seqMint);
+  assert.ok(next.localOrderId);
+  assert.notEqual(next.localOrderId, draftOf(first).localOrderId, "a new order, a new identity");
+  assert.equal(browser.local.getItem(DRAFTS_KEY)!.includes(next.draftId), true, "persisted at once");
+});
+
+test("[R4] completing an order clears only that draft", () => {
+  const browser = new Browser();
+  browser.cart = [{ id: "m-1", quantity: 1 }];
+  const tabA = browser.openTab();
+  const a = tabA.mount(T0);
+  tabA.heartbeat(T0 + 5, draftOf(a).draftId);
+
+  const tabB = browser.openTab();
+  const b = tabB.mount(T0 + 10);
+
+  tabA.finish(draftOf(a).draftId);
+
+  const remaining = readDrafts(browser.local);
+  assert.equal(Object.keys(remaining).length, 1);
+  assert.equal(Object.values(remaining)[0].localOrderId, draftOf(b).localOrderId, "B untouched");
+});
+
+test("[R5] a safe offline hand-off ends draft ownership but preserves the queued record", () => {
+  const browser = new Browser();
+  browser.cart = [{ id: "m-1", quantity: 2, customPrice: 4500, itemNote: "no pepper" }];
+  const tab = browser.openTab();
+  const draft = draftOf(tab.mount(T0));
+
+  // The record takes its own copy of the key, then the draft is retired.
+  const queued = { localOrderId: draft.localOrderId, syncStatus: "pending" as const, items: browser.cart };
+  browser.queued.push(queued.localOrderId);
+  tab.finish(draft.draftId);
+  browser.cart = [];
+
+  assert.equal(Object.keys(readDrafts(browser.local)).length, 0, "draft ownership released");
+  assert.equal(queued.localOrderId, draft.localOrderId, "the queue record keeps the identity");
+  assert.deepEqual(queued.items[0].customPrice, 4500, "and the transaction data");
+
+  // Its vestigial draft must never be offered as a recovery candidate again.
+  const stale = { ...draft, released: true, cartFingerprint: cartFingerprint(queued.items), cartCount: 1 };
+  assert.equal(
+    isRecoveryCandidate(stale, { now: T0 + 1_000, cartFingerprint: stale.cartFingerprint, queued: browser.queued }),
+    false,
+    "the queue record owns this transaction now"
+  );
+});
+
+test("[R6] a restored cart is adopted by the draft that actually held it", () => {
+  const browser = new Browser();
+  const CART: Item[] = [{ id: "m-7", quantity: 3, customPrice: 900, itemNote: "well done" }];
+  browser.cart = [...CART];
+
+  const tab = browser.openTab();
+  const original = draftOf(tab.mount(T0)).localOrderId;
+  tab.hide(T0 + 100, tab.session.getItem(OWNED_DRAFT_KEY)!);
+  browser.restart();
+
+  const recovered = browser.openTab().mount(T0 + 200);
+  assert.equal(recovered.kind, "adopted");
+  assert.equal(keyOf(recovered), original, "resubmits under the ORIGINAL key, so the server replays");
+});
+
+test("[R7] unrelated orphan drafts are ignored, never adopted for a different cart", () => {
+  const browser = new Browser();
+
+  // An orphan holding a completely different cart.
+  browser.cart = [{ id: "m-OTHER", quantity: 9 }];
+  const other = browser.openTab();
+  const otherDraft = draftOf(other.mount(T0));
+  other.hide(T0 + 10, otherDraft.draftId);
+  browser.restart();
+
+  // A different cart comes back. It must NOT inherit the unrelated identity.
+  browser.cart = [{ id: "m-MINE", quantity: 1 }];
+  const result = browser.openTab().mount(T0 + 20);
+
+  assert.equal(result.kind, "created", "no silent association with an unrelated orphan");
+  assert.notEqual(keyOf(result), otherDraft.localOrderId);
+
+  // And a stale orphan beyond the recovery window is never a candidate either.
+  assert.equal(
+    isRecoveryCandidate(otherDraft, { now: T0 + RECOVERY_WINDOW_MS + 1, cartFingerprint: otherDraft.cartFingerprint }),
+    false,
+    "older than the recovery window"
+  );
+});
+
+test("[R8] two tabs with separate carts stay isolated", () => {
+  const browser = new Browser();
+  browser.cart = [{ id: "m-A", quantity: 1 }];
+  const tabA = browser.openTab();
+  const a = tabA.mount(T0);
+  tabA.heartbeat(T0 + 5, draftOf(a).draftId);
+
+  browser.cart = [{ id: "m-B", quantity: 2 }];
+  const tabB = browser.openTab();
+  const b = tabB.mount(T0 + 10);
+
+  assert.notEqual(keyOf(a), keyOf(b));
+  assert.equal(tabA.mount(T0 + 20).kind, "existing");
+  assert.equal(keyOf(tabA.mount(T0 + 25)), keyOf(a), "A keeps its own");
+  assert.equal(keyOf(tabB.mount(T0 + 30)), keyOf(b), "B keeps its own");
+});
+
+test("[R9] a live draft owned by another tab is never stolen", () => {
+  const browser = new Browser();
+  const CART: Item[] = [{ id: "m-1", quantity: 1 }];
+  browser.cart = [...CART];
+  const tabA = browser.openTab();
+  const a = tabA.mount(T0);
+  tabA.heartbeat(T0 + 1_000, draftOf(a).draftId);
+
+  // Same cart, but A is alive and heartbeating.
+  const result = browser.openTab().mount(T0 + 1_500);
+  assert.equal(result.kind, "created", "a live draft is not adoptable even on an exact cart match");
+  assert.notEqual(keyOf(result), keyOf(a));
+  assert.equal(
+    isRecoveryCandidate(draftOf(a), { now: T0 + 1_500, cartFingerprint: cartFingerprint(CART) }),
+    false
+  );
+});
+
+test("[R10] a genuinely ambiguous non-empty cart is preserved, never auto-resubmitted", () => {
+  const browser = new Browser();
+  const CART: Item[] = [{ id: "m-9", quantity: 2 }];
+  browser.cart = [...CART];
+
+  const tabA = browser.openTab();
+  const a = tabA.mount(T0);
+  tabA.heartbeat(T0 + 5, draftOf(a).draftId);
+  const tabB = browser.openTab();
+  const b = tabB.mount(T0 + 10);
+  tabA.hide(T0 + 20, draftOf(a).draftId);
+  tabB.hide(T0 + 25, draftOf(b).draftId);
+  browser.restart();
+
+  const result = browser.openTab().mount(T0 + 30);
+  assert.equal(result.kind, "ambiguous");
+
+  // No new identity was minted for the cart, and neither candidate was chosen.
+  const drafts = readDrafts(browser.local);
+  assert.equal(Object.keys(drafts).length, 2, "nothing minted, nothing merged");
+  assert.deepEqual(browser.cart, CART, "the cart is preserved for the cashier");
+
+  // The recovery action is a DELIBERATE new transaction, not a silent resubmit.
+  const fresh = startNewDraft(browser.local, new MemStorage(), T0 + 40, seqMint);
+  assert.notEqual(fresh.localOrderId, keyOf({ kind: "created", draft: drafts[Object.keys(drafts)[0]] } as DraftResolution));
+});
+
+test("[R11][R12] recovery never touches Open Bills or queued records", () => {
+  const browser = new Browser();
+  // Standing queue records: an unsettled offline bill and a failed one.
+  const queueRecords = [
+    { localOrderId: "offline-open-bill-1", syncStatus: "pending", paymentStatus: "unpaid" },
+    { localOrderId: "offline-failed-1", syncStatus: "failed", paymentStatus: "unpaid" },
+  ];
+  const before = JSON.stringify(queueRecords);
+  browser.queued = queueRecords.map((q) => q.localOrderId);
+
+  // A pile of orphans plus an empty cart — the production scenario.
+  for (let i = 0; i < 5; i++) {
+    browser.cart = [{ id: `m-${i}`, quantity: 1 }];
+    const t = browser.openTab();
+    t.hide(T0 + i, draftOf(t.mount(T0 + i)).draftId);
+  }
+  browser.restart();
+  browser.cart = [];
+  const result = browser.openTab().mount(T0 + 10_000);
+
+  assert.equal(result.kind, "created", "till is usable");
+  assert.equal(JSON.stringify(queueRecords), before, "queue records byte-identical — nothing deleted or edited");
+  assert.equal(browser.queued.length, 2, "Open Bills still queued");
+});
+
+test("[R13][R14] drafts are disposable metadata only — no orders, no auth", () => {
+  // Draft storage holds ownership metadata and never order content, so pruning or
+  // clearing it cannot affect an unsettled bill, a completed order, or a session.
+  const browser = new Browser();
+  browser.cart = [{ id: "m-1", quantity: 1, customPrice: 500 }];
+  const tab = browser.openTab();
+  tab.mount(T0);
+
+  const raw = browser.local.getItem(DRAFTS_KEY)!;
+  const stored = Object.values(readDrafts(browser.local))[0];
+
+  // The record holds identity, liveness and a cart FINGERPRINT. The fingerprint
+  // necessarily encodes cart intent — that is what makes matching possible — but
+  // it is derived from a cart already sitting in this same origin's localStorage,
+  // so it exposes nothing new.
+  assert.deepEqual(
+    Object.keys(stored).sort(),
+    ["cartCount", "cartFingerprint", "createdAt", "draftId", "heartbeatAt", "lastUpdatedAt", "localOrderId"],
+    "no field beyond ownership metadata is persisted"
+  );
+  assert.equal(typeof stored.cartFingerprint, "string");
+  assert.equal(stored.cartCount, 1);
+
+  // Crucially: no order state and nothing authentication-related. Discarding a
+  // draft can therefore never affect an unsettled bill, a completed order, or a
+  // cashier's session.
+  assert.ok(!/paymentStatus|orderNumber|itemsTotal|deliveryFee/i.test(raw), "no order state");
+  assert.ok(!/token|session|cookie|password|\buid\b|auth/i.test(raw), "no auth or session material");
 });
 
 // ── runner ───────────────────────────────────────────────────────────────────

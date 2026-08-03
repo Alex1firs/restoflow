@@ -71,7 +71,9 @@ import {
   endDraft,
   posDraftStorages,
   releaseDraft,
+  cartFingerprint,
   resolveDraft,
+  startNewDraft,
   touchDraft,
   type PosDraft,
 } from "@/lib/pos/draft";
@@ -931,8 +933,13 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   const inFlightRequestRef = useRef<{ teardown: () => void } | null>(null);
   // This tab's durable draft record; holds the transaction's localOrderId.
   const draftRef = useRef<PosDraft | null>(null);
-  // Set when several recoverable drafts exist and we refuse to guess between them.
-  const [draftBlocked, setDraftBlocked] = useState(false);
+  // Set only when several drafts genuinely held THIS cart and we refuse to guess.
+  // Never sticky: it is cleared the moment the cart is empty, because an empty
+  // cart cannot belong to an unfinished transaction.
+  const [ambiguousDraftCount, setAmbiguousDraftCount] = useState(0);
+  // Guards the empty-cart recovery effect until the mount resolution has run, so
+  // it cannot fire against the pre-restore empty cart and discard the real one.
+  const draftResolvedRef = useRef(false);
   // Records parked for a human (409 conflicts, permanent failures, exhausted
   // retries) or awaiting sign-in. Visible so nothing sits stuck in silence.
   const [attentionCount, setAttentionCount] = useState(0);
@@ -1281,10 +1288,12 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
   useEffect(() => {
     const draft = localStorage.getItem("rf_pos_draft_cart");
     let restoredCartCount = 0;
+    let restoredCart: CartItem[] = [];
     if (draft) {
       try {
         const parsed = JSON.parse(draft);
         if (Array.isArray(parsed)) {
+          restoredCart = parsed;
           restoredCartCount = parsed.length;
           setCart(parsed);
         }
@@ -1296,25 +1305,34 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
     // adopted rather than replaced — that is what stops a browser restart from
     // resubmitting the same order under a new key and duplicating it.
     const { local, session } = posDraftStorages();
-    const resolution = resolveDraft({
-      local,
-      session,
-      now: Date.now(),
-      hasPersistedCart: restoredCartCount > 0,
-    });
-    if (resolution.kind === "ambiguous") {
-      // Never guess between recoverable transactions. Block submission and let a
-      // human decide, instead of minting an identity that could duplicate.
-      draftRef.current = null;
-      setDraftBlocked(true);
-      console.error(
-        `POS draft recovery ambiguous: ${resolution.candidates.length} recoverable drafts`,
-        resolution.candidates.map((c) => c.localOrderId)
-      );
-    } else {
-      draftRef.current = resolution.draft;
-      setDraftBlocked(false);
-    }
+    dbGetAll<QueuedOrderRecord>("ordersQueue")
+      .catch(() => [] as QueuedOrderRecord[])
+      .then((queue) => {
+        const resolution = resolveDraft({
+          local,
+          session,
+          now: Date.now(),
+          hasPersistedCart: restoredCartCount > 0,
+          // Match the restored cart to the draft that was actually holding it.
+          cartFingerprint: cartFingerprint(restoredCart),
+          // A transaction already in the queue is owned by that record, not by a
+          // leftover draft.
+          queuedLocalOrderIds: queue.map((q) => q.localOrderId).filter(Boolean),
+        });
+        if (resolution.kind === "ambiguous") {
+          // Never guess between recoverable transactions. The cart is preserved
+          // and the cashier is offered a choice; only THIS cart is held back.
+          draftRef.current = null;
+          setAmbiguousDraftCount(resolution.candidates.length);
+          console.error(
+            `POS draft recovery ambiguous: ${resolution.candidates.length} drafts held an identical cart`
+          );
+        } else {
+          draftRef.current = resolution.draft;
+          setAmbiguousDraftCount(0);
+        }
+        draftResolvedRef.current = true;
+      });
 
     const devId = getDeviceId();
     setTerminalId(devId);
@@ -1687,7 +1705,7 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
     // Editing the cart is also proof this tab is alive and still owns its draft,
     // which is what keeps another tab from adopting it.
     const id = draftRef.current?.draftId;
-    if (id) touchDraft(posDraftStorages().local, id, Date.now());
+    if (id) touchDraft(posDraftStorages().local, id, Date.now(), cart);
   }, [cart]);
 
   // Abort any in-flight submission when this component goes away, and mark it as
@@ -1712,6 +1730,27 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
       loadOfflineQueueBills();
     });
   }, [loadOfflineQueueBills]);
+
+  /**
+   * An empty cart can never belong to an unfinished transaction, so it must never
+   * be blocked.
+   *
+   * This is the fix for the production regression: the ambiguity state used to be
+   * set once at mount and never recomputed, so a terminal stayed blocked for every
+   * subsequent order — and the message told the cashier to clear the cart, which
+   * did nothing. The state is now derived from the current cart, so it clears
+   * itself on Clear All, resetPOS, a completed order and a safe offline hand-off,
+   * with no reload and no sign-in.
+   */
+  useEffect(() => {
+    if (!draftResolvedRef.current) return;
+    if (cart.length > 0) return;
+    if (ambiguousDraftCount > 0) setAmbiguousDraftCount(0);
+    if (!draftRef.current) {
+      const { local, session } = posDraftStorages();
+      draftRef.current = startNewDraft(local, session, Date.now());
+    }
+  }, [cart.length, ambiguousDraftCount]);
 
   // Liveness: advertise that this tab still holds its draft, and release it on
   // pagehide so a cleanly closed browser can recover the identity immediately
@@ -2283,6 +2322,30 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
     }
   };
 
+  /**
+   * Cashier deliberately abandons a cart that could not be matched to one
+   * transaction, and starts a new order.
+   *
+   * Discards ONLY the local cart and this tab's draft ownership. It does not
+   * touch server orders, Open Bills, or any queued record — those keep their own
+   * identities and sync independently. Confirmed because it loses local work.
+   */
+  const clearUnmatchedCartAndStartNew = () => {
+    if (!window.confirm(
+      "Clear this cart and start a new order?\n\nThe items on screen will be discarded. Orders already saved or waiting to sync are not affected."
+    )) return;
+    setCart([]);
+    setCustomerName("");
+    setNote("");
+    setEditingOrderId(null);
+    localStorage.removeItem("rf_pos_draft_cart");
+    finishActiveDraft();
+    setAmbiguousDraftCount(0);
+    const { local, session } = posDraftStorages();
+    draftRef.current = startNewDraft(local, session, Date.now());
+    setError(null);
+  };
+
   const resetPOS = () => {
     setCart([]);
     setServiceMode("counter");
@@ -2375,16 +2438,20 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
     // restart, so every retry — a lost response, a restored cart, the offline
     // queue draining later — carries the same key. That is what lets the server
     // collapse them into one order. Re-opening an offline bill keeps its identity.
-    if (draftBlocked && !editingOrderId) {
+    if (ambiguousDraftCount > 0 && cart.length > 0 && !editingOrderId) {
       setError(
-        "Couldn't tell which unfinished order this cart belongs to. Please check Open Bills, then clear the cart and ring it up again."
+        "We found an unfinished cart but could not safely match it to one transaction. Check Open Bills before clearing this cart."
       );
       return;
     }
-    const draftKey = activeLocalOrderId();
+    // The previous transaction ended and this tab has not started the next one
+    // yet. Mint deliberately rather than adopting anything: the cashier built
+    // this cart here, so it is a genuinely new transaction.
+    let draftKey = activeLocalOrderId();
     if (!draftKey && !editingOrderId) {
-      setError("Couldn't start this order safely. Please reload the page and try again.");
-      return;
+      const { local, session } = posDraftStorages();
+      draftRef.current = startNewDraft(local, session, Date.now());
+      draftKey = draftRef.current.localOrderId;
     }
     const txnId = editingOrderId || draftKey!;
 
@@ -3249,6 +3316,29 @@ export default function POSClient({ restaurant, menuItems, staffName, staffId, r
                   {isOnline ? "Online" : "Offline Mode"}
                 </span>
               </div>
+
+              {/* An unfinished cart we could not match. Only shown while the cart
+                  actually has items — an empty cart is never blocked. */}
+              {ambiguousDraftCount > 0 && cart.length > 0 && (
+                <div className="flex items-center gap-2 px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 text-[10px] font-bold text-amber-900 shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  <span className="uppercase tracking-wider">Unfinished cart</span>
+                  <button
+                    type="button"
+                    onClick={() => setRightTab("bills")}
+                    className="underline font-black hover:text-amber-950"
+                  >
+                    Check Open Bills
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearUnmatchedCartAndStartNew}
+                    className="underline font-black hover:text-amber-950"
+                  >
+                    Clear cart &amp; start new
+                  </button>
+                </div>
+              )}
 
               {/* Orders that cannot sync on their own — never left silent */}
               {attentionCount > 0 && (
