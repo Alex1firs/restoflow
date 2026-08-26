@@ -179,7 +179,13 @@ export default async function RestaurantPage({
           </div>
           <h1 className="text-2xl font-black text-gray-900 mb-3">{restaurant.name}</h1>
           <p className="text-gray-500 font-medium mb-2">Online ordering is temporarily unavailable.</p>
-          <p className="text-gray-400 text-sm">Please contact the restaurant directly to place your order.</p>
+          <p className="text-gray-400 text-sm mb-6">Please contact the restaurant directly to place your order.</p>
+          <Link
+            href={`/admin/${slug}/settings`}
+            className="inline-flex items-center justify-center w-full px-4 py-3 bg-gray-50 text-gray-700 text-sm font-semibold rounded-xl border border-gray-200 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+          >
+            Restaurant Owner? Manage Subscription
+          </Link>
         </div>
       </div>
     );
