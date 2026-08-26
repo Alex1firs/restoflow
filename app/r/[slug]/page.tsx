@@ -182,7 +182,7 @@ export default async function RestaurantPage({
           <p className="text-gray-400 text-sm mb-6">Please contact the restaurant directly to place your order.</p>
           <Link
             href={`/admin/${slug}/settings`}
-            className="inline-flex items-center justify-center w-full px-4 py-3 bg-gray-50 text-gray-700 text-sm font-semibold rounded-xl border border-gray-200 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+            className="inline-flex items-center justify-center w-full px-4 py-3.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold rounded-xl shadow-sm shadow-orange-500/20 transition-all duration-200 active:scale-[0.98]"
           >
             Restaurant Owner? Manage Subscription
           </Link>
