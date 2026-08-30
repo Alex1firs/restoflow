@@ -1,22 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHmac } from "crypto";
-import { serverEnv } from "@/lib/env";
+import { createHash } from "crypto";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { resolveTargets, verifyPaystackSignature } from "@/lib/paystack-relay-signature";
 
 export async function POST(req: NextRequest) {
+  // The RAW body, captured before anything parses it. Every downstream step —
+  // our own HMAC and the receiver's independent one — is computed over these
+  // exact bytes, so it is never re-serialised.
   const rawBody = await req.text();
 
   const signature = req.headers.get("x-paystack-signature");
-  if (!signature) {
-    return NextResponse.json({ error: "Missing signature" }, { status: 401 });
-  }
 
-  // serverEnv.PAYSTACK_SECRET_KEY throws immediately if the var is unset.
-  const secret = serverEnv.PAYSTACK_SECRET_KEY;
-  const expected = createHmac("sha512", secret).update(rawBody).digest("hex");
+  // Paystack signs TEST events with the TEST secret and LIVE events with the
+  // LIVE secret. Verifying against only one meant every event of the other kind
+  // was rejected here, before routing — which is why CintaMart's test payments
+  // never arrived. Either secret is now accepted; neither is logged, and which
+  // one matched is never disclosed in a response.
+  const check = verifyPaystackSignature(rawBody, signature, {
+    live: process.env.PAYSTACK_SECRET_KEY,
+    test: process.env.PAYSTACK_TEST_SECRET_KEY,
+  });
 
-  if (signature !== expected) {
+  if (!check.ok) {
+    // Observability for the failure that hid this bug for three payments: a 401
+    // returned before any dead-letter write, so a misconfigured relay looked
+    // healthy from Paystack's side while delivering nothing.
+    //
+    // The body is UNSIGNED at this point and therefore untrusted, so nothing is
+    // parsed out of it. A SHA-256 fingerprint and byte length are enough to
+    // correlate a rejection with a Paystack delivery attempt without storing
+    // payment data.
+    await writeDeadLetter({
+      event: null,
+      rawBody: "",
+      reason: `invalid_signature:${check.reason ?? "unknown"}`,
+      route: "/api/webhooks/relay",
+      bodySha256: createHash("sha256").update(rawBody).digest("hex"),
+      bodyBytes: Buffer.byteLength(rawBody),
+    });
+
+    // HTTP semantics unchanged: one opaque 401, whatever the reason.
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
@@ -27,20 +51,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
+  // Only now, on a VERIFIED event, is the payload trusted enough to route on.
   const project = event.data?.metadata?.project;
-
-  // Collect all registered webhook targets from env (WEBHOOK_URL_*)
-  const allTargets = Object.entries(process.env)
-    .filter(([key, val]) => key.startsWith("WEBHOOK_URL_") && val)
-    .map(([, url]) => url as string);
-
-  // If project is specified, route only to that target; otherwise broadcast to all
-  const targets = project
-    ? (() => {
-        const url = process.env[`WEBHOOK_URL_${project.toUpperCase()}`];
-        return url ? [url] : [];
-      })()
-    : allTargets;
+  const targets = resolveTargets(project, process.env);
 
   // If no targets are configured, write to dead-letter so the event is not lost.
   // Paystack retries on non-2xx, but we return 200 to avoid infinite retries for
@@ -81,6 +94,10 @@ async function writeDeadLetter(payload: {
   event: unknown;
   rawBody: string;
   reason: string;
+  route?: string;
+  /** Correlates a rejection with a delivery attempt without storing the payload. */
+  bodySha256?: string;
+  bodyBytes?: number;
   failures?: { url: string; reason: string }[];
 }) {
   try {
