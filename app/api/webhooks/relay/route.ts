@@ -10,19 +10,22 @@ export async function POST(req: NextRequest) {
   // exact bytes, so it is never re-serialised.
   const rawBody = await req.text();
 
-  const signature = req.headers.get("x-paystack-signature");
+  const rawSignature = req.headers.get("x-paystack-signature");
 
   // Paystack signs TEST events with the TEST secret and LIVE events with the
   // LIVE secret. Verifying against only one meant every event of the other kind
   // was rejected here, before routing — which is why CintaMart's test payments
   // never arrived. Either secret is now accepted; neither is logged, and which
   // one matched is never disclosed in a response.
-  const check = verifyPaystackSignature(rawBody, signature, {
+  const check = verifyPaystackSignature(rawBody, rawSignature, {
     live: process.env.PAYSTACK_SECRET_KEY,
     test: process.env.PAYSTACK_TEST_SECRET_KEY,
   });
 
-  if (!check.ok) {
+  // The rawSignature test is redundant — verification already rejects a missing
+  // header — but it is what narrows the header to a string for the forward
+  // below, which must relay the original value unchanged.
+  if (!check.ok || !rawSignature) {
     // Observability for the failure that hid this bug for three payments: a 401
     // returned before any dead-letter write, so a misconfigured relay looked
     // healthy from Paystack's side while delivering nothing.
@@ -43,6 +46,8 @@ export async function POST(req: NextRequest) {
     // HTTP semantics unchanged: one opaque 401, whatever the reason.
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
+
+  const signature = rawSignature;
 
   let event: { event?: string; data?: { metadata?: { project?: string } } };
   try {
