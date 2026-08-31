@@ -74,7 +74,10 @@ test("[5] the restaurant guard lives INSIDE the transaction, not in the route", 
 test("[6] cross-restaurant access is reported as 404, never 403", () => {
   const route = readFileSync(
     join(process.cwd(), "app/api/admin/marketplace/orders/[orderId]/route.ts"), "utf8");
-  assert.match(route, /another restaurant.*\? 404/s,
+  // No `s` flag: the project's tsconfig target predates it. Collapse newlines
+  // instead, which is clearer than a dotAll regex anyway.
+  const flat = route.replace(/\s+/g, " ");
+  assert.match(flat, /another restaurant.{0,80}\? 404 : 409/,
     "confirming an order exists but belongs to somebody else is itself a disclosure");
 });
 
