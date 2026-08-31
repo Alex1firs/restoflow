@@ -186,6 +186,22 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ─── Marketplace delivery integration (Dispatcher) ───────────────────────────
+    // Event-replay claims and the support timeline for marketplace deliveries.
+    // Written ONLY by the server (Admin SDK, which bypasses these rules) from the
+    // signed Dispatcher webhook. The claim document is what makes a redelivered
+    // event a no-op; the timeline is what support reads to answer "where is this
+    // order?". Neither is ever read or written directly by any client — the
+    // customer app reaches delivery state through /api/mobile/v1 only.
+    match /marketplace_delivery_events/{eventId} {
+      allow read:  if false;
+      allow write: if false;
+    }
+    match /marketplace_delivery_timeline/{entryId} {
+      allow read:  if false;
+      allow write: if false;
+    }
+
     // ─── POS order idempotency claims ────────────────────────────────────────────
     // One document per (restaurant, localOrderId) cashier transaction, written
     // ONLY by the server (Admin SDK, which bypasses these rules) inside the same
