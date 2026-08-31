@@ -186,6 +186,32 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ─── Marketplace commerce (orders, payments, ledger, outbox) ────────────────
+    // The money. Payment intents hold a basket between checkout and capture;
+    // marketplace_payments is the per-reference idempotency record; the ledger
+    // is append-only financial history; the outbox deduplicates notifications.
+    //
+    // ALL server-only (Admin SDK bypasses these rules). A customer reaches their
+    // own order through /api/mobile/v1, a restaurant through the admin routes,
+    // and nobody reaches the ledger from a client at all — a balance a client
+    // could write is not a balance.
+    match /marketplace_payment_intents/{reference} {
+      allow read:  if false;
+      allow write: if false;
+    }
+    match /marketplace_payments/{reference} {
+      allow read:  if false;
+      allow write: if false;
+    }
+    match /marketplace_ledger_entries/{entryId} {
+      allow read:  if false;
+      allow write: if false;
+    }
+    match /marketplace_notification_outbox/{outboxId} {
+      allow read:  if false;
+      allow write: if false;
+    }
+
     // ─── Marketplace delivery integration (Dispatcher) ───────────────────────────
     // Event-replay claims and the support timeline for marketplace deliveries.
     // Written ONLY by the server (Admin SDK, which bypasses these rules) from the

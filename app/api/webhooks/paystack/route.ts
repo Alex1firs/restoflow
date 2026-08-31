@@ -103,6 +103,13 @@ export async function POST(req: NextRequest) {
             }
           }
         }
+      } else if (metadata?.paymentType === "marketplace_order") {
+        // Marketplace orders are collected by the platform, not settled to a
+        // restaurant subaccount, so they cannot reuse the branch above. Gated
+        // on the feature flag: with the marketplace off this is unreachable and
+        // the webhook behaves exactly as it did before.
+        const { handleMarketplacePaymentWebhook } = await import("@/lib/marketplace/webhook");
+        await handleMarketplacePaymentWebhook(event.data);
       } else {
         await processSuccessfulPayment(event.data);
       }

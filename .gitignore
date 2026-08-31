@@ -33,6 +33,7 @@ yarn-error.log*
 # env files — exclude real secrets, track the example template
 .env*
 !.env.example
+!.env.staging.example
 
 # vercel
 .vercel
