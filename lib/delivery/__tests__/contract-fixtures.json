@@ -1,0 +1,196 @@
+{
+  "_comment": "SHARED between the RestoFlow and Dispatcher repositories. Both assert identical results against these cases, so a field rename or a mapping change in one repo is a failing test in the other rather than a production incident. Keep the two copies byte-identical.",
+  "contractVersion": "1.0.0",
+  "contractMajor": 1,
+  "deliveryStates": [
+    "REQUESTED",
+    "SEARCHING_FOR_DRIVER",
+    "DRIVER_ASSIGNED",
+    "DRIVER_TO_PICKUP",
+    "ARRIVED_AT_PICKUP",
+    "WAITING_FOR_ORDER",
+    "PICKED_UP",
+    "EN_ROUTE_TO_CUSTOMER",
+    "ARRIVING",
+    "DELIVERED",
+    "REASSIGNING",
+    "DRIVER_CANCELLED",
+    "CUSTOMER_UNREACHABLE",
+    "RESTAURANT_DELAY",
+    "DELIVERY_FAILED",
+    "CANCELLED"
+  ],
+  "terminalStates": [
+    "DELIVERED",
+    "DELIVERY_FAILED",
+    "CANCELLED"
+  ],
+  "failureReasons": [
+    "CUSTOMER_UNREACHABLE",
+    "CUSTOMER_REFUSED",
+    "ADDRESS_NOT_FOUND",
+    "RESTAURANT_NOT_READY",
+    "NO_DRIVER_FOUND",
+    "DRIVER_ACCIDENT",
+    "PACKAGE_DAMAGED",
+    "OTHER"
+  ],
+  "cancelledBy": [
+    "CUSTOMER",
+    "RESTAURANT",
+    "PLATFORM",
+    "DRIVER",
+    "SYSTEM"
+  ],
+  "eventTypes": [
+    "delivery.state_changed",
+    "delivery.driver_assigned",
+    "delivery.failed",
+    "delivery.cancelled"
+  ],
+  "headers": {
+    "apiKey": "x-rf-api-key",
+    "signature": "x-rf-signature",
+    "timestamp": "x-rf-timestamp",
+    "correlationId": "x-rf-correlation-id",
+    "idempotencyKey": "x-rf-idempotency-key",
+    "contractVersion": "x-rf-contract-version",
+    "eventId": "x-rf-event-id",
+    "attempt": "x-rf-attempt"
+  },
+  "statusMapping": [
+    {
+      "dispatcher": {
+        "status": "draft"
+      },
+      "canonical": "REQUESTED"
+    },
+    {
+      "dispatcher": {
+        "status": "pending"
+      },
+      "canonical": "SEARCHING_FOR_DRIVER"
+    },
+    {
+      "dispatcher": {
+        "status": "pending",
+        "reassigning": true
+      },
+      "canonical": "REASSIGNING"
+    },
+    {
+      "dispatcher": {
+        "status": "accepted"
+      },
+      "canonical": "DRIVER_ASSIGNED"
+    },
+    {
+      "dispatcher": {
+        "status": "assigned"
+      },
+      "canonical": "DRIVER_ASSIGNED"
+    },
+    {
+      "dispatcher": {
+        "status": "in_progress"
+      },
+      "canonical": "DRIVER_TO_PICKUP"
+    },
+    {
+      "dispatcher": {
+        "status": "in_progress",
+        "arrivedAtPickupAt": 1
+      },
+      "canonical": "ARRIVED_AT_PICKUP"
+    },
+    {
+      "dispatcher": {
+        "status": "in_progress",
+        "pickedUpAt": 2
+      },
+      "canonical": "EN_ROUTE_TO_CUSTOMER"
+    },
+    {
+      "dispatcher": {
+        "status": "in_progress",
+        "arrivedAtPickupAt": 1,
+        "pickedUpAt": 2
+      },
+      "canonical": "EN_ROUTE_TO_CUSTOMER"
+    },
+    {
+      "dispatcher": {
+        "status": "completed"
+      },
+      "canonical": "DELIVERED"
+    },
+    {
+      "dispatcher": {
+        "status": "cancelled"
+      },
+      "canonical": "CANCELLED"
+    },
+    {
+      "dispatcher": {
+        "status": "declined"
+      },
+      "canonical": "REASSIGNING"
+    },
+    {
+      "dispatcher": {
+        "status": "returned_to_sender"
+      },
+      "canonical": "DELIVERY_FAILED"
+    },
+    {
+      "dispatcher": {
+        "status": "rescheduled"
+      },
+      "canonical": "DELIVERY_FAILED"
+    },
+    {
+      "dispatcher": {
+        "status": "  ACCEPTED  "
+      },
+      "canonical": "DRIVER_ASSIGNED"
+    },
+    {
+      "dispatcher": {
+        "status": "teleported"
+      },
+      "canonical": null
+    },
+    {
+      "dispatcher": {
+        "status": ""
+      },
+      "canonical": null
+    }
+  ],
+  "signature": {
+    "secret": "fixture-shared-secret",
+    "timestampMs": 1756000000000,
+    "rawBody": "{\"eventId\":\"evt-1\",\"state\":\"PICKED_UP\"}",
+    "expected": "v1=21bc89406341b8b1002f96edadb3f43b9a670435132d72aa3a3d1e65bdb4c578"
+  },
+  "forbiddenOutboundKeys": [
+    "foodSubtotal",
+    "itemsTotal",
+    "customerSubtotal",
+    "restaurantSubtotal",
+    "markup",
+    "markupTotal",
+    "marketplaceMarkup",
+    "platformGross",
+    "platformMargin",
+    "restaurantPayable",
+    "settlement",
+    "settlementId",
+    "processorFee",
+    "customerId",
+    "customerEmail",
+    "customerUid",
+    "paymentReference",
+    "items"
+  ]
+}
