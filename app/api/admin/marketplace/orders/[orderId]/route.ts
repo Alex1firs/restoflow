@@ -88,6 +88,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ord
   // repeated Accept, a retry, or the reconcile sweep all converge on one job.
   if (result.to === "accepted") {
     try {
+      // Marked BEFORE the attempt, so a crash between here and the write back
+      // is recoverable too. The handoff clears it when the job attaches.
+      await store.markHandoffPending(orderId, nowMs).catch(() => {});
       const { requestDeliveryForOrder } = await import("@/lib/marketplace/delivery-handoff");
       const handoff = await requestDeliveryForOrder({ db, orderId, nowMs });
       console.log(JSON.stringify({

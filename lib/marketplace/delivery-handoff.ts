@@ -174,6 +174,8 @@ export async function requestDeliveryForOrder(args: {
     if (existing?.deliveryJobId) return String(existing.deliveryJobId);
     tx.update(ref, {
       delivery: projection,
+      // The order no longer owes Dispatcher a request; the retry sweep skips it.
+      deliveryHandoffPending: null,
       // When to release the job to riders: back off from the food being ready
       // by the courier's travel time, so a rider is not idling at the counter.
       deliveryConfirmAt: computeConfirmAt({

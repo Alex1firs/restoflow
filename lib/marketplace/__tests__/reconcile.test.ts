@@ -89,4 +89,30 @@ test("[10] an amount mismatch is loud in the logs and vague to the customer", ()
     "the customer must not be told the expected amount");
 });
 
+test("[11] an acceptance that could not reach Dispatcher is retried", () => {
+  // Acceptance deliberately swallows a Dispatcher failure so the restaurant is
+  // not shown an error. Without this sweep that trade would strand the order.
+  assert.match(SWEEPS, /handoffSweep\(/);
+  assert.match(SWEEPS, /findPendingHandoffs/);
+  assert.match(SWEEPS, /requestDeliveryForOrder/);
+});
+
+test("[12] the retry marker is set before the attempt and cleared on success", () => {
+  const ACCEPT = strip(readFileSync(join(ROOT, "app/api/admin/marketplace/orders/[orderId]/route.ts"), "utf8"));
+  const HANDOFF = strip(readFileSync(join(ROOT, "lib/marketplace/delivery-handoff.ts"), "utf8"));
+  const mark = ACCEPT.indexOf("markHandoffPending");
+  const call = ACCEPT.indexOf("requestDeliveryForOrder", mark);
+  assert.ok(mark > -1 && call > mark,
+    "marking after the attempt would lose a crash between the two");
+  // Cleared inside the same transaction that attaches the job, so a retry
+  // cannot see an attached order as still owing one.
+  assert.match(HANDOFF, /deliveryHandoffPending: null/);
+});
+
+test("[13] an order rejected after acceptance stops being retried", () => {
+  const seg = SWEEPS.slice(SWEEPS.indexOf("handoffSweep("));
+  assert.match(seg, /outcome === "skipped"[\s\S]{0,200}clearHandoffPending/,
+    "a skipped handoff must clear the marker, not retry forever");
+});
+
 console.log(`\n${passed} checks passed\n`);

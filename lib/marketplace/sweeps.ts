@@ -27,8 +27,64 @@ export type SweepRun = {
   reconcile: WorkerResult;
   /** Payments Paystack accepted but no webhook ever told us about. */
   intents: WorkerResult;
+  /** Orders the restaurant accepted that never got a courier requested. */
+  handoffs: WorkerResult;
   durationMs: number;
 };
+
+/** Long enough that a slow-but-succeeding handoff is not raced by a retry. */
+const HANDOFF_RETRY_AFTER_MS = 60_000;
+
+/**
+ * Retry the accept → Dispatcher handoff.
+ *
+ * Acceptance deliberately does not fail when Dispatcher is unreachable — the
+ * restaurant IS committed and must not see an error, nor have the acceptance
+ * rolled back. That trade needs this on the other side of it, or an order
+ * accepted during a Dispatcher blip would wait for a rider forever.
+ *
+ * Safe to run against an order that already has a job: `requestDeliveryForOrder`
+ * returns `already_attached` without calling Dispatcher, and `externalOrderId`
+ * means even a genuine double-call yields the same job.
+ */
+async function handoffSweep(
+  db: ReturnType<typeof getAdminDb>,
+  store: FirestoreMarketplaceStore,
+  nowMs: number
+): Promise<WorkerResult> {
+  const r: WorkerResult = { scanned: 0, actioned: 0, skipped: 0, failed: 0, attention: [] };
+  const { requestDeliveryForOrder } = await import("./delivery-handoff");
+
+  const pending = await store.findPendingHandoffs(nowMs - HANDOFF_RETRY_AFTER_MS, BATCH_SIZE);
+  r.scanned = pending.length;
+
+  for (const orderId of pending) {
+    try {
+      const outcome = await requestDeliveryForOrder({ db, orderId, nowMs });
+      if (outcome.outcome === "created" || outcome.outcome === "already_attached") {
+        r.actioned++;
+        log("handoff_retry_succeeded", { orderId, deliveryJobId: outcome.deliveryJobId });
+      } else if (outcome.outcome === "skipped") {
+        // Rejected, cancelled or refunded since. Stop asking.
+        await store.clearHandoffPending(orderId);
+        r.skipped++;
+        log("handoff_retry_abandoned", { orderId, reason: outcome.reason });
+      } else {
+        r.failed++;
+        if (!outcome.retryable) {
+          r.attention.push(orderId);
+          await store.markAttention(orderId, `handoff_failed:${outcome.reason}`, nowMs).catch(() => {});
+        }
+      }
+    } catch (err) {
+      r.failed++;
+      log("handoff_retry_threw", { orderId, error: String(err) });
+    }
+  }
+
+  log("handoff_sweep", { ...r, attention: r.attention.length });
+  return r;
+}
 
 /**
  * The payment-reconciliation sweep's ports.
@@ -63,7 +119,7 @@ export async function runMarketplaceSweeps(nowMs: number): Promise<SweepRun> {
     // Money is still reconciled: a charged customer gets their order even with
     // the delivery integration switched off.
     const intents = await intentSweep(intentPorts(db, nowMs), nowMs);
-    return { confirm: empty, reconcile: empty, intents, durationMs: Date.now() - started };
+    return { confirm: empty, reconcile: empty, intents, handoffs: empty, durationMs: Date.now() - started };
   }
 
   const deliveryStore = new FirestoreDeliveryStore(db);
@@ -126,8 +182,9 @@ export async function runMarketplaceSweeps(nowMs: number): Promise<SweepRun> {
   const reconcile = await reconcileSweep(reconcilePorts, nowMs, STALE_AFTER_MS);
   // Last, and independent of the two above: it repairs money, not logistics.
   const intents = await intentSweep(intentPorts(db, nowMs), nowMs);
+  const handoffs = await handoffSweep(db, marketplaceStore, nowMs);
 
-  return { confirm, reconcile, intents, durationMs: Date.now() - started };
+  return { confirm, reconcile, intents, handoffs, durationMs: Date.now() - started };
 }
 
 export { BATCH_SIZE };

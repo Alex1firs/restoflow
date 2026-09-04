@@ -111,8 +111,16 @@ export function GET(req: Request, ctx: { params: Promise<{ orderId: string }> })
       restaurantLocation: null,
       destination: null,
       pollIntervalMs: pollIntervalMs(state),
-      canMessageCourier: copy.showContact,
-      // Masked calling is a later phase; the seam is in the contract.
+      // Both false, honestly.
+      //
+      // Dispatcher HAS a conversation store (functions/integration/chat.js) and
+      // the contract already carries an opaque per-delivery `contactHandle` for
+      // exactly this — but those functions are not mounted on any partner
+      // endpoint, so there is nothing for the app to call yet. Reporting `true`
+      // here put a live-looking Message button on the tracking screen whose tap
+      // did nothing. Exposing them means adding routes to the Dispatcher core,
+      // which is a phase of its own.
+      canMessageCourier: false,
       canCallCourier: false,
       trackingAvailable: true,
     };

@@ -191,6 +191,34 @@ export class FirestoreMarketplaceStore implements PaymentStore {
     });
   }
 
+  /**
+   * Remember that this order still owes Dispatcher a delivery request.
+   *
+   * Written when the restaurant accepts, cleared when the job attaches. It
+   * exists because Firestore cannot query for an ABSENT field: without a
+   * marker there is no way to ask "which accepted orders never got a courier",
+   * and an acceptance that happened while Dispatcher was unreachable would
+   * simply never be retried.
+   */
+  async markHandoffPending(orderId: string, nowMs: number): Promise<void> {
+    await this.db.collection("orders").doc(orderId).update({ deliveryHandoffPending: nowMs });
+  }
+
+  async clearHandoffPending(orderId: string): Promise<void> {
+    await this.db.collection("orders").doc(orderId).update({ deliveryHandoffPending: null });
+  }
+
+  /** Accepted orders still waiting on a delivery job, oldest first. */
+  async findPendingHandoffs(olderThanMs: number, limit: number): Promise<string[]> {
+    const snap = await this.db
+      .collection("orders")
+      .where("deliveryHandoffPending", "<=", olderThanMs)
+      .orderBy("deliveryHandoffPending", "asc")
+      .limit(limit)
+      .get();
+    return snap.docs.map((d) => d.id);
+  }
+
   /** Schedules the moment the delivery job is released to riders. */
   async setDeliveryConfirmAt(orderId: string, confirmAt: number): Promise<void> {
     await this.db.collection("orders").doc(orderId).update({ deliveryConfirmAt: confirmAt });
