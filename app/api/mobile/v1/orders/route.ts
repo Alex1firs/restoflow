@@ -43,6 +43,16 @@ export const GET = withCustomer(async ({ customer }) => {
  * holding. A quote is a display; this is the number that gets charged, and the
  * two must be computed the same way from the same source.
  */
+/** Reserved TLDs that can never receive mail (RFC 2606 / RFC 6761). */
+const UNDELIVERABLE_TLDS = [".invalid", ".test", ".example", ".localhost"];
+
+function paystackEmailFor(email: string | null): string {
+  if (!email) return "orders@restoflow.app";
+  const lower = email.toLowerCase();
+  if (UNDELIVERABLE_TLDS.some((t) => lower.endsWith(t))) return "orders@restoflow.app";
+  return email;
+}
+
 export const POST = withCustomer(async ({ customer, req }) => {
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object") return badRequest("Invalid request body");
@@ -131,7 +141,12 @@ export const POST = withCustomer(async ({ customer, req }) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      email: customer.email ?? "orders@restoflow.app",
+      // Paystack rejects reserved, undeliverable TLDs (.invalid, .test,
+      // .example, .localhost) — which is exactly what synthetic staging
+      // accounts use so they can never receive real mail. Substitute only for
+      // those; a real customer's address must still reach them, because this
+      // is where the provider sends the receipt.
+      email: paystackEmailFor(customer.email),
       amount: quote.snapshot.totalChargedMinor,
       currency: "NGN",
       reference,
@@ -146,6 +161,9 @@ export const POST = withCustomer(async ({ customer, req }) => {
     console.error(JSON.stringify({
       scope: "marketplace_checkout", event: "provider_init_failed",
       reference, correlationId, status: init.status,
+      // The provider's error text, which carries no secret and is the only way
+      // to tell "bad email" from "bad key" from "amount out of range".
+      providerError: await init.text().catch(() => "<unreadable>"),
     }));
     return unprocessable("We couldn't start your payment. Please try again.", { code: "PROVIDER_ERROR" });
   }
