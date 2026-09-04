@@ -141,7 +141,7 @@ async function main() {
       }));
       deliveryStore.seedOrder({
         orderId, restaurantId: intent.restaurantId, customerId: intent.customerId,
-        restaurantProgress: "placed",
+        restaurantName: "Trisha's Kitchen", restaurantProgress: "placed",
         delivery: initialProjection({ correlationId: intent.correlationId, quoteId: intent.quoteId, nowMs }),
       });
       return { orderId, created: true };

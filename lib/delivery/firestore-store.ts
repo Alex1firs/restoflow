@@ -152,6 +152,11 @@ function toView(orderId: string, d: Record<string, unknown>): DeliveryOrderView 
   return {
     orderId,
     restaurantId,
+    // Deliberately NOT falling back to restaurantId: a slug is worse than a
+    // generic noun in a sentence a customer reads.
+    restaurantName: typeof d.restaurantName === "string" && d.restaurantName.trim()
+      ? d.restaurantName
+      : null,
     customerId: typeof d.customerId === "string" ? d.customerId : "",
     restaurantProgress: toProgress(d),
     delivery,

@@ -92,7 +92,13 @@ export function GET(req: Request, ctx: { params: Promise<{ orderId: string }> })
     const driver = (live.ok ? live.value.driver : null) ?? projection.driver;
     const restaurantState = (order!.restaurantProgress ?? "placed") as RestaurantState;
     const { stage, problem } = toCustomerStage(restaurantState, state);
-    const copy = toCustomerFacing(state, { driverFirstName: driver?.firstName });
+    const copy = toCustomerFacing(state, {
+      driverFirstName: driver?.firstName,
+      // "Enjoy your food from Trisha's Kitchen" rather than "…from the
+      // restaurant". Absent on orders written before the field existed, and
+      // `toCustomerFacing` already falls back for that case.
+      restaurantName: order!.restaurantName ?? undefined,
+    });
 
     const payload = buildTrackingPayload({
       state,

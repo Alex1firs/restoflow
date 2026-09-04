@@ -25,7 +25,7 @@ const proj = (over: Partial<DeliveryProjection> = {}): DeliveryProjection => ({
 function storeWith(over: Partial<DeliveryProjection> = {}) {
   return new FakeDeliveryStore().seedOrder({
     orderId: "RF-1", restaurantId: "trishas", customerId: "cust-a",
-    restaurantProgress: "preparing", delivery: proj(over),
+    restaurantName: "Trisha's Kitchen", restaurantProgress: "preparing", delivery: proj(over),
   });
 }
 

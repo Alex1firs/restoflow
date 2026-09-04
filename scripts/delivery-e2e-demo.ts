@@ -238,7 +238,7 @@ async function main() {
 
   store.seedOrder({
     orderId: ORDER_ID, restaurantId: "trishas-kitchen", customerId: CUSTOMER,
-    restaurantProgress: "preparing",
+    restaurantName: "Trisha's Kitchen", restaurantProgress: "preparing",
     delivery: { ...initialProjection({ correlationId, quoteId: q.quoteId, nowMs: now() }), deliveryJobId: job.deliveryJobId },
   });
 

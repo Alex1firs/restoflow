@@ -14,6 +14,14 @@ import type { RestaurantProgress } from "./status";
 export type DeliveryOrderView = {
   orderId: string;
   restaurantId: string;
+  /**
+   * The restaurant's display name, when the order carries one.
+   *
+   * Null for orders written before the field existed — the customer-facing
+   * copy falls back to "the restaurant" rather than printing an internal slug,
+   * so an old order reads a little generically instead of wrongly.
+   */
+  restaurantName: string | null;
   /** Firebase Auth uid of the owning customer. The IDOR check hangs off this. */
   customerId: string;
   restaurantProgress: RestaurantProgress;

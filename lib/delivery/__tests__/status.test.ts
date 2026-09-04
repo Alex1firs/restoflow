@@ -167,4 +167,14 @@ test("[19] tracking opens at assignment and closes permanently at terminal", () 
   assert.equal(trackingAllowed("CANCELLED"), false);
 });
 
+test("[13] a delivered order names the restaurant when the order carries one", () => {
+  const named = toCustomerFacing("DELIVERED", { restaurantName: "Trisha's Kitchen" });
+  assert.match(named.detail ?? "", /Trisha's Kitchen/);
+  // Orders written before the field existed still read as a sentence, not as
+  // an internal slug.
+  const anonymous = toCustomerFacing("DELIVERED");
+  assert.match(anonymous.detail ?? "", /the restaurant/);
+  assert.ok(!/stg-|undefined|null/.test(anonymous.detail ?? ""));
+});
+
 console.log(`\n${passed} checks passed\n`);
