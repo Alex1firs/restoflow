@@ -101,6 +101,25 @@ export const POST = withCustomer(async ({ customer, req }) => {
   // orphan intent, which the TTL sweep clears and nobody ever sees.
   await new FirestoreMarketplaceStore(db).putIntent(intent);
 
+  // A staging deployment must never be able to charge a real card.
+  //
+  // Checked here rather than at boot because this is the only line that moves
+  // money: if the wrong key is ever configured, the failure should be a
+  // refused checkout, not a live charge somebody has to refund. The key's
+  // value is never logged — only the prefix decides.
+  if (
+    process.env.DELIVERY_ENVIRONMENT === "staging" &&
+    !serverEnv.PAYSTACK_SECRET_KEY.startsWith("sk_test_")
+  ) {
+    console.error(JSON.stringify({
+      scope: "marketplace_checkout", event: "refused_non_test_key_in_staging", reference,
+    }));
+    return unprocessable(
+      "Staging is not configured with a test payment key.",
+      { code: "LIVE_KEY_IN_STAGING" }
+    );
+  }
+
   // Server-side initialize, the same as the storefront checkout: the reference
   // and the amount are ours, and no Paystack key of any kind reaches the phone.
   // Note there is no `subaccount` — marketplace money is collected by the
