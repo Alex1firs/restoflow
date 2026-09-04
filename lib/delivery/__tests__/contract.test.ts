@@ -68,8 +68,21 @@ test("[7] external ids are narrow, and reject traversal / injection shapes", () 
   assert.equal(isValidExternalId("../../etc/passwd"), false);
   assert.equal(isValidExternalId("has space"), false);
   assert.equal(isValidExternalId(""), false);
-  assert.equal(isValidExternalId("-leading"), false);
   assert.equal(isValidExternalId("a".repeat(200)), false);
+
+  // A LEADING HYPHEN IS VALID, and this is not a relaxation for its own sake.
+  // Firebase RTDB push keys begin with one, and those keys are Dispatcher's
+  // delivery job ids — so rejecting them meant every delivery event referenced
+  // an id the receiver called malformed. Staging caught it; unit tests could
+  // not, because both sides agreed with themselves.
+  assert.equal(isValidExternalId("-P0eCVY4Vfp72vnsGv5z"), true);
+  assert.equal(isValidExternalId("-P0eCVY4Vfp72vnsGv5z-1"), true);
+
+  // What the narrowness was actually protecting against is unchanged.
+  assert.equal(isValidExternalId("--"), true);           // hyphens are just characters
+  assert.equal(isValidExternalId("-/../etc"), false);    // no traversal
+  assert.equal(isValidExternalId("-a b"), false);        // no whitespace
+  assert.equal(isValidExternalId("-a;rm -rf /"), false); // no shell metacharacters
 });
 
 const goodCreate = (): CreateDeliveryRequest => ({

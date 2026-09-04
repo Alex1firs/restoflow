@@ -7,7 +7,7 @@
     },
     {
       "path": "/api/cron/marketplace",
-      "schedule": "* * * * *"
+      "schedule": "0 3 * * *"
     }
   ]
 }

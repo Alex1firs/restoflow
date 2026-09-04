@@ -158,3 +158,29 @@ writes to a POS order. `RestoFlow` restaurants keep two unlinked catalogues,
 which is exactly what makes marketplace markup free of consequences for POS
 prices. Two tests assert this: one over the mobile routes, one over the whole
 delivery module.
+
+## The marketplace sweep cannot run per-minute on Vercel Hobby
+
+`vercel.json` asks for `/api/cron/marketplace` every minute. Vercel **Hobby
+accounts allow daily crons only**, and a deployment carrying `* * * * *` is
+rejected outright — a production deploy of this branch would fail the same way.
+
+The schedule is therefore set to `0 3 * * *` so deployments succeed. That is
+not sufficient for the real workload: the sweep exists to fire `confirmAt`
+transitions and reconcile deliveries whose events were lost, and a daily pass
+would leave an order stuck for hours.
+
+Two ways to restore per-minute cadence, neither of which needs Vercel Pro:
+
+1. **External scheduler (recommended, free).** The Dispatcher droplet already
+   runs cron. One line hitting the endpoint with the shared secret:
+
+       * * * * * curl -fsS -H "Authorization: Bearer $CRON_SECRET" \
+         https://<host>/api/cron/marketplace >/dev/null 2>&1
+
+   The endpoint is already secret-guarded and idempotent, so a duplicate or
+   overlapping run is harmless.
+
+2. **Vercel Pro**, which lifts the restriction.
+
+Until one is in place, treat the sweep as manual in staging.

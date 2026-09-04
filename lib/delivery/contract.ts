@@ -392,8 +392,20 @@ function nonEmpty(v: unknown): v is string {
  * External ids travel in URLs, log lines and document keys on both sides, so
  * the safe set is deliberately narrow. `__` is not special here, but keeping the
  * set tight means a composite key built from these can never be ambiguous.
+ *
+ * A LEADING HYPHEN is permitted because Firebase RTDB push keys begin with one
+ * (`-P0eCVY4Vfp72vnsGv5z`), and those keys ARE Dispatcher's delivery job ids.
+ * Forbidding it meant every delivery event referenced an id the receiving side
+ * rejected as malformed: the events arrived, verified, and were thrown away
+ * with `eventId invalid`. Found by running the two systems against each other
+ * in staging — no unit test on either side could have caught it, because each
+ * was internally consistent.
+ *
+ * A leading hyphen is safe in a URL path segment and as a Firestore document
+ * id. It is NOT safe as a bare CLI argument, so never interpolate one straight
+ * into a shell command.
  */
-const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+const SAFE_ID = /^[A-Za-z0-9-][A-Za-z0-9_-]{0,127}$/;
 
 export function isValidExternalId(v: unknown): v is string {
   return typeof v === "string" && SAFE_ID.test(v);
