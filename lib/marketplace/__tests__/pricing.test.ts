@@ -2,6 +2,8 @@
 // Run: npx tsx lib/marketplace/__tests__/pricing.test.ts
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   resolveMarkup, applyMarkup, roundUpTo, priceLine, buildSnapshot, checkInvariants,
   DEFAULT_ROUND_TO, formatNaira,
@@ -278,6 +280,38 @@ test("[20] a delivery subsidy is expressible as a NEGATIVE delivery margin", () 
   assert.equal(s.platformGrossMinor, 200_000 - 200_000, "the markup pays for the free delivery");
   assert.equal(s.restaurantPayableMinor, 1_000_000, "the restaurant is unaffected");
   assert.equal(checkInvariants(s).ok, true);
+});
+
+test("[MARKUP APPLIES ONCE] an option is not marked up twice", () => {
+  // Found on staging: the storefront displayed a ₦500 option at ₦600 (20%),
+  // and checkout charged ₦750 — because the quote fed the ALREADY marked-up
+  // customer price into `optionsTotalMinor`, which is marked up again with the
+  // base. The customer was shown one price and charged another.
+  const config = cfg({ restaurantDefault: { type: "percent", bps: 2000 }, roundToMinor: 0 });
+
+  const plain = priceLine({ dishId: "d", name: "Jollof", quantity: 1, basePriceMinor: 350_000 }, config);
+  const withOption = priceLine(
+    { dishId: "d", name: "Jollof", quantity: 1, basePriceMinor: 350_000, optionsTotalMinor: 50_000 },
+    config
+  );
+
+  // The option costs the restaurant ₦500; the customer pays ₦600 more, not ₦750.
+  assert.equal(withOption.customerPriceMinor - plain.customerPriceMinor, 60_000,
+    "an option must carry exactly one markup");
+
+  // And the whole line is simply (base + options) marked up once.
+  assert.equal(withOption.customerPriceMinor, Math.round(400_000 * 1.2));
+});
+
+test("[MARKUP APPLIES ONCE] the quote passes BASE option prices, never customer ones", () => {
+  // Structural: the public projection carries customer prices, so summing
+  // `choice.priceMinor` into the line is the bug above. The quote must look the
+  // base price up from the raw menu document instead.
+  const src = readFileSync(join(__dirname, "..", "quote.ts"), "utf8");
+  assert.ok(!/optionsTotalMinor \+= choice\.priceMinor/.test(src),
+    "the quote is summing customer-priced options into the marked-up line again");
+  assert.match(src, /optionBaseMinor\.get/);
+  assert.match(src, /function baseOptionPrices/);
 });
 
 console.log(`\n${passed} checks passed\n`);

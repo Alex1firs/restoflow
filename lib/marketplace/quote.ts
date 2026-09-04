@@ -109,13 +109,21 @@ export async function quoteCart(args: {
 
     // Options are resolved against the MENU's option groups, so a client
     // cannot invent a cheap option or a free upgrade.
+    //
+    // Two prices exist for every option and they must not be confused. The
+    // public projection carries the CUSTOMER price — already marked up, and
+    // what the storefront displays. `LineInput.optionsTotalMinor` is marked up
+    // again together with the base, so it must be given the RESTAURANT's own
+    // price. Feeding it the customer price applied the markup twice: a ₦500
+    // option displayed at ₦600 was charged at ₦750.
+    const optionBaseMinor = baseOptionPrices(raw.options);
     let optionsTotalMinor = 0;
     const resolvedOptions: MarketplaceOrderItem["options"] = [];
     for (const chosen of line.options ?? []) {
       const group = item.optionGroups.find((g) => g.id === chosen.groupId);
       const choice = group?.choices.find((c) => c.id === chosen.choiceId);
       if (!choice) return { ok: false, error: "An option in your cart is no longer available." };
-      optionsTotalMinor += choice.priceMinor;
+      optionsTotalMinor += optionBaseMinor.get(`${group!.id}:${choice.id}`) ?? 0;
       // The NAME is captured too, not just the id: an order printed in the
       // kitchen months later must still read "Extra plantain", even if the
       // restaurant has since renamed or deleted that option.
@@ -241,3 +249,25 @@ function extractReason(message: string): Parameters<typeof unserviceableToCustom
 }
 
 export { customerDeliveryFee };
+
+/**
+ * The restaurant's own price for every option, keyed `groupId:choiceId`.
+ *
+ * Read from the raw menu document rather than the public projection, because
+ * the projection deliberately carries only customer prices — a restaurant's
+ * own cost must never reach a phone.
+ */
+function baseOptionPrices(raw: unknown): Map<string, number> {
+  const out = new Map<string, number>();
+  if (!Array.isArray(raw)) return out;
+  for (const g of raw) {
+    const group = (g ?? {}) as Record<string, unknown>;
+    if (typeof group.id !== "string" || !Array.isArray(group.choices)) continue;
+    for (const c of group.choices) {
+      const choice = (c ?? {}) as Record<string, unknown>;
+      if (typeof choice.id !== "string") continue;
+      out.set(`${group.id}:${choice.id}`, Math.round(Number(choice.price ?? 0) * 100));
+    }
+  }
+  return out;
+}
