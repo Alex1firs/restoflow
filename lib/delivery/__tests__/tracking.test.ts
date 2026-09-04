@@ -2,6 +2,8 @@
 // Run: npx tsx lib/delivery/__tests__/tracking.test.ts
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { DeliveryState } from "../contract";
 import { initialProjection, type DeliveryProjection } from "../projection";
 import type { DeliveryOrderView } from "../store";
@@ -131,6 +133,17 @@ test("[14] poll cadence tightens near arrival and stops at terminal", () => {
   assert.equal(pollIntervalMs("SEARCHING_FOR_DRIVER"), 30_000);
   assert.equal(pollIntervalMs("DELIVERED"), null, "a finished delivery must stop being polled");
   assert.equal(pollIntervalMs("CANCELLED"), null);
+});
+
+test("a marketplace order's acceptance is visible to tracking", () => {
+  // Regression found on staging: `toProgress` read `fulfillment.state`, but the
+  // marketplace machine writes `fulfillment.restaurantState`. Every marketplace
+  // order therefore fell through to the legacy `status` field — which maps
+  // `accepted` to "pending" — and the customer's tracking screen said the order
+  // was still waiting for the restaurant that had already accepted it.
+  const src = readFileSync(join(__dirname, "..", "firestore-store.ts"), "utf8");
+  assert.match(src, /fulfilment\.restaurantState \?\? fulfilment\.state/,
+    "toProgress must prefer the marketplace state machine's own field");
 });
 
 console.log(`\n${passed} checks passed\n`);

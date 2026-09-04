@@ -94,6 +94,13 @@ export async function requestDeliveryForOrder(args: {
     return { outcome: "skipped", reason: "restaurant_has_not_accepted" };
   }
   if (order.delivery?.deliveryJobId) {
+    // Clear the retry marker on the way out. Acceptance sets it before every
+    // attempt, and an order whose job was attached by some earlier path — an
+    // order created under an older build, a race, a replay — would otherwise
+    // be re-asked about on every sweep, forever, always with this answer.
+    if (order.deliveryHandoffPending != null) {
+      await ref.update({ deliveryHandoffPending: null }).catch(() => {});
+    }
     return { outcome: "already_attached", deliveryJobId: String(order.delivery.deliveryJobId) };
   }
 
@@ -109,6 +116,9 @@ export async function requestDeliveryForOrder(args: {
   const dropLat = Number(drop?.lat);
   const dropLng = Number(drop?.lng);
   if (!Number.isFinite(dropLat) || !Number.isFinite(dropLng)) {
+    // Refuse rather than guess: this order was priced for a point we no longer
+    // have, and geocoding the street now would send a courier somewhere the
+    // customer was never quoted for. Retrying cannot help, so stop asking.
     return { outcome: "failed", reason: "order_has_no_dropoff_coordinates", retryable: false };
   }
 

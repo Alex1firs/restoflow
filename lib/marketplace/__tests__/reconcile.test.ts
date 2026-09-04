@@ -115,4 +115,25 @@ test("[13] an order rejected after acceptance stops being retried", () => {
     "a skipped handoff must clear the marker, not retry forever");
 });
 
+test("[14] the retry marker is cleared on every terminal answer, not just success", () => {
+  // Found on staging: accepting an order that already had a job left the
+  // marker set, so the sweep re-asked forever and always got the same answer.
+  const HANDOFF = strip(readFileSync(join(ROOT, "lib/marketplace/delivery-handoff.ts"), "utf8"));
+  const attached = HANDOFF.indexOf('outcome: "already_attached", deliveryJobId: String(order.delivery.deliveryJobId)');
+  const clear = HANDOFF.lastIndexOf("deliveryHandoffPending: null", attached);
+  assert.ok(attached > -1 && clear > -1 && clear < attached,
+    "the already-attached early return must clear the marker before returning");
+});
+
+test("[15] a failure that can never succeed stops being retried", () => {
+  // A missing dropoff coordinate is not a transient fault: asking again cannot
+  // change the answer, so it escalates and clears rather than looping.
+  const seg = SWEEPS.slice(SWEEPS.indexOf("handoffSweep("));
+  const nonRetryable = seg.indexOf("!outcome.retryable");
+  assert.ok(nonRetryable > -1);
+  const block = seg.slice(nonRetryable, nonRetryable + 400);
+  assert.match(block, /markAttention/);
+  assert.match(block, /clearHandoffPending/);
+});
+
 console.log(`\n${passed} checks passed\n`);

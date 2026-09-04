@@ -72,8 +72,12 @@ async function handoffSweep(
       } else {
         r.failed++;
         if (!outcome.retryable) {
+          // Nothing about asking again can change the answer — missing dropoff
+          // coordinates, a restaurant with no location. Escalate for a human
+          // and stop the sweep re-asking every minute until someone notices.
           r.attention.push(orderId);
           await store.markAttention(orderId, `handoff_failed:${outcome.reason}`, nowMs).catch(() => {});
+          await store.clearHandoffPending(orderId).catch(() => {});
         }
       }
     } catch (err) {

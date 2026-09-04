@@ -165,7 +165,11 @@ function toView(orderId: string, d: Record<string, unknown>): DeliveryOrderView 
  */
 function toProgress(d: Record<string, unknown>): RestaurantProgress {
   const fulfilment = (d.fulfillment ?? {}) as Record<string, unknown>;
-  const s = String(fulfilment.state ?? d.status ?? "pending");
+  // `restaurantState` is where the marketplace state machine writes. Reading
+  // only `state` meant every marketplace order fell through to the legacy
+  // `status` field — which maps `accepted` to "pending" — so tracking could
+  // never report that the restaurant had accepted, no matter what it had done.
+  const s = String(fulfilment.restaurantState ?? fulfilment.state ?? d.status ?? "pending");
   switch (s) {
     case "accepted": return "accepted";
     case "preparing": return "preparing";

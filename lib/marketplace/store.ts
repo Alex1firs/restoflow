@@ -170,6 +170,11 @@ export class FirestoreMarketplaceStore implements PaymentStore {
       const decision = args.decide(from, args.to);
       if (!decision.ok) return { ok: false as const, reason: decision.reason };
 
+      // A repeat of a move already made is reported as success and writes
+      // nothing. Appending to `history` regardless put "Restaurant accepted
+      // your order" on the customer's timeline once per tap.
+      if (from === decision.next) return { ok: true as const, from, to: decision.next };
+
       const patch: Record<string, unknown> = {
         "fulfillment.restaurantState": decision.next,
         "fulfillment.history": FieldValue.arrayUnion({
