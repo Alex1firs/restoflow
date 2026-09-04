@@ -85,8 +85,11 @@ async function main() {
       slug: "stg-trishas-kitchen",
       name: "Trisha's Kitchen (STAGING COPY — SYNTHETIC)",
       publicName: "Trisha's Kitchen",
+      cuisines: ["African", "Rice", "Grills"],
       address: "14 Synthetic Close, Lekki Phase 1, Lagos",
       city: "Lekki", lat: 6.4474, lng: 3.4736,
+      coverUrl: "https://images.unsplash.com/photo-1604329760661-e71dc83f8f26?w=1200&q=70",
+      logoUrl: "https://images.unsplash.com/photo-1552566626-52f8b828add9?w=200&q=70",
       marketplace: {
         state: "active", marketplaceEnabled: true,
         prepTimeMins: { min: 20, max: 35 },
@@ -98,8 +101,11 @@ async function main() {
       slug: "stg-the-steam-menu",
       name: "The Steam Menu (STAGING COPY — SYNTHETIC)",
       publicName: "The Steam Menu",
+      cuisines: ["Asian", "Bowls", "Small chops"],
       address: "8 Invented Avenue, Ikeja GRA, Lagos",
       city: "Ikeja", lat: 6.6018, lng: 3.3515,
+      coverUrl: "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=1200&q=70",
+      logoUrl: "https://images.unsplash.com/photo-1590846406792-0adc7f938f1d?w=200&q=70",
       marketplace: {
         state: "active", marketplaceEnabled: true,
         prepTimeMins: { min: 30, max: 50 },
@@ -135,11 +141,14 @@ async function main() {
       deliveryEnabled: true, pickupEnabled: true,
       orderCounter: 0,
       isStagingSynthetic: true,
+      coverImage: r.coverUrl ?? null,
+      logo: r.logoUrl ?? null,
       ...(r.marketplace
         ? {
             marketplace: {
               ...r.marketplace,
               publicName: r.publicName,
+              cuisines: r.cuisines ?? [],
               approvedAt: Date.now(),
               approvedBy: "seed-script",
               // Open every day, all day — a staging environment that is closed
@@ -157,6 +166,9 @@ async function main() {
   // Written to `menu_items` — the CUSTOMER catalogue. `prepared_items` is the
   // POS catalogue and is not touched by this script at all: the two are
   // unlinked, which is exactly what makes marketplace pricing safe.
+
+  // Real photography so the app can be reviewed as it will actually look.
+  const DISH_IMAGES: Record<string, string> = {"stg-jollof": "https://images.unsplash.com/photo-1604329760661-e71dc83f8f26?w=600&q=70", "stg-suya": "https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=600&q=70", "stg-pepper": "https://images.unsplash.com/photo-1547592180-85f173990554?w=600&q=70", "stg-soldout": "https://images.unsplash.com/photo-1535140728325-a4d3707eee61?w=600&q=70", "stg-steam-rice": "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=600&q=70", "stg-steam-dumpling": "https://images.unsplash.com/photo-1496116218417-1a781b1c416c?w=600&q=70"};
 
   const MENU: Array<{
     id: string; restaurantId: string; name: string; price: number; category: string;
@@ -208,7 +220,8 @@ async function main() {
     await db.collection("menu_items").doc(it.id).set({
       restaurantId: it.restaurantId,
       name: it.name, price: it.price, category: it.category,
-      description: it.description, image: "",
+      description: it.description,
+      image: DISH_IMAGES[it.id] ?? "",
       available: it.available !== false,
       isStagingSynthetic: true,
       marketplace: {
