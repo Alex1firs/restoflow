@@ -1,4 +1,13 @@
-import "server-only";
+/**
+ * Deliberately NOT `server-only`.
+ *
+ * This module holds no secret, reads no environment variable, and imports
+ * `Firestore` as a TYPE only — it operates on a database handle passed in by
+ * the caller and cannot reach one on its own. Marking it server-only bought no
+ * safety and made the matching logic untestable, which is a worse trade.
+ * The modules that DO hold secrets (config, store, webhook, sweeps) keep the
+ * annotation, and a test asserts that.
+ */
 import type { Firestore } from "firebase-admin/firestore";
 import { checkIsOpen, nextOpenTime, type OpeningHours } from "@/lib/restaurant-utils";
 import { haversineKm } from "./geo";
@@ -119,7 +128,7 @@ export async function getMarketplaceRestaurant(
   };
 }
 
-function toPublicRestaurant(
+export function toPublicRestaurant(
   slug: string,
   data: Record<string, unknown>,
   args: { at: { lat: number; lng: number } | null; nowMs: number }

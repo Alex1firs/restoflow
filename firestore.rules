@@ -249,6 +249,14 @@ service cloud.firestore {
         allow read:  if false;
         allow write: if false;
       }
+
+      // Favourites, same reasoning: reached only through /api/mobile/v1, which
+      // verifies the ID token and reads with the Admin SDK. The document id is
+      // the restaurant slug, which is what makes add/remove idempotent.
+      match /favourites/{restaurantSlug} {
+        allow read:  if false;
+        allow write: if false;
+      }
     }
 
     // ─── POS order idempotency claims ────────────────────────────────────────────
