@@ -47,7 +47,38 @@ export async function handleMarketplacePaymentWebhook(
   if (result.outcome !== "created") {
     // replayed / pending / no_intent / mismatch are all settled outcomes. The
     // caller returns 200 so Paystack stops retrying something that is done.
+    //
+    // Note this returns BEFORE the delivery handoff below. A replayed webhook
+    // therefore never reaches Dispatcher — the first line of defence against a
+    // second delivery job for one order.
     return;
+  }
+
+  // ── The order is paid and committed. Now ask for a rider. ──────────────────
+  //
+  // Deliberately after settlement, not inside it: settlement runs in a
+  // transaction, and a Dispatcher timeout inside that transaction would roll
+  // back an order the customer has already been charged for. The paid order is
+  // the durable record; the delivery is requested against it and retried until
+  // it succeeds.
+  //
+  // Failures here are logged and swallowed. Paystack must still get its 200 —
+  // redelivering a payment we have already settled would achieve nothing, and
+  // the reconcile sweep picks up an order left without a delivery.
+  try {
+    const { requestDeliveryForOrder } = await import("./delivery-handoff");
+    const handoff = await requestDeliveryForOrder({ db, orderId: result.orderId, nowMs: Date.now() });
+    console.log(JSON.stringify({
+      scope: "marketplace_payment", event: "delivery_handoff",
+      orderId: result.orderId, outcome: handoff.outcome,
+      ...("deliveryJobId" in handoff ? { deliveryJobId: handoff.deliveryJobId } : {}),
+      ...("reason" in handoff ? { reason: handoff.reason } : {}),
+    }));
+  } catch (err) {
+    console.error(JSON.stringify({
+      scope: "marketplace_payment", event: "delivery_handoff_threw",
+      orderId: result.orderId, error: err instanceof Error ? err.message : String(err),
+    }));
   }
 
   // Notifications are ENQUEUED, never sent inline: a slow push provider must
