@@ -191,15 +191,53 @@ export default function AdminOrdersClient({ restaurant, role }: Props) {
     return () => unsub();
   }, [restaurant.slug, showToast]);
 
+  /**
+   * Marketplace orders move through their own state machine.
+   *
+   * A marketplace order is not just a row with a `status` column: accepting one
+   * is what books the courier, and rejecting one is what refunds the customer.
+   * Writing `status` directly — which is all the counter flow needs — would
+   * move the card on screen and do neither.
+   *
+   * Counter and other order sources are untouched and still take the path they
+   * always have.
+   */
+  const isMarketplace = (orderId: string) =>
+    orders.find((o) => o.id === orderId)?.orderSource === "marketplace";
+
+  const marketplaceAction = async (orderId: string, action: string, reason?: string) => {
+    const res = await fetch(`/api/admin/marketplace/orders/${orderId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(reason ? { action, reason } : { action }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error((body as { error?: string } | null)?.error ?? "Failed");
+    }
+  };
+
   const advance = async (orderId: string, next: OrderStatus) => {
     setUpdating(orderId);
     try {
-      const res = await fetch(`/api/orders/${orderId}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: next }),
-      });
-      if (!res.ok) throw new Error("Failed");
+      if (isMarketplace(orderId)) {
+        // One tap on Accept means both things to a marketplace order: the
+        // restaurant has committed (which requests the rider) and the kitchen
+        // has started. Sent in order so the courier is requested first.
+        if (next === "preparing") {
+          await marketplaceAction(orderId, "accept");
+          await marketplaceAction(orderId, "preparing");
+        } else if (next === "ready") {
+          await marketplaceAction(orderId, "ready");
+        }
+      } else {
+        const res = await fetch(`/api/orders/${orderId}/status`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: next }),
+        });
+        if (!res.ok) throw new Error("Failed");
+      }
 
       // Auto-print kitchen ticket on Acceptance (status moving to preparing)
       if (next === "preparing") {
@@ -218,17 +256,32 @@ export default function AdminOrdersClient({ restaurant, role }: Props) {
 
   const reject = async (orderId: string) => {
     if (!window.confirm("Reject this order? The customer will be notified.")) return;
+
+    // A marketplace rejection refunds a real payment, so it needs a reason
+    // somebody can be held to. A counter order has no money to send back.
+    let reason: string | undefined;
+    if (isMarketplace(orderId)) {
+      const entered = window.prompt("Why are you rejecting this order? The customer is refunded in full.");
+      if (entered === null) return;                 // cancelled the prompt
+      reason = entered.trim();
+      if (!reason) { alert("A reason is required to reject a marketplace order."); return; }
+    }
+
     setUpdating(orderId);
     try {
-      const res = await fetch(`/api/orders/${orderId}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "rejected" }),
-      });
-      if (!res.ok) throw new Error("Failed");
+      if (isMarketplace(orderId)) {
+        await marketplaceAction(orderId, "reject", reason);
+      } else {
+        const res = await fetch(`/api/orders/${orderId}/status`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "rejected" }),
+        });
+        if (!res.ok) throw new Error("Failed");
+      }
       setRejectingId(null);
-    } catch {
-      alert("Failed to reject order.");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to reject order.");
     } finally {
       setUpdating(null);
     }
