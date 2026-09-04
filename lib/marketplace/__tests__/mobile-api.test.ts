@@ -409,4 +409,13 @@ test("[24] every marketplace query starts from the opt-in flag", () => {
   }
 });
 
+test("[9d] BOTH tracking branches name the restaurant", () => {
+  // A delivered order takes the "nothing left to track" branch, which is
+  // exactly the moment the customer reads "enjoy your food from …". Patching
+  // only the live-tracking branch left the finished order generic.
+  const src = readFileSync(join(ROOT, "app/api/mobile/v1/orders/[orderId]/tracking/route.ts"), "utf8");
+  const hits = src.match(/restaurantName: order[!?]?\.restaurantName/g) ?? [];
+  assert.ok(hits.length >= 2, `both branches must pass the name, found ${hits.length}`);
+});
+
 console.log(`\n${passed} checks passed\n`);

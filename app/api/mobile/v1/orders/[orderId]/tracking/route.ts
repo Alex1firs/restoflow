@@ -48,7 +48,7 @@ export function GET(req: Request, ctx: { params: Promise<{ orderId: string }> })
       // the delivery copy for a state that does not exist would report progress
       // nothing has actually made.
       const copy = deliveryState
-        ? toCustomerFacing(deliveryState)
+        ? toCustomerFacing(deliveryState, { restaurantName: order?.restaurantName ?? undefined })
         : restaurantFacing(restaurantState);
       const state = deliveryState ?? "REQUESTED";
       return {
