@@ -24,7 +24,7 @@ const snapshot = buildSnapshot({
 });
 
 const intent = (over: Partial<PaymentIntent> = {}): PaymentIntent => ({
-  reference: "pay_1", restaurantId: "trishas", customerId: "cust-1",
+  reference: "pay_1", restaurantName: "Trisha's Kitchen", restaurantId: "trishas", customerId: "cust-1",
   customerFirstName: "Amaka", customerPhone: "+2348111111111",
   deliveryAddress: "2 Mobolaji Bank", deliveryLocation: { lat: 6.57, lng: 3.36 },
   note: "", items: [{ dishId: "d1", menuItemId: "d1", name: "Jollof", quantity: 1, options: [], note: "" }],

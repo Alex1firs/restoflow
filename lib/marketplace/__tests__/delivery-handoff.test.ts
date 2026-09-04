@@ -20,12 +20,31 @@ const ROOT = join(__dirname, "..", "..", "..");
 const code = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 const SRC = code(readFileSync(join(ROOT, "lib/marketplace/delivery-handoff.ts"), "utf8"));
 const HOOK = code(readFileSync(join(ROOT, "lib/marketplace/webhook.ts"), "utf8"));
+const ACCEPT = code(readFileSync(join(ROOT, "app/api/admin/marketplace/orders/[orderId]/route.ts"), "utf8"));
 
-test("[1] a replayed webhook returns before the handoff is reached", () => {
-  const settled = HOOK.indexOf('result.outcome !== "created"');
-  const handoff = HOOK.indexOf("requestDeliveryForOrder");
-  assert.ok(settled > -1 && handoff > settled,
-    "the handoff must sit AFTER the replay guard, or a redelivered payment creates a second job");
+test("[1] paying does not book a rider — the webhook never reaches Dispatcher", () => {
+  // The strongest form of the old "handoff sits after the replay guard" rule:
+  // there is no handoff in the payment path at all, so neither a first
+  // delivery nor a replay can create a job for an unaccepted order.
+  assert.ok(!HOOK.includes("requestDeliveryForOrder"),
+    "the payment webhook requests a delivery; acceptance is the only handoff boundary");
+});
+
+test("[1a] the restaurant's acceptance is what requests the rider", () => {
+  const accepted = ACCEPT.indexOf('result.to === "accepted"');
+  const handoff = ACCEPT.indexOf("requestDeliveryForOrder");
+  assert.ok(accepted > -1 && handoff > accepted,
+    "the handoff must be gated on the accepted transition");
+});
+
+test("[1b] the handoff refuses an order the restaurant has not accepted", () => {
+  assert.match(SRC, /restaurant_has_not_accepted/);
+  const guard = SRC.indexOf("restaurant_has_not_accepted");
+  assert.ok(guard < SRC.indexOf("client.createDelivery("),
+    "the acceptance guard must precede the network call");
+  // The rule lives in the handoff, not only at the call site, so a sweep or a
+  // future caller cannot route around it.
+  assert.match(SRC, /POST_ACCEPTANCE/);
 });
 
 test("[2] an order that already has a job never calls Dispatcher", () => {
@@ -95,10 +114,11 @@ test("[11] a disabled integration refuses rather than guessing an endpoint", () 
   assert.ok(gate < SRC.indexOf("client.createDelivery("));
 });
 
-test("[12] a handoff failure never fails the webhook", () => {
-  // Paystack must still get its 200; redelivering a settled payment helps nobody.
-  const i = HOOK.indexOf("requestDeliveryForOrder");
-  const seg = HOOK.slice(i - 400, i + 700);
+test("[12] a handoff failure never fails the acceptance", () => {
+  // The order IS accepted. A briefly unreachable Dispatcher must not show the
+  // restaurant an error, nor roll the acceptance back.
+  const i = ACCEPT.indexOf("requestDeliveryForOrder");
+  const seg = ACCEPT.slice(i - 400, i + 700);
   assert.ok(/try\s*\{/.test(seg) && /catch/.test(seg), "the handoff is not wrapped in try/catch");
 });
 

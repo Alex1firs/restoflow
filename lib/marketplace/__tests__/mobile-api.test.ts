@@ -23,7 +23,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-import { toCustomerStage, toCustomerOrderSummary, toCustomerOrderDetail } from "../customer-view";
+import { restaurantFacing, toCustomerStage, toCustomerOrderSummary, toCustomerOrderDetail } from "../customer-view";
 import { isValidLatLng, haversineKm, roadDistanceKm, DEFAULT_ROAD_FACTOR } from "../geo";
 import { customerDeliveryFee } from "../pricing";
 
@@ -174,8 +174,37 @@ test("[9] before a rider exists, the kitchen is the whole story", () => {
   assert.equal(stage("accepted", null).stage, "restaurant_accepted");
   assert.equal(stage("preparing", null).stage, "preparing");
   assert.equal(stage("ready", null).stage, "preparing");   // the pass is invisible to a customer
+  // A reserved job that riders cannot see yet is still the kitchen's story.
   assert.equal(stage("preparing", "REQUESTED").stage, "preparing");
-  assert.equal(stage("preparing", "SEARCHING_FOR_DRIVER").stage, "preparing");
+});
+
+test("[9a] once the job is out to riders, waiting for one IS the story", () => {
+  // The job only exists after acceptance now, so SEARCHING no longer overlaps
+  // with "the kitchen hasn't started". Reporting "preparing" while the food is
+  // ready and nobody has claimed the job hides the thing that is actually
+  // holding the order up.
+  assert.equal(stage("preparing", "SEARCHING_FOR_DRIVER").stage, "finding_rider");
+  assert.equal(stage("ready", "SEARCHING_FOR_DRIVER").stage, "finding_rider");
+  // Losing a rider and looking for the first one are the same wait to a customer.
+  assert.equal(stage("ready", "REASSIGNING").stage, "finding_rider");
+  assert.equal(stage("ready", "DRIVER_CANCELLED").stage, "finding_rider");
+});
+
+test("[9b] a paid order the kitchen has not seen never claims to be cooking", () => {
+  // The regression this guards: the tracking route used to default a missing
+  // delivery job to "REQUESTED" and print "Preparing your food" for an order
+  // no restaurant had accepted.
+  assert.match(restaurantFacing("placed").headline, /waiting for restaurant/i);
+  assert.ok(!/preparing/i.test(restaurantFacing("placed").headline));
+  assert.match(restaurantFacing("accepted").headline, /accepted/i);
+  assert.match(restaurantFacing("preparing").headline, /preparing/i);
+});
+
+test("[9c] a refused order says so plainly and promises the money back", () => {
+  for (const s of ["rejected", "cancelled"] as const) {
+    const copy = restaurantFacing(s);
+    assert.match(`${copy.headline} ${copy.detail ?? ""}`, /refund/i);
+  }
 });
 
 test("[10] once a rider is assigned, delivery leads", () => {

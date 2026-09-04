@@ -4,7 +4,6 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { readFlags } from "@/lib/marketplace/config";
 import { FirestoreMarketplaceStore } from "@/lib/marketplace/store";
 import { transitionRestaurant, type RestaurantState } from "@/lib/marketplace/order";
-import { computeConfirmAt } from "@/lib/delivery/projection";
 import {
   customerEventForRestaurantState, customerMessage,
 } from "@/lib/marketplace/notifications";
@@ -74,24 +73,34 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ord
     return NextResponse.json({ error: result.reason }, { status });
   }
 
-  // On acceptance, schedule when the courier should be released. The job is
-  // already reserved as a draft; this is the moment riders start being offered
-  // it, so a 25-minute prep does not have a rider waiting for 20 of them.
-  if (to === "accepted") {
+  // ── Acceptance is the handoff boundary ────────────────────────────────────
+  //
+  // This is the moment a rider is genuinely warranted: a human at the
+  // restaurant has committed to cooking the order. Requesting the delivery
+  // here rather than at payment means a paid-but-rejected order never books a
+  // courier, and `computeConfirmAt` inside the handoff is measured from a real
+  // acceptance rather than from whenever Paystack happened to call back.
+  //
+  // Deliberately after the transition has committed, and deliberately
+  // swallowing failures: the order IS accepted, and the restaurant must not
+  // see an error — nor a rollback — because Dispatcher was briefly unreachable.
+  // `externalOrderId` idempotency plus the compare-and-set on `delivery` mean a
+  // repeated Accept, a retry, or the reconcile sweep all converge on one job.
+  if (result.to === "accepted") {
     try {
-      const snap = await db.collection("orders").doc(orderId).get();
-      const d = snap.data() ?? {};
-      const confirmAt = computeConfirmAt({
-        acceptedAtMs: nowMs,
-        prepMins: Number(d.fulfillment?.prepMins ?? 25),
-        etaToPickupMins: typeof d.delivery?.etaToPickupMins === "number" ? d.delivery.etaToPickupMins : null,
-        nowMs,
-      });
-      await store.setDeliveryConfirmAt(orderId, confirmAt);
+      const { requestDeliveryForOrder } = await import("@/lib/marketplace/delivery-handoff");
+      const handoff = await requestDeliveryForOrder({ db, orderId, nowMs });
+      console.log(JSON.stringify({
+        scope: "marketplace_acceptance", event: "delivery_handoff",
+        orderId, outcome: handoff.outcome,
+        ...("deliveryJobId" in handoff ? { deliveryJobId: handoff.deliveryJobId } : {}),
+        ...("reason" in handoff ? { reason: handoff.reason } : {}),
+      }));
     } catch (err) {
-      // The order IS accepted. A scheduling failure must not undo that — the
-      // restaurant's "ready" signal is the backstop, and the sweep retries.
-      console.error("[marketplace] failed to schedule dispatch", { orderId, error: String(err) });
+      console.error(JSON.stringify({
+        scope: "marketplace_acceptance", event: "delivery_handoff_threw",
+        orderId, error: err instanceof Error ? err.message : String(err),
+      }));
     }
   }
 

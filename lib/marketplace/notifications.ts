@@ -187,6 +187,27 @@ export function restaurantMessage(args: {
 }
 
 /** Restaurant-state changes that warrant telling the customer. */
+/**
+ * The customer notification a delivery state warrants, if any.
+ *
+ * Gated on `shouldPushForDelivery` rather than on its own list of states: which
+ * transitions are worth interrupting somebody for is already decided in exactly
+ * one place, and a second copy here is how "we push on ARRIVING" and "we don't"
+ * end up both being true. This only answers *which message*, never *whether*.
+ */
+export function customerEventForDeliveryState(state: DeliveryState): CustomerEvent | null {
+  if (!shouldPushForDelivery(state)) return null;
+  switch (state) {
+    case "DRIVER_ASSIGNED": return "courier_assigned";
+    case "PICKED_UP": return "picked_up";
+    case "ARRIVING": return "arriving";
+    case "DELIVERED": return "delivered";
+    case "DELIVERY_FAILED": return "delivery_issue";
+    case "CANCELLED": return "order_rejected";
+    default: return null;
+  }
+}
+
 export function customerEventForRestaurantState(state: RestaurantState): CustomerEvent | null {
   switch (state) {
     case "accepted": return "restaurant_accepted";

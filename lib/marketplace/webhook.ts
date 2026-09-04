@@ -54,32 +54,13 @@ export async function handleMarketplacePaymentWebhook(
     return;
   }
 
-  // ── The order is paid and committed. Now ask for a rider. ──────────────────
+  // ── No rider is requested here ────────────────────────────────────────────
   //
-  // Deliberately after settlement, not inside it: settlement runs in a
-  // transaction, and a Dispatcher timeout inside that transaction would roll
-  // back an order the customer has already been charged for. The paid order is
-  // the durable record; the delivery is requested against it and retried until
-  // it succeeds.
-  //
-  // Failures here are logged and swallowed. Paystack must still get its 200 —
-  // redelivering a payment we have already settled would achieve nothing, and
-  // the reconcile sweep picks up an order left without a delivery.
-  try {
-    const { requestDeliveryForOrder } = await import("./delivery-handoff");
-    const handoff = await requestDeliveryForOrder({ db, orderId: result.orderId, nowMs: Date.now() });
-    console.log(JSON.stringify({
-      scope: "marketplace_payment", event: "delivery_handoff",
-      orderId: result.orderId, outcome: handoff.outcome,
-      ...("deliveryJobId" in handoff ? { deliveryJobId: handoff.deliveryJobId } : {}),
-      ...("reason" in handoff ? { reason: handoff.reason } : {}),
-    }));
-  } catch (err) {
-    console.error(JSON.stringify({
-      scope: "marketplace_payment", event: "delivery_handoff_threw",
-      orderId: result.orderId, error: err instanceof Error ? err.message : String(err),
-    }));
-  }
+  // Paying is the customer's decision; accepting is the restaurant's. The order
+  // now exists in `placed` and waits for the kitchen. `requestDeliveryForOrder`
+  // is called from the restaurant's accept action, and refuses outright for an
+  // order that has not been accepted, so a webhook — first delivery or replay —
+  // can no longer book a rider for food nobody has agreed to cook.
 
   // Notifications are ENQUEUED, never sent inline: a slow push provider must
   // not delay a webhook Paystack is timing, and the outbox is deduplicated so a

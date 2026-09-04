@@ -57,6 +57,8 @@ export type MarketplaceOrder = {
   /** Customer-facing. NOT the per-restaurant cashier sequence. */
   marketplaceOrderCode: string;
   restaurantId: string;
+  /** Display name, frozen at checkout so history never shows an internal slug. */
+  restaurantName: string;
   customerId: string;
 
   items: MarketplaceOrderItem[];
@@ -143,6 +145,8 @@ export function legacyStatusFor(restaurantState: RestaurantState): MarketplaceOr
 export type BuildOrderInput = {
   marketplaceOrderCode: string;
   restaurantId: string;
+  /** Display name, frozen at checkout. Never an internal slug. */
+  restaurantName: string;
   customerId: string;
   customerFirstName: string;
   customerPhone: string;
@@ -173,6 +177,7 @@ export function buildMarketplaceOrder(input: BuildOrderInput): MarketplaceOrder 
     orderSource: ORDER_SOURCE,
     marketplaceOrderCode: input.marketplaceOrderCode,
     restaurantId: input.restaurantId,
+    restaurantName: input.restaurantName,
     customerId: input.customerId,
     items: input.items,
     pricing: p,

@@ -15,9 +15,9 @@ import type { RestaurantState } from "./order";
  */
 
 export type CustomerOrderStage =
-  | "confirmed" | "restaurant_accepted" | "preparing" | "courier_assigned"
-  | "courier_to_restaurant" | "courier_at_restaurant" | "picked_up"
-  | "on_the_way" | "arriving" | "delivered";
+  | "confirmed" | "restaurant_accepted" | "preparing" | "finding_rider"
+  | "courier_assigned" | "courier_to_restaurant" | "courier_at_restaurant"
+  | "picked_up" | "on_the_way" | "arriving" | "delivered";
 
 export type CustomerProblem = "cancelled" | "rejected" | "delivery_failed" | null;
 
@@ -45,6 +45,16 @@ export function toCustomerStage(
     case "WAITING_FOR_ORDER": return { stage: "courier_at_restaurant", problem: null };
     case "DRIVER_TO_PICKUP": return { stage: "courier_to_restaurant", problem: null };
     case "DRIVER_ASSIGNED": return { stage: "courier_assigned", problem: null };
+
+    // A job exists and is out to riders, but nobody has taken it yet. Worth
+    // its own stage: "Preparing" while the kitchen is done and everyone is
+    // waiting on a rider is the wrong answer to "where is my food".
+    // REASSIGNING lands here too — from the customer's side, losing a rider
+    // and looking for the first one are the same wait.
+    case "SEARCHING_FOR_DRIVER":
+    case "REASSIGNING":
+    case "DRIVER_CANCELLED": return { stage: "finding_rider", problem: null };
+
     default: break;
   }
 
@@ -54,6 +64,36 @@ export function toCustomerStage(
     case "ready": return { stage: "preparing", problem: null };
     case "accepted": return { stage: "restaurant_accepted", problem: null };
     default: return { stage: "confirmed", problem: null };
+  }
+}
+
+/**
+ * What to say when there is no delivery job yet.
+ *
+ * Before the restaurant accepts, no rider has been booked and nothing is
+ * cooking — so the delivery state machine has nothing to report and must not
+ * be asked. Reading a fabricated "REQUESTED" here is how a paid order that the
+ * kitchen has not even seen ends up telling the customer their food is being
+ * prepared.
+ */
+export function restaurantFacing(
+  restaurantState: RestaurantState
+): { headline: string; detail: string | null } {
+  switch (restaurantState) {
+    case "awaiting_payment":
+      return { headline: "Confirming your payment", detail: null };
+    case "placed":
+      return { headline: "Waiting for restaurant", detail: "We've sent your order to the kitchen." };
+    case "accepted":
+      return { headline: "Restaurant accepted your order", detail: "They're getting it ready." };
+    case "preparing":
+      return { headline: "Preparing your order", detail: null };
+    case "ready":
+      return { headline: "Your order is ready", detail: "We're finding you a rider." };
+    case "rejected":
+      return { headline: "Your order couldn't be accepted", detail: "You'll be refunded in full." };
+    case "cancelled":
+      return { headline: "Order cancelled", detail: "Any payment will be refunded." };
   }
 }
 

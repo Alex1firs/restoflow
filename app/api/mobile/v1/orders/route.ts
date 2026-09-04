@@ -89,6 +89,7 @@ export const POST = withCustomer(async ({ customer, req }) => {
   const intent: PaymentIntent = {
     reference,
     restaurantId: restaurantSlug.trim(),
+    restaurantName: quote.restaurantName,
     customerId: customer.id,
     customerFirstName: customer.name.split(" ")[0] || "Customer",
     customerPhone: customer.phone,

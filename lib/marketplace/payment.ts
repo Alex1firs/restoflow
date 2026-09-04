@@ -23,6 +23,13 @@ import type { MarketplaceOrderItem } from "./order";
 export type PaymentIntent = {
   reference: string;
   restaurantId: string;
+  /**
+   * The restaurant's public display name, frozen with the rest of the intent.
+   * A customer's order history must read "Trisha's Kitchen" forever, even if
+   * the restaurant is later renamed — and it must never fall back to the
+   * internal slug, which is what a customer saw before this field existed.
+   */
+  restaurantName: string;
   customerId: string;
   customerFirstName: string;
   customerPhone: string;
@@ -41,6 +48,26 @@ export type PaymentIntent = {
 
 /** Intents older than this are swept; the customer re-checks-out. */
 export const INTENT_TTL_MS = 30 * 60_000;
+
+export type VerifyOutcome = "success" | "failed" | "unknown";
+
+/**
+ * Paystack's transaction status, mapped to a decision.
+ *
+ * Pure, and exported, because the whole safety of reconciliation rests on this
+ * table: anything that is not a definite verdict must fall to `unknown`, which
+ * means "leave the basket alone and ask again". Only `failed`, `reversed` and
+ * `abandoned` are Paystack telling us the money is not coming.
+ */
+export function classifyPaystackStatus(status: string | undefined): VerifyOutcome {
+  switch (status) {
+    case "success": return "success";
+    case "failed":
+    case "reversed":
+    case "abandoned": return "failed";
+    default: return "unknown";
+  }
+}
 
 export type ProviderVerification = {
   reference: string;

@@ -124,6 +124,7 @@ async function main() {
       const orderId = `order_${++orderSeq}`;
       const order = buildMarketplaceOrder({
         marketplaceOrderCode: makeOrderCode(), restaurantId: intent.restaurantId,
+        restaurantName: intent.restaurantName,
         customerId: intent.customerId, customerFirstName: intent.customerFirstName,
         customerPhone: intent.customerPhone, deliveryAddress: intent.deliveryAddress,
         deliveryLocation: intent.deliveryLocation ?? null,
@@ -255,7 +256,7 @@ async function main() {
   say("Payment");
   const reference = "pay_stg_1";
   intents.set(reference, {
-    reference, restaurantId: "staging-test-kitchen", customerId: CUSTOMER,
+    reference, restaurantName: "Trisha's Kitchen", restaurantId: "staging-test-kitchen", customerId: CUSTOMER,
     customerFirstName: "Amaka", customerPhone: "+2348111111111",
     deliveryAddress: "2 Mobolaji Bank Anthony Way", deliveryLocation: AMAKA,
     note: "extra pepper",
@@ -340,7 +341,7 @@ async function main() {
   advance(11);
   const sweepPorts: ConfirmPorts = {
     findDueForConfirm: async () => [{
-      orderId: ORDER_REF, restaurantId: "staging-test-kitchen", correlationId,
+      orderId: ORDER_REF, restaurantName: "Trisha's Kitchen", restaurantId: "staging-test-kitchen", correlationId,
       delivery: deliveryStore.orders.get(orderId)!.delivery!, confirmAt,
     }],
     confirmDelivery: async ({ externalOrderId, correlationId: cid }: never) => {

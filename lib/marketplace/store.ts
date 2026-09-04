@@ -84,6 +84,7 @@ export class FirestoreMarketplaceStore implements PaymentStore {
       const order = buildMarketplaceOrder({
         marketplaceOrderCode: orderCode,
         restaurantId: intent.restaurantId,
+        restaurantName: intent.restaurantName || intent.restaurantId,
         customerId: intent.customerId,
         customerFirstName: intent.customerFirstName,
         customerPhone: intent.customerPhone,

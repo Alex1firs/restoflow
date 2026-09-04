@@ -27,7 +27,7 @@ const items: MarketplaceOrderItem[] = [
 ];
 
 const order = () => buildMarketplaceOrder({
-  marketplaceOrderCode: "RF-ABC123", restaurantId: "trishas", customerId: "cust-1",
+  marketplaceOrderCode: "RF-ABC123", restaurantName: "Trisha's Kitchen", restaurantId: "trishas", customerId: "cust-1",
   customerFirstName: "Amaka", customerPhone: "+2348111111111",
   deliveryAddress: "2 Mobolaji Bank", note: "extra pepper",
   deliveryLocation: { lat: 6.4474, lng: 3.4736 },

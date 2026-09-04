@@ -148,8 +148,14 @@ export function toCustomerFacing(
 
   switch (state) {
     case "REQUESTED":
+      // The job is reserved but riders cannot see it yet — it is released when
+      // the food is close to ready. The kitchen is the story at this point.
+      return { ...base, headline: "Preparing your order", detail: "We'll find you a rider shortly." };
+
     case "SEARCHING_FOR_DRIVER":
-      return { ...base, headline: "Preparing your food", detail: "We'll assign a courier shortly." };
+      // Out to riders and nobody has taken it. Saying "preparing" here answers
+      // the wrong question when the kitchen is already done.
+      return { ...base, headline: "Finding a rider", detail: "We're matching you with a rider nearby." };
 
     case "DRIVER_ASSIGNED":
       return { ...base, headline: "Courier assigned", detail: `${who} will collect your order.`, notify: true, showContact: true };

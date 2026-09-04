@@ -5,7 +5,8 @@ import assert from "node:assert/strict";
 import { DELIVERY_STATES, type DeliveryState } from "../../delivery/contract";
 import {
   NOTIFICATION_OWNER, dispatcherMustStaySilent, customerMessage, restaurantMessage,
-  shouldPushForDelivery, customerEventForRestaurantState, CUSTOMER_PUSH_STATES,
+  shouldPushForDelivery, customerEventForRestaurantState, customerEventForDeliveryState,
+  CUSTOMER_PUSH_STATES,
   type CustomerEvent,
 } from "../notifications";
 
@@ -149,6 +150,36 @@ test("[14] every delivery state that pushes has customer copy", () => {
       restaurantName: "T", deliveryState: s as DeliveryState,
     });
     assert.ok(m.title.length > 0, s);
+  }
+});
+
+test("delivery notifications fire for news, not for every transition", () => {
+  // Worth waking someone for.
+  assert.equal(customerEventForDeliveryState("DRIVER_ASSIGNED"), "courier_assigned");
+  assert.equal(customerEventForDeliveryState("PICKED_UP"), "picked_up");
+  assert.equal(customerEventForDeliveryState("ARRIVING"), "arriving");
+  assert.equal(customerEventForDeliveryState("DELIVERED"), "delivered");
+  assert.equal(customerEventForDeliveryState("DELIVERY_FAILED"), "delivery_issue");
+});
+
+test("routine state changes do NOT push", () => {
+  // These change the tracking screen and nothing else. A push per transition
+  // is how a customer turns notifications off before their food arrives.
+  for (const s of [
+    "REQUESTED", "SEARCHING_FOR_DRIVER", "DRIVER_TO_PICKUP",
+    "ARRIVED_AT_PICKUP", "WAITING_FOR_ORDER", "EN_ROUTE_TO_CUSTOMER",
+    "REASSIGNING", "DRIVER_CANCELLED", "RESTAURANT_DELAY", "CUSTOMER_UNREACHABLE",
+  ] as const) {
+    assert.equal(customerEventForDeliveryState(s), null, `${s} must not push`);
+  }
+});
+
+test("the message map and the push decision cannot drift apart", () => {
+  // Exactly the states that push must have a message, and no others.
+  for (const s of DELIVERY_STATES) {
+    const event = customerEventForDeliveryState(s);
+    assert.equal(event !== null, shouldPushForDelivery(s),
+      `${s}: pushes=${shouldPushForDelivery(s)} but message=${String(event)}`);
   }
 });
 

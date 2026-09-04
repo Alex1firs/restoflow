@@ -47,6 +47,12 @@ export type QuoteResult =
        * truth for what was actually ordered.
        */
       items: MarketplaceOrderItem[];
+      /**
+       * The restaurant's display name, resolved here because this is where the
+       * restaurant document is already read. Callers freeze it onto the intent
+       * so a customer never sees an internal slug.
+       */
+      restaurantName: string;
       prepMins: number;
       etaMins: number | null;
       quoteId: string;
@@ -210,6 +216,9 @@ export async function quoteCart(args: {
 
   return {
     ok: true, serviceable: true, snapshot, items, correlationId,
+    restaurantName: String(
+      (pricing.settings as { publicName?: unknown }).publicName ?? restaurant.name ?? args.restaurantSlug
+    ),
     prepMins: pricing.settings.prepTimeMins.max,
     etaMins: q.etaToDropoffMins,
     quoteId: q.quoteId,

@@ -6,7 +6,19 @@ import { DispatcherClient } from "@/lib/delivery/dispatcher-client";
 import { initialProjection, computeConfirmAt } from "@/lib/delivery/projection";
 
 /**
- * The seam between "the customer has paid" and "a rider is coming".
+ * The seam between "the restaurant has accepted" and "a rider is coming".
+ *
+ * ── Why acceptance, not payment ──────────────────────────────────────────────
+ * Paying is the customer's decision; accepting is the restaurant's. A kitchen
+ * that is slammed, out of an ingredient, or closing can still refuse an order
+ * that has been paid for, and the money is refunded. Committing a Dispatcher
+ * job at payment therefore books a rider against an order that may never be
+ * cooked — the rider is dispatched, the job is cancelled, and somebody has to
+ * reconcile a delivery that never had food behind it.
+ *
+ * So the paid order waits in `placed` until a human at the restaurant accepts
+ * it, and only that transition asks for a rider. `computeConfirmAt` below is
+ * measured from acceptance, which is now genuinely the same instant.
  *
  * ── Why this is a separate step, not part of settlement ──────────────────────
  * `settlePayment` runs inside a transaction that must stay short and must not
@@ -39,6 +51,13 @@ import { initialProjection, computeConfirmAt } from "@/lib/delivery/projection";
  * refuses to transmit if any of them appear.
  */
 
+/**
+ * States in which the restaurant has committed to cooking the order. `ready`
+ * and `preparing` are included because a retry must still succeed for an order
+ * that has moved on since it was accepted.
+ */
+const POST_ACCEPTANCE = new Set(["accepted", "preparing", "ready"]);
+
 export type HandoffResult =
   | { outcome: "created"; deliveryJobId: string }
   | { outcome: "already_attached"; deliveryJobId: string }
@@ -66,6 +85,14 @@ export async function requestDeliveryForOrder(args: {
 
   if (order.orderSource !== "marketplace") return { outcome: "skipped", reason: "not_a_marketplace_order" };
   if (order.payment?.state !== "paid") return { outcome: "skipped", reason: "not_paid" };
+
+  // The restaurant's decision gates the rider. Enforced here rather than only
+  // at the call site so that a sweep, a retry or a future caller cannot route
+  // around it — the rule belongs to the handoff, not to whoever invokes it.
+  const restaurantState = String(order.fulfillment?.restaurantState ?? "placed");
+  if (!POST_ACCEPTANCE.has(restaurantState)) {
+    return { outcome: "skipped", reason: "restaurant_has_not_accepted" };
+  }
   if (order.delivery?.deliveryJobId) {
     return { outcome: "already_attached", deliveryJobId: String(order.delivery.deliveryJobId) };
   }

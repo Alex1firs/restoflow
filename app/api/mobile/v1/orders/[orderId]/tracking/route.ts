@@ -5,7 +5,7 @@ import { FirestoreDeliveryStore } from "@/lib/delivery/firestore-store";
 import { authorizeTracking, buildTrackingPayload, pollIntervalMs } from "@/lib/delivery/tracking";
 import { toCustomerFacing } from "@/lib/delivery/status";
 import { withCustomer, notFound } from "@/lib/marketplace/mobile-api";
-import { toCustomerStage } from "@/lib/marketplace/customer-view";
+import { restaurantFacing, toCustomerStage } from "@/lib/marketplace/customer-view";
 import type { RestaurantState } from "@/lib/marketplace/order";
 import { randomUUID } from "crypto";
 
@@ -41,10 +41,16 @@ export function GET(req: Request, ctx: { params: Promise<{ orderId: string }> })
       // The order IS theirs, but there is nothing to track — before assignment
       // or after completion. Return the customer-facing state with no location,
       // so the app renders a correct screen rather than an error.
-      const state = order?.delivery?.state ?? "REQUESTED";
+      const deliveryState = order?.delivery?.state ?? null;
       const restaurantState = (order?.restaurantProgress ?? "placed") as RestaurantState;
-      const { stage, problem } = toCustomerStage(restaurantState, order?.delivery?.state ?? null);
-      const copy = toCustomerFacing(state);
+      const { stage, problem } = toCustomerStage(restaurantState, deliveryState);
+      // With no delivery job the kitchen is the only source of truth. Asking
+      // the delivery copy for a state that does not exist would report progress
+      // nothing has actually made.
+      const copy = deliveryState
+        ? toCustomerFacing(deliveryState)
+        : restaurantFacing(restaurantState);
+      const state = deliveryState ?? "REQUESTED";
       return {
         orderId, stage, problem,
         headline: copy.headline, detail: copy.detail,

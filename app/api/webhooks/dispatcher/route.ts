@@ -5,6 +5,8 @@ import { verifySignature } from "@/lib/delivery/signature";
 import { validateEvent, HEADERS, type DeliveryEvent } from "@/lib/delivery/contract";
 import { FirestoreDeliveryStore } from "@/lib/delivery/firestore-store";
 import { ingestEvent } from "@/lib/delivery/ingest";
+import { FirestoreMarketplaceStore } from "@/lib/marketplace/store";
+import { customerEventForDeliveryState, customerMessage } from "@/lib/marketplace/notifications";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,10 +75,42 @@ export async function POST(req: NextRequest) {
   const event = parsed as DeliveryEvent;
 
   try {
+    const db = getAdminDb();
     const result = await ingestEvent(event, {
-      store: new FirestoreDeliveryStore(getAdminDb()),
+      store: new FirestoreDeliveryStore(db),
       nowMs: Date.now(),
       log: (name, fields) => console.log(JSON.stringify({ scope: "dispatcher_webhook", event: name, ...fields })),
+
+      /**
+       * Tell the customer, for the handful of events that are actually news.
+       *
+       * Enqueued, never sent inline: a slow push provider must not hold up a
+       * webhook Dispatcher is timing, and the outbox is deduplicated so a
+       * redelivered event cannot send the same message twice. `ingestEvent`
+       * swallows anything thrown here — the state IS applied, and returning
+       * non-2xx would make Dispatcher redeliver an event we already have.
+       */
+      onStateChange: async ({ orderId, projection }) => {
+        const customerEvent = customerEventForDeliveryState(projection.state);
+        if (!customerEvent) return;
+
+        const snap = await db.collection("orders").doc(orderId).get();
+        const order = snap.data();
+        if (!order || order.orderSource !== "marketplace") return;
+
+        await new FirestoreMarketplaceStore(db).enqueueNotification({
+          orderId, audience: "customer", event: customerEvent,
+          payload: customerMessage({
+            event: customerEvent,
+            orderId,
+            orderCode: String(order.marketplaceOrderCode ?? ""),
+            restaurantName: String(order.restaurantName ?? order.restaurantId ?? ""),
+            driverFirstName: projection.driver?.firstName,
+            deliveryState: projection.state,
+          }) as unknown as Record<string, unknown>,
+          nowMs: Date.now(),
+        });
+      },
     });
 
     return NextResponse.json({ received: true, outcome: result.outcome }, { status: 200 });

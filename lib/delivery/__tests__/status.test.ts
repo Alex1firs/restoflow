@@ -71,9 +71,22 @@ test("[8] a lost rider reads as reassurance, never as a cancellation", () => {
   }
 });
 
-test("[9] searching is silent during prep — no invented anxiety", () => {
+test("[9] searching says so, calmly, and does not notify", () => {
+  // A delivery job now only exists once the restaurant has accepted, so
+  // SEARCHING no longer overlaps with "we haven't told the kitchen yet".
+  // Reporting "preparing your food" here would answer the wrong question once
+  // the kitchen is done and everyone is waiting on a rider.
   const c = toCustomerFacing("SEARCHING_FOR_DRIVER");
-  assert.match(c.headline, /preparing your food/i);
+  assert.match(c.headline, /finding a rider/i);
+  // Still no push: not finding a rider *yet* is not news worth waking someone.
+  assert.equal(c.notify, false);
+  assert.equal(/sorry|delay|problem|unable/i.test(`${c.headline} ${c.detail ?? ""}`), false,
+    "waiting is not an apology");
+});
+
+test("[9a] a reserved-but-unreleased job still reads as the kitchen's work", () => {
+  const c = toCustomerFacing("REQUESTED");
+  assert.match(c.headline, /preparing your order/i);
   assert.equal(c.notify, false);
 });
 
