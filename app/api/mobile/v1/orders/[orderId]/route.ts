@@ -2,6 +2,7 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { withCustomer, notFound } from "@/lib/marketplace/mobile-api";
 import { ORDER_SOURCE_MARKETPLACE } from "@/lib/marketplace/store";
 import { toCustomerOrderDetail } from "@/lib/marketplace/customer-view";
+import { resolveRestaurantNames } from "@/lib/marketplace/restaurant-names";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +20,10 @@ export function GET(req: Request, ctx: { params: Promise<{ orderId: string }> })
     if (d.orderSource !== ORDER_SOURCE_MARKETPLACE) return notFound();
     if (d.customerId !== customer.id) return notFound();
 
-    return toCustomerOrderDetail(orderId, d);
+    const fallback = d.restaurantName
+      ? null
+      : (await resolveRestaurantNames(getAdminDb(), [String(d.restaurantId ?? "")]))
+          .get(String(d.restaurantId ?? "")) ?? null;
+    return toCustomerOrderDetail(orderId, d, fallback);
   })(req);
 }

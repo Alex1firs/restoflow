@@ -97,7 +97,18 @@ export function restaurantFacing(
   }
 }
 
-export function toCustomerOrderSummary(orderId: string, d: Record<string, unknown>) {
+export function toCustomerOrderSummary(
+  orderId: string,
+  d: Record<string, unknown>,
+  /**
+   * Display name for orders written before `restaurantName` was stored.
+   *
+   * Passed in rather than looked up here so this module stays pure. Without it
+   * the fallback chain ends at `restaurantId` — an internal slug — which is
+   * exactly what a customer must never be shown.
+   */
+  restaurantNameFallback?: string | null
+) {
   const fulfilment = (d.fulfillment ?? {}) as Record<string, unknown>;
   const delivery = (d.delivery ?? null) as Record<string, unknown> | null;
   const pricing = (d.pricing ?? {}) as Record<string, number>;
@@ -111,7 +122,7 @@ export function toCustomerOrderSummary(orderId: string, d: Record<string, unknow
   return {
     id: orderId,
     code: String(d.marketplaceOrderCode ?? ""),
-    restaurantName: String(d.restaurantName ?? d.restaurantId ?? ""),
+    restaurantName: String(d.restaurantName ?? restaurantNameFallback ?? d.restaurantId ?? ""),
     restaurantLogoUrl: (d.restaurantLogoUrl as string | undefined) ?? null,
     totalMinor: Number(pricing.totalChargedMinor ?? 0),
     stage, problem,
@@ -121,8 +132,12 @@ export function toCustomerOrderSummary(orderId: string, d: Record<string, unknow
   };
 }
 
-export function toCustomerOrderDetail(orderId: string, d: Record<string, unknown>) {
-  const summary = toCustomerOrderSummary(orderId, d);
+export function toCustomerOrderDetail(
+  orderId: string,
+  d: Record<string, unknown>,
+  restaurantNameFallback?: string | null
+) {
+  const summary = toCustomerOrderSummary(orderId, d, restaurantNameFallback);
   const pricing = (d.pricing ?? {}) as Record<string, number>;
   const fulfilment = (d.fulfillment ?? {}) as Record<string, unknown>;
   const items = Array.isArray(d.items) ? d.items : [];

@@ -7,6 +7,7 @@ import { INTENT_TTL_MS, type PaymentIntent } from "@/lib/marketplace/payment";
 import { serverEnv } from "@/lib/env";
 import { randomUUID } from "crypto";
 import { toCustomerOrderSummary } from "@/lib/marketplace/customer-view";
+import { resolveRestaurantNames } from "@/lib/marketplace/restaurant-names";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +27,14 @@ export const GET = withCustomer(async ({ customer }) => {
     .limit(50)
     .get();
 
-  return snap.docs.map((d) => toCustomerOrderSummary(d.id, d.data() ?? {}));
+  const rows = snap.docs.map((d) => ({ id: d.id, data: d.data() ?? {} }));
+
+  // Only historic orders need this; ones placed since the name is frozen at
+  // checkout already carry it.
+  const missing = rows.filter((r) => !r.data.restaurantName).map((r) => String(r.data.restaurantId ?? ""));
+  const names = await resolveRestaurantNames(getAdminDb(), missing);
+
+  return rows.map((r) => toCustomerOrderSummary(r.id, r.data, names.get(String(r.data.restaurantId ?? "")) ?? null));
 });
 
 /**

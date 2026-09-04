@@ -418,4 +418,19 @@ test("[9d] BOTH tracking branches name the restaurant", () => {
   assert.ok(hits.length >= 2, `both branches must pass the name, found ${hits.length}`);
 });
 
+test("[9e] a customer NEVER sees an internal restaurant slug", () => {
+  // The fallback chain used to end at restaurantId, so every order written
+  // before the name was stored showed "stg-trishas-kitchen" in the app.
+  const withName = toCustomerOrderSummary("o1", { restaurantName: "Trisha's Kitchen", restaurantId: "stg-trishas-kitchen" });
+  assert.equal(withName.restaurantName, "Trisha's Kitchen");
+
+  const hydrated = toCustomerOrderSummary("o2", { restaurantId: "stg-trishas-kitchen" }, "Trisha's Kitchen");
+  assert.equal(hydrated.restaurantName, "Trisha's Kitchen",
+    "a historic order must take the hydrated name over its slug");
+
+  // Last resort only when the restaurant itself is gone.
+  const orphan = toCustomerOrderSummary("o3", { restaurantId: "stg-gone" }, null);
+  assert.equal(orphan.restaurantName, "stg-gone");
+});
+
 console.log(`\n${passed} checks passed\n`);
