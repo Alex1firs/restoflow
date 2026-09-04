@@ -294,3 +294,15 @@ const sum = (xs: number[]): number => xs.reduce((a, b) => a + b, 0);
 export function formatNaira(minor: Minor): string {
   return `₦${(minor / 100).toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
+
+/**
+ * What the customer is charged for delivery, given what Dispatcher charges us.
+ *
+ * Pass-through at launch (audit decision D2): the customer pays the courier
+ * cost and the platform takes its margin on the food, not on the ride. The
+ * margin field exists on the snapshot so this policy can change later without
+ * a schema change or a migration of historical orders.
+ */
+export function customerDeliveryFee(dispatcherFeeMinor: number): number {
+  return dispatcherFeeMinor;
+}

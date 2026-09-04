@@ -228,6 +228,29 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ─── Marketplace customers ───────────────────────────────────────────────────
+    // Consumer accounts and their saved addresses. Server-only, even though a
+    // rule of the form `request.auth.uid == customerId` would look correct
+    // here: the mobile app has no Firestore SDK and never opens a direct
+    // connection to this database. It holds a Firebase ID token and talks to
+    // /api/mobile/v1, which verifies the token and reads with the Admin SDK.
+    //
+    // Keeping the door shut rather than ajar means a stolen ID token buys an
+    // attacker exactly the API surface we wrote and nothing else — no ad-hoc
+    // queries, no collection listing, no fields we forgot were on the document.
+    match /customers/{customerId} {
+      allow read:  if false;
+      allow write: if false;
+
+      // Addresses are a subcollection so ownership is a path rather than a
+      // field somebody has to remember to compare. Same reasoning applies:
+      // reached only through the API.
+      match /addresses/{addressId} {
+        allow read:  if false;
+        allow write: if false;
+      }
+    }
+
     // ─── POS order idempotency claims ────────────────────────────────────────────
     // One document per (restaurant, localOrderId) cashier transaction, written
     // ONLY by the server (Admin SDK, which bypasses these rules) inside the same

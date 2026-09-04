@@ -107,11 +107,26 @@ test("[8] no delivery module imports POS code", () => {
   }
 });
 
-test("[9] the customer tracking route never accepts an identity from the request body", () => {
+test("[9] the customer tracking route never accepts an identity from the request", () => {
   const route = files.find((f) => f.path.includes("tracking/route.ts"))!;
-  assert.match(route.code, /verifyIdToken/, "identity must come from a verified token");
+
+  // The route no longer verifies the token itself; it goes through the one
+  // wrapper every `/api/mobile/v1` route goes through. That is the stronger
+  // arrangement — a route CANNOT forget the check by being written slightly
+  // differently — but it moves the assertion, so both halves are checked here.
+  assert.match(route.code, /withCustomer\(/, "the route must go through the customer wrapper");
+
+  const wrapper = readFileSync(join(process.cwd(), "lib/marketplace/mobile-api.ts"), "utf8");
+  assert.match(wrapper, /authenticateCustomer\(req\)/, "the wrapper must authenticate");
+  const auth = readFileSync(join(process.cwd(), "lib/marketplace/customer.ts"), "utf8");
+  assert.match(auth, /verifyIdToken\(token, true\)/, "identity must come from a verified, revocation-checked token");
+
+  // And, either way: there is no request field through which a caller could
+  // name a different customer.
   assert.equal(/body\.customerId|searchParams\.get\(["']customerId/.test(route.code), false,
     "a caller-supplied customer id would be an IDOR");
+  assert.match(route.code, /requestingCustomerId: customer\.id/,
+    "ownership must be checked against the uid from the token");
 });
 
 test("[10] the webhook route verifies the signature over the RAW body, before parsing", () => {

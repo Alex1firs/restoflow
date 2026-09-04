@@ -1,5 +1,19 @@
 # Staging setup checklist
 
+> **Superseded in part by [`STAGING_SETUP.md`](./STAGING_SETUP.md)**, which is
+> the ordered, step-by-step version of this and is the one to follow. Two
+> things have changed since this file was written:
+>
+> - **Phone auth is out.** Staging sign-in uses Email/Password only. Phone auth
+>   sends SMS, which is billable; there is no reason to spend that on synthetic
+>   accounts.
+> - **The indexes are now in the repository** as `firestore.indexes.json` and
+>   deploy with `firebase deploy --only firestore:indexes --project restoflow-staging`,
+>   rather than being created by hand from the list below.
+>
+> This file remains useful as the reference for what each value is *for*.
+
+
 ## What I can create: nothing
 
 `firebase login:list` → **no authorized accounts**. `vercel` → **not installed**.
