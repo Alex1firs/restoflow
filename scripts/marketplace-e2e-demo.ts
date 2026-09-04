@@ -126,6 +126,7 @@ async function main() {
         marketplaceOrderCode: makeOrderCode(), restaurantId: intent.restaurantId,
         customerId: intent.customerId, customerFirstName: intent.customerFirstName,
         customerPhone: intent.customerPhone, deliveryAddress: intent.deliveryAddress,
+        deliveryLocation: intent.deliveryLocation ?? null,
         note: intent.note, items: intent.items, pricing: intent.pricing,
         paymentReference: reference, prepMins: intent.prepMins,
         correlationId: intent.correlationId, nowMs,

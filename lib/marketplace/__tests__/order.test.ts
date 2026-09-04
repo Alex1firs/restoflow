@@ -30,6 +30,7 @@ const order = () => buildMarketplaceOrder({
   marketplaceOrderCode: "RF-ABC123", restaurantId: "trishas", customerId: "cust-1",
   customerFirstName: "Amaka", customerPhone: "+2348111111111",
   deliveryAddress: "2 Mobolaji Bank", note: "extra pepper",
+  deliveryLocation: { lat: 6.4474, lng: 3.4736 },
   items, pricing: snapshot, paymentReference: "pay_ref_1",
   prepMins: 25, correlationId: "corr-1", nowMs: T0,
 });

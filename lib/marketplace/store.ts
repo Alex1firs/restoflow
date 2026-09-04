@@ -88,6 +88,7 @@ export class FirestoreMarketplaceStore implements PaymentStore {
         customerFirstName: intent.customerFirstName,
         customerPhone: intent.customerPhone,
         deliveryAddress: intent.deliveryAddress,
+        deliveryLocation: intent.deliveryLocation ?? null,
         note: intent.note,
         items: intent.items,
         pricing: intent.pricing,

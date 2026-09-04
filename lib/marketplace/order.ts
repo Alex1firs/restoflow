@@ -76,6 +76,8 @@ export type MarketplaceOrder = {
   customerName: string;
   phone: string;
   address: string;
+  /** Dropoff coordinates, carried from the quote so delivery uses the priced point. */
+  deliveryLocation: { lat: number; lng: number } | null;
   note: string;
 
   // ── Marketplace lifecycle ──
@@ -145,6 +147,16 @@ export type BuildOrderInput = {
   customerFirstName: string;
   customerPhone: string;
   deliveryAddress: string;
+  /**
+   * Dropoff coordinates.
+   *
+   * Persisted alongside the address because the delivery handoff needs a
+   * LatLng and a street string cannot be turned back into one without a
+   * paid geocode — and geocoding at handoff time would mean a courier is
+   * dispatched to a slightly different place than the customer was quoted
+   * for. The quote priced THIS point; the delivery must use the same one.
+   */
+  deliveryLocation: { lat: number; lng: number } | null;
   note: string;
   items: MarketplaceOrderItem[];
   pricing: PriceSnapshot;
@@ -178,6 +190,7 @@ export function buildMarketplaceOrder(input: BuildOrderInput): MarketplaceOrder 
     customerName: input.customerFirstName,
     phone: input.customerPhone,
     address: input.deliveryAddress,
+    deliveryLocation: input.deliveryLocation ?? null,
     note: input.note,
 
     fulfillment: {
