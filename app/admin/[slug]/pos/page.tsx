@@ -54,7 +54,7 @@ export default async function POSPage({ params }: Props) {
   });
 
   const restaurant = {
-    slug: data.slug as string,
+    slug: (data.slug as string) ?? restaurantSnap.id,
     name: data.name as string,
     cancellationManagerPinEnabled: data.cancellationManagerPinEnabled !== false,
     cancellationOwnerApprovalEnabled: data.cancellationOwnerApprovalEnabled !== false,

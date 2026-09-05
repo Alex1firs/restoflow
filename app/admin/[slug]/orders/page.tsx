@@ -34,7 +34,7 @@ export default async function AdminOrdersPage({ params }: Props) {
   const restaurant = {
     id: restaurantSnap.id,
     name: data.name as string,
-    slug: data.slug as string,
+    slug: (data.slug as string) ?? restaurantSnap.id,
   };
 
   // 4. Derive subscription state (fetches plan name from plans collection)

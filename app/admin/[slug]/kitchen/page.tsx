@@ -25,7 +25,7 @@ export default async function KitchenPage({ params }: Props) {
 
   const data = restaurantSnap.data()!;
   const restaurant = {
-    slug: data.slug as string,
+    slug: (data.slug as string) ?? restaurantSnap.id,
     name: data.name as string,
   };
 
