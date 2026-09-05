@@ -306,3 +306,26 @@ export function formatNaira(minor: Minor): string {
 export function customerDeliveryFee(dispatcherFeeMinor: number): number {
   return dispatcherFeeMinor;
 }
+
+/**
+ * The restaurant's own price for every option, keyed `groupId:choiceId`.
+ *
+ * Read from the raw menu document rather than the public projection, because
+ * the projection deliberately carries only customer prices — a restaurant's
+ * own cost must never reach a phone.
+ */
+export function baseOptionPrices(raw: unknown): Map<string, number> {
+  const out = new Map<string, number>();
+  if (!Array.isArray(raw)) return out;
+  for (const g of raw) {
+    const group = (g ?? {}) as Record<string, unknown>;
+    if (typeof group.id !== "string" || !Array.isArray(group.choices)) continue;
+    for (const c of group.choices) {
+      const choice = (c ?? {}) as Record<string, unknown>;
+      if (typeof choice.id !== "string") continue;
+      out.set(`${group.id}:${choice.id}`, Math.round(Number(choice.price ?? 0) * 100));
+    }
+  }
+  return out;
+}
+

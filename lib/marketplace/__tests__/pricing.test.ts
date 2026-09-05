@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  resolveMarkup, applyMarkup, roundUpTo, priceLine, buildSnapshot, checkInvariants,
+  resolveMarkup, applyMarkup, roundUpTo, priceLine, buildSnapshot, checkInvariants, baseOptionPrices,
   DEFAULT_ROUND_TO, formatNaira,
   type PricingConfig, type LineInput, type MarkupRule,
 } from "../pricing";
@@ -303,6 +303,34 @@ test("[MARKUP APPLIES ONCE] an option is not marked up twice", () => {
   assert.equal(withOption.customerPriceMinor, Math.round(400_000 * 1.2));
 });
 
+test("[MARKUP APPLIES ONCE] option base prices are read from the real document shape", () => {
+  // The first attempt at the fix read `menu_items/<id>.options`, which does not
+  // exist — option groups live under `marketplace.options`. Every option then
+  // priced at ZERO, which is worse than the overcharge it replaced. A
+  // structural test could not see that; this uses the real staging shape.
+  const marketplace = {
+    options: [
+      { id: "protein", name: "Protein", minSelect: 1, maxSelect: 1, choices: [
+        { id: "chicken", name: "Chicken", price: 0 },
+        { id: "beef", name: "Beef", price: 500 },
+      ]},
+      { id: "extras", name: "Add extras", minSelect: 0, maxSelect: 3, choices: [
+        { id: "plantain", name: "Fried plantain", price: 700 },
+      ]},
+    ],
+  };
+  const prices = baseOptionPrices(marketplace.options);
+  assert.equal(prices.get("protein:beef"), 50_000, "₦500 in naira becomes 50,000 minor");
+  assert.equal(prices.get("extras:plantain"), 70_000);
+  assert.equal(prices.get("protein:chicken"), 0, "a free option is free, not missing");
+  assert.equal(prices.get("protein:missing"), undefined);
+
+  // Malformed input must not throw — a menu can be edited badly.
+  assert.equal(baseOptionPrices(undefined).size, 0);
+  assert.equal(baseOptionPrices({ nope: true }).size, 0);
+  assert.equal(baseOptionPrices([{ id: "g" }]).size, 0, "a group with no choices is skipped");
+});
+
 test("[MARKUP APPLIES ONCE] the quote passes BASE option prices, never customer ones", () => {
   // Structural: the public projection carries customer prices, so summing
   // `choice.priceMinor` into the line is the bug above. The quote must look the
@@ -311,7 +339,9 @@ test("[MARKUP APPLIES ONCE] the quote passes BASE option prices, never customer 
   assert.ok(!/optionsTotalMinor \+= choice\.priceMinor/.test(src),
     "the quote is summing customer-priced options into the marked-up line again");
   assert.match(src, /optionBaseMinor\.get/);
-  assert.match(src, /function baseOptionPrices/);
+  assert.match(src, /baseOptionPrices\(/);
+  // …and reads them from where they actually live.
+  assert.match(src, /marketplace as \{ options\?: unknown \}/);
 });
 
 console.log(`\n${passed} checks passed\n`);

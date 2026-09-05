@@ -9,14 +9,13 @@ if (!getApps().length) initializeApp({ credential: cert({ projectId,
   privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY!.replace(/\\n/g, "\n") })});
 const db = getFirestore();
 (async () => {
-  const snap = await db.collection("restaurants").doc("stg-trishas-kitchen").collection("menu_items").get();
-  for (const d of snap.docs) {
-    const m = d.data();
-    if (d.id !== "stg-jollof") continue;
-    console.log(`${d.id}: base price = ${m.price ?? m.priceMinor}`);
-    console.log("options raw:", JSON.stringify(m.options, null, 1).slice(0, 600));
+  const d = await db.collection("menu_items").doc("stg-jollof").get();
+  const m = d.data();
+  if (!m) { console.log("not found by id; querying"); process.exit(0); }
+  console.log("price:", m.price);
+  console.log("marketplace =", JSON.stringify(m.marketplace).slice(0, 700));
+  for (const k of ["options","optionGroups","modifiers","addons"]) {
+    if (m[k] !== undefined) console.log(k, "=", JSON.stringify(m[k]).slice(0, 500));
   }
-  const r = (await db.collection("restaurants").doc("stg-trishas-kitchen").get()).data()!;
-  console.log("marketplace pricing config:", JSON.stringify(r.marketplace?.pricing ?? r.marketplace ?? {}).slice(0, 400));
   process.exit(0);
 })().catch(e => { console.error(e.message); process.exit(1); });

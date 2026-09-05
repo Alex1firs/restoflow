@@ -1,5 +1,5 @@
 import "server-only";
-import { customerDeliveryFee } from "./pricing";
+import { baseOptionPrices, customerDeliveryFee } from "./pricing";
 import { randomUUID } from "crypto";
 import type { Firestore } from "firebase-admin/firestore";
 import { CONTRACT_VERSION } from "@/lib/delivery/contract";
@@ -116,7 +116,9 @@ export async function quoteCart(args: {
     // again together with the base, so it must be given the RESTAURANT's own
     // price. Feeding it the customer price applied the markup twice: a ₦500
     // option displayed at ₦600 was charged at ₦750.
-    const optionBaseMinor = baseOptionPrices(raw.options);
+    // `toPublicMenuItem` is handed the marketplace sub-object, which is where
+    // the option groups live — the top-level document has no `options` field.
+    const optionBaseMinor = baseOptionPrices((raw.marketplace as { options?: unknown } | undefined)?.options);
     let optionsTotalMinor = 0;
     const resolvedOptions: MarketplaceOrderItem["options"] = [];
     for (const chosen of line.options ?? []) {
@@ -249,25 +251,3 @@ function extractReason(message: string): Parameters<typeof unserviceableToCustom
 }
 
 export { customerDeliveryFee };
-
-/**
- * The restaurant's own price for every option, keyed `groupId:choiceId`.
- *
- * Read from the raw menu document rather than the public projection, because
- * the projection deliberately carries only customer prices — a restaurant's
- * own cost must never reach a phone.
- */
-function baseOptionPrices(raw: unknown): Map<string, number> {
-  const out = new Map<string, number>();
-  if (!Array.isArray(raw)) return out;
-  for (const g of raw) {
-    const group = (g ?? {}) as Record<string, unknown>;
-    if (typeof group.id !== "string" || !Array.isArray(group.choices)) continue;
-    for (const c of group.choices) {
-      const choice = (c ?? {}) as Record<string, unknown>;
-      if (typeof choice.id !== "string") continue;
-      out.set(`${group.id}:${choice.id}`, Math.round(Number(choice.price ?? 0) * 100));
-    }
-  }
-  return out;
-}
