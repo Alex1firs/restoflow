@@ -6,6 +6,7 @@ import {
   type ProviderVerification, type SettleResult,
 } from "./payment";
 import { FirestoreMarketplaceStore, INTENTS } from "./store";
+import { announceOrderCreated } from "./announce";
 import type { VerifyOutcome } from "./payment";
 
 /**
@@ -96,11 +97,18 @@ export async function verifyAndSettle(args: {
     feeMinor: v.feeMinor,
   };
 
-  return settlePayment({
+  const result = await settlePayment({
     verification, store, nowMs,
     log: (event, fields) =>
       console.log(JSON.stringify({ scope: "marketplace_reconcile", event, ...fields })),
   });
+
+  // Whoever settles first announces. Without this an order recovered by the
+  // callback or the sweep — the very case a lost webhook produces — reached the
+  // customer in silence. The outbox's own key makes a later webhook a no-op.
+  if (result.outcome === "created") await announceOrderCreated(db, result.orderId);
+
+  return result;
 }
 
 /**
