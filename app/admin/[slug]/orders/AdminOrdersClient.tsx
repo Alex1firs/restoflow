@@ -34,6 +34,13 @@ type Order = {
   cancellationRequestedAt?: Timestamp;
   orderNumber?: number | null;
   deliveryZoneName?: string | null;
+  /**
+   * Marketplace deliveries only. The rider must quote this to collect the food,
+   * and `orders/{id}` is readable by restaurant staff and nobody else, so this
+   * is the one screen it belongs on. The customer's receiving code is
+   * deliberately NOT on this document.
+   */
+  delivery?: { pickupCode?: string | null } | null;
 };
 
 type FilterTab = "active" | "completed" | "all";
@@ -541,6 +548,21 @@ export default function AdminOrdersClient({ restaurant, role }: Props) {
                         <span className="text-xl text-gray-900">₦{order.total.toLocaleString("en-NG")}</span>
                       </div>
                     </div>
+
+                    {/* Rider pickup code. Without it the rider cannot collect
+                        the food: Dispatcher keeps only a hash and will not
+                        reissue it. */}
+                    {order.delivery?.pickupCode && (
+                      <div className="bg-indigo-50 border border-indigo-100 px-3 py-2 rounded-xl">
+                        <p className="text-xs font-bold text-indigo-700 uppercase mb-0.5">Rider pickup code</p>
+                        <p className="text-2xl font-black tracking-[0.3em] text-indigo-900 tabular-nums">
+                          {order.delivery.pickupCode}
+                        </p>
+                        <p className="text-xs text-indigo-700 mt-0.5">
+                          Give this to the rider when they collect the order.
+                        </p>
+                      </div>
+                    )}
 
                     {/* Actions */}
                     <div className="space-y-2 mt-auto">

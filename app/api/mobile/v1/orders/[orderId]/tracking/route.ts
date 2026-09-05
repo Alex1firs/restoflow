@@ -4,6 +4,7 @@ import { DispatcherClient } from "@/lib/delivery/dispatcher-client";
 import { FirestoreDeliveryStore } from "@/lib/delivery/firestore-store";
 import { authorizeTracking, buildTrackingPayload, pollIntervalMs } from "@/lib/delivery/tracking";
 import { toCustomerFacing } from "@/lib/delivery/status";
+import { isTerminal } from "@/lib/delivery/contract";
 import { withCustomer, notFound } from "@/lib/marketplace/mobile-api";
 import { restaurantFacing, toCustomerStage } from "@/lib/marketplace/customer-view";
 import type { RestaurantState } from "@/lib/marketplace/order";
@@ -106,6 +107,16 @@ export function GET(req: Request, ctx: { params: Promise<{ orderId: string }> })
       restaurantName: order!.restaurantName ?? undefined,
     });
 
+    // The customer's half of the handover. Read server-side with the Admin SDK
+    // from a collection no client can touch, and returned only here — inside a
+    // branch that has already proved this customer owns this order. Withheld
+    // once the delivery is done, so a completed order stops carrying a live
+    // secret around.
+    const handoverSnap = await db.collection("order_handover").doc(orderId).get();
+    const receivingCode = isTerminal(state)
+      ? null
+      : ((handoverSnap.data()?.receivingCode as string | undefined) ?? null);
+
     const payload = buildTrackingPayload({
       state,
       headline: copy.headline,
@@ -135,6 +146,8 @@ export function GET(req: Request, ctx: { params: Promise<{ orderId: string }> })
       etaMins: payload.etaToDropoffMins,
       restaurantLocation: pickup,
       destination: order!.dropoff,
+      // Quoted to the rider at the door to complete the delivery.
+      receivingCode,
       pollIntervalMs: pollIntervalMs(state),
       // Both false, honestly.
       //

@@ -71,6 +71,18 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ─── Order handover codes ───────────────────────────────────────────────────
+    //
+    // The customer's receiving code. Deliberately unreachable from every client:
+    // restaurant staff can read `orders/{id}`, so anything stored there is
+    // visible to them, and this code is the customer's half of the handover.
+    // The server reads it with the Admin SDK and returns it only to the
+    // authenticated customer who owns the order.
+    match /order_handover/{orderId} {
+      allow read:  if false;
+      allow write: if false;
+    }
+
     // ─── Onboardings ────────────────────────────────────────────────────────────
     match /onboardings/{id} {
       allow read:  if false;

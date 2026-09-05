@@ -167,8 +167,13 @@ export async function requestDeliveryForOrder(args: {
     // The DELIVERY charge only. Read from the frozen snapshot, never recomputed.
     deliveryFeeMinor: Number(order.pricing?.deliveryFeeMinor ?? 0),
     paymentCollection: "NONE",
-    // No item names: a rider does not need to know what is in the bag.
-    packageDescription: "Food delivery",
+    // No item names: a rider does not need to know what is in the bag. The
+    // order code is here because it is the reference the restaurant, the
+    // customer and support all quote — and because "Food delivery" alone makes
+    // every marketplace job in the rider's list look identical.
+    packageDescription: order.marketplaceOrderCode
+      ? `Food delivery · ${String(order.marketplaceOrderCode)}`
+      : "Food delivery",
   };
 
   const log = (event: string, fields: Record<string, unknown>) =>
@@ -193,12 +198,29 @@ export async function requestDeliveryForOrder(args: {
   projection.deliveryJobId = res.value.deliveryJobId;
   projection.state = res.value.state;
   projection.lastEventAt = nowMs;
+  // Dispatcher hands these over exactly once, on the creating call, and stores
+  // only hashes. A replay returns nulls, so this is the single moment they can
+  // ever be captured — and neither code is logged, here or anywhere else.
+  projection.pickupCode = res.value.pickupCode ?? null;
 
   // Compare-and-set: only the caller that finds `delivery` still unset attaches.
   const attached = await db.runTransaction(async (tx) => {
     const fresh = await tx.get(ref);
     const existing = fresh.data()?.delivery;
     if (existing?.deliveryJobId) return String(existing.deliveryJobId);
+
+    // The customer's code cannot sit on the order: restaurant staff can read
+    // that document. It goes somewhere no client can read at all, and reaches
+    // the customer only through the authenticated tracking route.
+    const receivingCode = res.value.receivingCode ?? null;
+    if (receivingCode) {
+      tx.set(db.collection("order_handover").doc(orderId), {
+        orderId,
+        receivingCode,
+        createdAt: nowMs,
+      });
+    }
+
     tx.update(ref, {
       delivery: projection,
       // The order no longer owes Dispatcher a request; the retry sweep skips it.

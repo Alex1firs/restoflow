@@ -101,7 +101,11 @@ test("[8] the customer's surname never travels", () => {
 });
 
 test("[9] item names never travel — a rider does not need the menu", () => {
-  assert.match(SRC, /packageDescription: "Food delivery"/);
+  // The description carries the order code so a rider can tell one job from
+  // another — every marketplace card read "Food delivery" and looked identical.
+  // What it must never carry is what is in the bag.
+  assert.match(SRC, /packageDescription: order\.marketplaceOrderCode/);
+  assert.match(SRC, /Food delivery · \$\{String\(order\.marketplaceOrderCode\)\}/);
   assert.ok(!/order\.items/.test(SRC));
 });
 
@@ -167,6 +171,43 @@ test("[16] a job that was attached but never released can still be released", ()
   // Both the race path and the early return reach it.
   assert.ok((SRC.match(/await release\(/g) ?? []).length >= 3,
     "created, race and already-attached paths must all release");
+});
+
+test("[17] the handover codes are captured, and each lands where only its own audience can read it", () => {
+  // Dispatcher issues both codes exactly once, on the creating call, and keeps
+  // only hashes. Dropping them here is what left riders unable to collect an
+  // order at all — the whole delivery stalled at ACCEPTED.
+  assert.match(SRC, /projection\.pickupCode = res\.value\.pickupCode/);
+
+  // `orders/{id}` is readable by restaurant staff. The pickup code is theirs to
+  // quote, so it belongs there. The customer's receiving code must NOT, or
+  // staff could read the code that closes the delivery.
+  assert.match(SRC, /collection\("order_handover"\)/);
+  assert.ok(!/projection\.receivingCode/.test(SRC),
+    "the receiving code must never be written onto the order projection");
+});
+
+test("[18] neither code is ever logged", () => {
+  // These are bearer secrets for collecting somebody's food. A log line is a
+  // copy nobody is watching.
+  const logCalls = SRC.match(/log\([^)]*\)/g) ?? [];
+  for (const call of logCalls) {
+    assert.ok(!/pickupCode|receivingCode/.test(call), `code leaked into a log: ${call}`);
+  }
+  assert.ok(!/console\.log[^\n]*(pickupCode|receivingCode)/.test(SRC));
+});
+
+test("[19] a replay cannot overwrite the codes with nulls", () => {
+  // Dispatcher returns nulls when it replays an existing job. The codes are
+  // only ever written inside the compare-and-set that attaches a NEW job, and
+  // that branch returns early once `deliveryJobId` is set — so a retry, a
+  // sweep, or a second acceptance cannot blank them.
+  const txStart = SRC.indexOf("runTransaction");
+  const txBody = SRC.slice(txStart);
+  const guard = txBody.indexOf("existing?.deliveryJobId");
+  const write = txBody.indexOf("order_handover");
+  assert.ok(guard !== -1 && write !== -1 && guard < write,
+    "the code write must sit behind the already-attached guard");
 });
 
 console.log(`\n${passed} checks passed\n`);

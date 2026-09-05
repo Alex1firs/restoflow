@@ -53,6 +53,17 @@ export type DeliveryProjection = {
   /** Correlation for support. One per order, stable across every call. */
   correlationId: string;
   reconcileState: "ok" | "stale" | "attention";
+  /**
+   * The code the rider quotes to collect the food. Dispatcher returns it once,
+   * at creation, and keeps only a hash — so if we drop it here nobody can ever
+   * complete a pickup.
+   *
+   * It lives on the order because `orders/{id}` is readable by restaurant staff
+   * and nobody else, which is exactly who is meant to see it. The customer's
+   * receiving code deliberately does NOT live here: staff would be able to read
+   * it. That one is in `order_handover/{orderId}`, which no client can read.
+   */
+  pickupCode: string | null;
 };
 
 export function initialProjection(args: {
@@ -77,6 +88,7 @@ export function initialProjection(args: {
     issue: null,
     correlationId: args.correlationId,
     reconcileState: "ok",
+    pickupCode: null,
   };
 }
 

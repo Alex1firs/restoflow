@@ -146,6 +146,8 @@ function toView(orderId: string, d: Record<string, unknown>): DeliveryOrderView 
       issue: (raw.issue ?? null) as DeliveryProjection["issue"],
       correlationId: typeof raw.correlationId === "string" ? raw.correlationId : "",
       reconcileState: (raw.reconcileState === "stale" || raw.reconcileState === "attention") ? raw.reconcileState : "ok",
+      // Absent on every order written before the handoff started keeping it.
+      pickupCode: typeof raw.pickupCode === "string" ? raw.pickupCode : null,
     };
   }
 
