@@ -186,8 +186,9 @@ export async function requestDeliveryForOrder(args: {
       delivery: projection,
       // The order no longer owes Dispatcher a request; the retry sweep skips it.
       deliveryHandoffPending: null,
-      // When to release the job to riders: back off from the food being ready
-      // by the courier's travel time, so a rider is not idling at the counter.
+      // Kept for the sweep, which is now a safety net rather than the release
+      // mechanism: if the release below fails, this is what makes the job
+      // findable again.
       deliveryConfirmAt: computeConfirmAt({
         acceptedAtMs: nowMs,
         prepMins,
@@ -207,5 +208,31 @@ export async function requestDeliveryForOrder(args: {
   }
 
   log("created", { deliveryJobId: res.value.deliveryJobId, state: res.value.state });
+
+  // ── Release it to riders now ──────────────────────────────────────────────
+  //
+  // A created job is `draft`, and draft is invisible to the rider app, which
+  // only lists deliveries in `pending`. Until this call the only thing that
+  // released one was the confirm sweep, on a once-daily cron — so a restaurant
+  // could accept an order and no rider would see it for up to 24 hours.
+  //
+  // This is the SAME contract call the sweep makes, not a second copy of the
+  // state logic: Dispatcher owns `draft → pending`, and answers a repeat with
+  // the same job rather than a new one. The sweep stays as the safety net for
+  // the case below.
+  //
+  // Deliberately after the attach, and deliberately swallowing failure: the
+  // job exists and is recorded, so a Dispatcher timeout here must not lose it
+  // or make the caller think the handoff failed. `deliveryConfirmAt` is
+  // already written, which is precisely what lets the sweep finish the job.
+  const released = await client.confirmDelivery({
+    externalOrderId: orderId,
+    correlationId,
+  });
+  log(released.ok ? "released_to_riders" : "release_failed", {
+    deliveryJobId: res.value.deliveryJobId,
+    ...(released.ok ? {} : { kind: released.failure.kind, retryable: released.failure.retryable }),
+  });
+
   return { outcome: "created", deliveryJobId: res.value.deliveryJobId };
 }

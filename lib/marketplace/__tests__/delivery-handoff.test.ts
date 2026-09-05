@@ -17,6 +17,8 @@ const test = (n: string, f: () => void) => { f(); passed++; console.log(`  ✓ $
 console.log("marketplace/delivery-handoff");
 
 const ROOT = join(__dirname, "..", "..", "..");
+const strip = (s: string) =>
+  s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 const code = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 const SRC = code(readFileSync(join(ROOT, "lib/marketplace/delivery-handoff.ts"), "utf8"));
 const HOOK = code(readFileSync(join(ROOT, "lib/marketplace/webhook.ts"), "utf8"));
@@ -120,6 +122,37 @@ test("[12] a handoff failure never fails the acceptance", () => {
   const i = ACCEPT.indexOf("requestDeliveryForOrder");
   const seg = ACCEPT.slice(i - 400, i + 700);
   assert.ok(/try\s*\{/.test(seg) && /catch/.test(seg), "the handoff is not wrapped in try/catch");
+});
+
+test("[13] the job is released to riders at acceptance, not by the daily cron", () => {
+  // Found by running the real rider app: a created job is `draft`, and the
+  // rider app only lists `pending`. Until this, the confirm sweep — on a
+  // once-daily cron — was the only thing that released one, so a restaurant
+  // could accept an order and no rider would see it for up to 24 hours.
+  assert.match(SRC, /client\.confirmDelivery\(/);
+  const attach = SRC.indexOf("runTransaction");
+  const release = SRC.indexOf("client.confirmDelivery(");
+  assert.ok(release > attach,
+    "release must follow the attach, so a failed release cannot lose the job");
+});
+
+test("[14] a failed release neither fails the handoff nor loses the job", () => {
+  // The job exists and is recorded; a Dispatcher timeout here must leave the
+  // sweep able to finish it, which is what deliveryConfirmAt is for.
+  const tail = SRC.slice(SRC.indexOf("client.confirmDelivery("));
+  assert.ok(!/throw|return \{ outcome: "failed"/.test(tail),
+    "a release failure must not fail the handoff");
+  assert.match(tail, /outcome: "created"/);
+  assert.match(SRC, /deliveryConfirmAt: computeConfirmAt/);
+});
+
+test("[15] releasing is the same contract call the sweep makes", () => {
+  // Not a second copy of the state machine: Dispatcher owns draft → pending
+  // and answers a repeat with the same job.
+  const SWEEP = strip(readFileSync(join(ROOT, "lib/marketplace/sweeps.ts"), "utf8"));
+  assert.match(SWEEP, /client\.confirmDelivery\(/);
+  assert.ok(!/status.*['"]pending['"]/.test(SRC),
+    "RestoFlow must not set the Dispatcher-side status itself");
 });
 
 console.log(`\n${passed} checks passed\n`);
