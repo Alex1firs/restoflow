@@ -29,7 +29,7 @@ const proj = (over: Partial<DeliveryProjection> = {}): DeliveryProjection => ({
   deliveryJobId: "DJ-1", state: "EN_ROUTE_TO_CUSTOMER", ...over,
 });
 const order = (customerId: string, restaurantId = "trishas"): DeliveryOrderView => ({
-  orderId: "RF-1", restaurantId, customerId, restaurantName: "Trisha's Kitchen", restaurantProgress: "preparing", delivery: proj(),
+  orderId: "RF-1", restaurantId, customerId, restaurantName: "Trisha's Kitchen", pickup: null, dropoff: null, restaurantProgress: "preparing", delivery: proj(),
 });
 
 // ── Customer isolation ──────────────────────────────────────────────────────

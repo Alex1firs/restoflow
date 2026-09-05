@@ -22,6 +22,16 @@ export type DeliveryOrderView = {
    * so an old order reads a little generically instead of wrongly.
    */
   restaurantName: string | null;
+  /**
+   * The two fixed ends of the journey, for the customer's map.
+   *
+   * The pickup is the restaurant's own published location and the dropoff is
+   * the address this customer chose, so neither tells them anything they did
+   * not already supply or could not already see. The RIDER's position stays
+   * behind `authorizeTracking` and the staleness gate, as it always has.
+   */
+  pickup: { lat: number; lng: number } | null;
+  dropoff: { lat: number; lng: number } | null;
   /** Firebase Auth uid of the owning customer. The IDOR check hangs off this. */
   customerId: string;
   restaurantProgress: RestaurantProgress;

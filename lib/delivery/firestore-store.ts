@@ -158,6 +158,8 @@ function toView(orderId: string, d: Record<string, unknown>): DeliveryOrderView 
       ? d.restaurantName
       : null,
     customerId: typeof d.customerId === "string" ? d.customerId : "",
+    pickup: null,   // filled by the caller, which has the restaurant document
+    dropoff: coords(d.deliveryLocation),
     restaurantProgress: toProgress(d),
     delivery,
   };
@@ -183,6 +185,12 @@ function toProgress(d: Record<string, unknown>): RestaurantProgress {
     case "cancelled": return "cancelled";
     default: return "placed";
   }
+}
+
+function coords(v: unknown): { lat: number; lng: number } | null {
+  const p = (v ?? {}) as { lat?: unknown; lng?: unknown };
+  const lat = Number(p.lat), lng = Number(p.lng);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
 }
 
 const numOrNull = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);

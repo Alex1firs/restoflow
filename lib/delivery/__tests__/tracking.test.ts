@@ -19,7 +19,7 @@ console.log("delivery/tracking");
 const T0 = 1_756_000_000_000;
 
 const order = (over: Partial<DeliveryProjection> = {}, customerId = "cust-a"): DeliveryOrderView => ({
-  orderId: "RF-1", restaurantId: "trishas", customerId, restaurantName: "Trisha's Kitchen", restaurantProgress: "preparing",
+  orderId: "RF-1", restaurantId: "trishas", customerId, restaurantName: "Trisha's Kitchen", pickup: null, dropoff: null, restaurantProgress: "preparing",
   delivery: {
     ...initialProjection({ correlationId: "c", quoteId: "q", nowMs: T0 }),
     deliveryJobId: "DJ-1", state: "EN_ROUTE_TO_CUSTOMER",

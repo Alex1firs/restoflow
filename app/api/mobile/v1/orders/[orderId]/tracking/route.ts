@@ -33,6 +33,12 @@ export function GET(req: Request, ctx: { params: Promise<{ orderId: string }> })
     const store = new FirestoreDeliveryStore(db);
     const order = await store.getOrder(orderId);
 
+    // The restaurant's own published location — the other fixed end of the
+    // journey, and already visible on its storefront.
+    const pickup = order
+      ? await restaurantPickup(db, order.restaurantId)
+      : null;
+
     const decision = authorizeTracking({ order, requestingCustomerId: customer.id });
 
     if (!decision.allowed) {
@@ -57,8 +63,8 @@ export function GET(req: Request, ctx: { params: Promise<{ orderId: string }> })
         showMap: false,
         courier: order?.delivery?.driver ?? null,
         courierLocation: null,
-        restaurantLocation: null,
-        destination: null,
+        restaurantLocation: pickup,
+        destination: order?.dropoff ?? null,
         etaMins: order?.delivery?.etaToDropoffMins ?? null,
         pollIntervalMs: pollIntervalMs(state),
         canMessageCourier: false,
@@ -127,8 +133,8 @@ export function GET(req: Request, ctx: { params: Promise<{ orderId: string }> })
       courier: payload.driver,
       courierLocation: payload.location,
       etaMins: payload.etaToDropoffMins,
-      restaurantLocation: null,
-      destination: null,
+      restaurantLocation: pickup,
+      destination: order!.dropoff,
       pollIntervalMs: pollIntervalMs(state),
       // Both false, honestly.
       //
@@ -144,4 +150,12 @@ export function GET(req: Request, ctx: { params: Promise<{ orderId: string }> })
       trackingAvailable: true,
     };
   })(req);
+}
+
+async function restaurantPickup(
+  db: ReturnType<typeof getAdminDb>, restaurantId: string
+): Promise<{ lat: number; lng: number } | null> {
+  const d = (await db.collection("restaurants").doc(restaurantId).get()).data();
+  const lat = Number(d?.latitude), lng = Number(d?.longitude);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
 }
