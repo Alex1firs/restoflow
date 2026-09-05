@@ -253,4 +253,21 @@ test("[20] a live production-shaped restaurant is NOT in the marketplace", () =>
   assert.equal(isOrderable(s, T0).ok, false);
 });
 
+test("the cart quote sends customer prices per line and no restaurant economics", () => {
+  // The app must never compute its own food subtotal from displayed option
+  // values — it showed ₦5,640 while the server charged ₦5,650. It now renders
+  // the server's per-line figures, which must carry nothing about what the
+  // restaurant earns.
+  const raw = readFileSync(join(__dirname, "..", "..", "..", "app/api/mobile/v1/cart/quote/route.ts"), "utf8");
+  // Comments name the forbidden fields precisely so the rule is readable; the
+  // check is about what the route SENDS.
+  const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+  assert.match(src, /unitPriceMinor: l\.customerPriceMinor/);
+  assert.match(src, /lineTotalMinor: l\.lineCustomerMinor/);
+  for (const leak of ["restaurantUnitMinor", "basePriceMinor", "lineRestaurantMinor",
+                      "restaurantSubtotalMinor", "markupTotalMinor", "platformGrossMinor"]) {
+    assert.ok(!src.includes(leak), `the cart quote leaks ${leak} to the customer app`);
+  }
+});
+
 console.log(`\n${passed} checks passed\n`);

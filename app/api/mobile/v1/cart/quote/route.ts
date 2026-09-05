@@ -51,6 +51,7 @@ export const POST = withCustomer(async ({ customer, req }) => {
   if (!result.serviceable) {
     return {
       serviceable: false, reason: result.reason, code: result.code,
+      lines: [],
       subtotalMinor: 0, deliveryFeeMinor: 0, discountMinor: 0, taxMinor: 0,
       totalMinor: 0, etaMins: null, quoteId: null, expiresAt: null,
     };
@@ -62,6 +63,17 @@ export const POST = withCustomer(async ({ customer, req }) => {
   return {
     serviceable: true,
     reason: null,
+    // Per line, in the order they were sent, so the app can render the price of
+    // each row without doing arithmetic of its own. Index rather than id
+    // because two rows of the same dish with different options are two lines.
+    //
+    // Customer figures only: `restaurantUnitMinor`, `basePriceMinor` and
+    // `lineRestaurantMinor` are the restaurant's business and never leave here.
+    lines: s.lines.map((l) => ({
+      quantity: l.quantity,
+      unitPriceMinor: l.customerPriceMinor,
+      lineTotalMinor: l.lineCustomerMinor,
+    })),
     subtotalMinor: s.customerSubtotalMinor,
     deliveryFeeMinor: s.deliveryFeeMinor,
     discountMinor: s.discountTotalMinor,
