@@ -110,6 +110,14 @@ export function buildTrackingPayload(args: {
     }
   }
 
+  // A finished delivery has no arrival time and no position. The projection
+  // keeps the last ETA it was told, and printing it under "Delivered" tells the
+  // customer their food is still eight minutes away.
+  //
+  // Applied to `location` BEFORE `showMap` is derived from it: computing the
+  // two independently is how a map gets shown with nothing to put on it.
+  if (isTerminal(args.state)) location = null;
+
   return {
     state: args.state,
     headline: args.headline,
@@ -117,7 +125,7 @@ export function buildTrackingPayload(args: {
     showMap: args.showMap && location !== null,
     driver: args.driver,
     location,
-    etaToDropoffMins: args.etaToDropoffMins,
+    etaToDropoffMins: isTerminal(args.state) ? null : args.etaToDropoffMins,
   };
 }
 

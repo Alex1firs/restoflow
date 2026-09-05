@@ -146,4 +146,34 @@ test("a marketplace order's acceptance is visible to tracking", () => {
     "toProgress must prefer the marketplace state machine's own field");
 });
 
+test("a delivered order has no arrival time and no position", () => {
+  // Seen on staging: "Delivered — Enjoy your food from Trisha's Kitchen" with
+  // "Arriving in about 8 min" underneath it. The projection keeps the last ETA
+  // it was told; a finished delivery has none.
+  const payload = buildTrackingPayload({
+    state: "DELIVERED",
+    headline: "Delivered", detail: null, showMap: true,
+    driver: { firstName: "Chidi", photoUrl: null, vehicle: "Bike", contactHandle: "dh_1" },
+    raw: { lat: 6.44, lng: 3.47, recordedAtMs: Date.now() },
+    etaToDropoffMins: 8,
+    nowMs: Date.now(),
+  });
+  assert.equal(payload.etaToDropoffMins, null, "a delivered order is not still arriving");
+  assert.equal(payload.location, null, "a finished delivery does not keep broadcasting a position");
+  assert.equal(payload.showMap, false);
+});
+
+test("a live delivery keeps its ETA and position", () => {
+  const payload = buildTrackingPayload({
+    state: "EN_ROUTE_TO_CUSTOMER",
+    headline: "On the way", detail: null, showMap: true,
+    driver: null,
+    raw: { lat: 6.44, lng: 3.47, recordedAtMs: Date.now() },
+    etaToDropoffMins: 8,
+    nowMs: Date.now(),
+  });
+  assert.equal(payload.etaToDropoffMins, 8);
+  assert.ok(payload.location);
+});
+
 console.log(`\n${passed} checks passed\n`);
