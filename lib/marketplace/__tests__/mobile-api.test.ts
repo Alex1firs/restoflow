@@ -433,4 +433,20 @@ test("[9e] a customer NEVER sees an internal restaurant slug", () => {
   assert.equal(orphan.restaurantName, "stg-gone");
 });
 
+test("[9f] tracking answers in the CUSTOMER's vocabulary, not the subsystem's", () => {
+  // buildTrackingPayload speaks driver / location / etaToDropoffMins; the app
+  // reads courier / courierLocation / etaMins. The live-tracking branch used to
+  // spread the payload, so while a rider was actually moving the app got three
+  // keys it does not read — no courier card, no map, no ETA — and they only
+  // appeared once tracking STOPPED, because that branch maps by hand.
+  const src = readFileSync(join(ROOT, "app/api/mobile/v1/orders/[orderId]/tracking/route.ts"), "utf8");
+  assert.ok(!/\.\.\.payload/.test(src),
+    "the tracking payload must be mapped field by field, never spread");
+  for (const key of ["courier: payload.driver", "courierLocation: payload.location", "etaMins: payload.etaToDropoffMins"]) {
+    assert.ok(src.includes(key), `missing mapping: ${key}`);
+  }
+  // Both branches must offer the same shape.
+  assert.equal((src.match(/courier:/g) ?? []).length >= 2, true);
+});
+
 console.log(`\n${passed} checks passed\n`);

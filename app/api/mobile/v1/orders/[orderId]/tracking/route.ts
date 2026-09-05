@@ -111,9 +111,22 @@ export function GET(req: Request, ctx: { params: Promise<{ orderId: string }> })
       nowMs: Date.now(),
     });
 
+    // Mapped field by field, NOT spread. `buildTrackingPayload` speaks the
+    // delivery subsystem's vocabulary (driver / location / etaToDropoffMins);
+    // the customer app reads courier / courierLocation / etaMins. Spreading the
+    // payload silently handed the app three keys it does not read, so for the
+    // whole time a rider was actually moving there was no courier card, no map
+    // and no ETA — and it only appeared once tracking had stopped, because that
+    // branch maps them by hand.
     return {
       orderId, stage, problem,
-      ...payload,
+      state: payload.state,
+      headline: payload.headline,
+      detail: payload.detail,
+      showMap: payload.showMap,
+      courier: payload.driver,
+      courierLocation: payload.location,
+      etaMins: payload.etaToDropoffMins,
       restaurantLocation: null,
       destination: null,
       pollIntervalMs: pollIntervalMs(state),
