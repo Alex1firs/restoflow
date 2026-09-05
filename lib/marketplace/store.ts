@@ -74,11 +74,23 @@ export class FirestoreMarketplaceStore implements PaymentStore {
       const existing = await tx.get(paymentRef);
       if (existing.exists) {
         const orderId = String(existing.data()?.orderId ?? "");
-        // A payment record with no order behind it is an integrity fault. Never
-        // paper over it by writing a replacement — that is how duplicates come
-        // back.
-        if (!orderId) throw new Error(`payment ${reference} exists with no order`);
-        return { orderId, created: false };
+        if (orderId) return { orderId, created: false };
+
+        // No order behind the record. What that means depends on the state.
+        //
+        // A recorded FAILURE is not an integrity fault: one Paystack reference
+        // covers a whole checkout, and a customer whose card is declined can
+        // try another on the same page. The first attempt writes `failed` here,
+        // the second succeeds, and the transaction then reads `success`. This
+        // used to throw forever — the money was taken and the order could never
+        // be created. Fall through and materialise it.
+        //
+        // Anything else with no order really is a fault: a `succeeded` payment
+        // whose order is missing must never be papered over with a replacement,
+        // because that is how duplicate orders come back.
+        if (String(existing.data()?.state ?? "") !== "failed") {
+          throw new Error(`payment ${reference} exists with no order`);
+        }
       }
 
       const order = buildMarketplaceOrder({
@@ -101,9 +113,11 @@ export class FirestoreMarketplaceStore implements PaymentStore {
 
       tx.set(orderRef, { ...order, createdAt: FieldValue.serverTimestamp(), createdAtMs: nowMs });
 
-      // `create`, not `set`: if two transactions somehow reach here the second
-      // fails with ALREADY_EXISTS rather than overwriting a payment record.
-      tx.create(paymentRef, {
+      // `set`, not `create`: a failed earlier attempt on this reference may
+      // already have left a record, and this replaces it wholesale. Two
+      // concurrent successes cannot both land here — Firestore aborts one of
+      // them, because both read this same document inside the transaction.
+      tx.set(paymentRef, {
         reference, orderId: orderRef.id,
         restaurantId: intent.restaurantId, customerId: intent.customerId,
         amountChargedMinor: verification.amountMinor,

@@ -136,4 +136,28 @@ test("[15] a failure that can never succeed stops being retried", () => {
   assert.match(block, /clearHandoffPending/);
 });
 
+test("[16] a declined first attempt does not poison the reference forever", () => {
+  // Found in a real staging run: the customer's first card attempt recorded
+  // `failed` against the reference, they paid with another card on the same
+  // Paystack page, and every settlement path then threw
+  // "payment … exists with no order". The money was taken and the order could
+  // never be created — by any path, forever.
+  const STORE = strip(readFileSync(join(ROOT, "lib/marketplace/store.ts"), "utf8"));
+  const guard = STORE.indexOf("exists with no order");
+  const seg = STORE.slice(Math.max(0, guard - 700), guard + 120);
+  assert.match(seg, /!== "failed"/,
+    "a recorded failure must fall through and materialise, not throw");
+  // A succeeded payment with no order IS still a fault and must still throw.
+  assert.match(STORE, /throw new Error\(`payment \$\{reference\} exists with no order`\)/);
+});
+
+test("[17] the payment record is replaced, not created, so a retry can settle", () => {
+  const STORE = strip(readFileSync(join(ROOT, "lib/marketplace/store.ts"), "utf8"));
+  assert.match(STORE, /tx\.set\(paymentRef, \{/,
+    "tx.create would fail with ALREADY_EXISTS over a failed attempt's record");
+  // The ledger still uses create: those ids are deterministic and must never
+  // be overwritten.
+  assert.match(STORE, /tx\.create\(this\.db\.collection\(LEDGER\)/);
+});
+
 console.log(`\n${passed} checks passed\n`);
