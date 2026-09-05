@@ -139,10 +139,12 @@ test("[13] the job is released to riders at acceptance, not by the daily cron", 
 test("[14] a failed release neither fails the handoff nor loses the job", () => {
   // The job exists and is recorded; a Dispatcher timeout here must leave the
   // sweep able to finish it, which is what deliveryConfirmAt is for.
-  const tail = SRC.slice(SRC.indexOf("client.confirmDelivery("));
-  assert.ok(!/throw|return \{ outcome: "failed"/.test(tail),
-    "a release failure must not fail the handoff");
-  assert.match(tail, /outcome: "created"/);
+  const helper = SRC.slice(SRC.indexOf("async function release("));
+  assert.ok(!/throw|rethrow/.test(helper), "the release helper must never throw");
+  assert.ok(!/return \{ outcome: "failed"/.test(helper),
+    "a release failure must not turn into a handoff failure");
+  // The created path still reports created regardless of the release outcome.
+  assert.match(SRC, /await release\([\s\S]{0,120}?\n\n  return \{ outcome: "created"/);
   assert.match(SRC, /deliveryConfirmAt: computeConfirmAt/);
 });
 
@@ -153,6 +155,18 @@ test("[15] releasing is the same contract call the sweep makes", () => {
   assert.match(SWEEP, /client\.confirmDelivery\(/);
   assert.ok(!/status.*['"]pending['"]/.test(SRC),
     "RestoFlow must not set the Dispatcher-side status itself");
+});
+
+test("[16] a job that was attached but never released can still be released", () => {
+  // Every marketplace job created before the release existed is attached and
+  // still `draft` — invisible to riders. Retrying the handoff must finish the
+  // job, not just report that it is already there.
+  const early = SRC.indexOf("already_attached");
+  assert.ok(SRC.slice(0, early).includes("release(") || /release\(\s*client/.test(SRC),
+    "the already-attached path must also release");
+  // Both the race path and the early return reach it.
+  assert.ok((SRC.match(/await release\(/g) ?? []).length >= 3,
+    "created, race and already-attached paths must all release");
 });
 
 console.log(`\n${passed} checks passed\n`);

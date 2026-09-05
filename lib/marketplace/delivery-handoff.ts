@@ -94,6 +94,23 @@ export async function requestDeliveryForOrder(args: {
     return { outcome: "skipped", reason: "restaurant_has_not_accepted" };
   }
   if (order.delivery?.deliveryJobId) {
+    // An order can carry a job that was attached but never released — every
+    // marketplace job created before the release existed is in exactly that
+    // state, invisible to riders. Retrying the handoff must be able to finish
+    // the job, not just report that it is already there.
+    const jobId = String(order.delivery.deliveryJobId);
+    const client = new DispatcherClient({
+      baseUrl: cfg.config.baseUrl, apiKey: cfg.config.apiKey,
+      signingSecret: cfg.config.signingSecret,
+      log: (event, fields) =>
+        console.log(JSON.stringify({ scope: "marketplace_delivery_handoff", event, orderId, ...fields })),
+    });
+    await release(
+      client, orderId, String(order.correlationId || `mp-${orderId}`), jobId,
+      (event, fields) =>
+        console.log(JSON.stringify({ scope: "marketplace_delivery_handoff", event, orderId, ...fields }))
+    );
+
     // Clear the retry marker on the way out. Acceptance sets it before every
     // attempt, and an order whose job was attached by some earlier path — an
     // order created under an older build, a race, a replay — would otherwise
@@ -202,8 +219,10 @@ export async function requestDeliveryForOrder(args: {
 
   if (attached) {
     // Another handoff won the race. Dispatcher's idempotency means it is the
-    // same job, so there is nothing to undo.
+    // same job, so there is nothing to undo — but it may not have been
+    // released, so ask again. Confirming an already-released job is a no-op.
     log("already_attached_by_race", { deliveryJobId: attached });
+    await release(client, orderId, correlationId, attached, log);
     return { outcome: "already_attached", deliveryJobId: attached };
   }
 
@@ -225,14 +244,31 @@ export async function requestDeliveryForOrder(args: {
   // job exists and is recorded, so a Dispatcher timeout here must not lose it
   // or make the caller think the handoff failed. `deliveryConfirmAt` is
   // already written, which is precisely what lets the sweep finish the job.
-  const released = await client.confirmDelivery({
-    externalOrderId: orderId,
-    correlationId,
-  });
-  log(released.ok ? "released_to_riders" : "release_failed", {
-    deliveryJobId: res.value.deliveryJobId,
-    ...(released.ok ? {} : { kind: released.failure.kind, retryable: released.failure.retryable }),
-  });
+  await release(client, orderId, correlationId, res.value.deliveryJobId, log);
 
   return { outcome: "created", deliveryJobId: res.value.deliveryJobId };
+}
+
+/**
+ * Ask Dispatcher to release a job to riders.
+ *
+ * `draft` is invisible to the rider app; `pending` is what it lists. Dispatcher
+ * owns that transition and answers a repeat with the same job, so this is safe
+ * to call on every path that could reach an unreleased delivery.
+ *
+ * Never throws. The job exists and is recorded either way, and the confirm
+ * sweep remains the safety net.
+ */
+async function release(
+  client: DispatcherClient,
+  orderId: string,
+  correlationId: string,
+  deliveryJobId: string,
+  log: (event: string, fields: Record<string, unknown>) => void
+): Promise<void> {
+  const res = await client.confirmDelivery({ externalOrderId: orderId, correlationId });
+  log(res.ok ? "released_to_riders" : "release_failed", {
+    deliveryJobId,
+    ...(res.ok ? {} : { kind: res.failure.kind, retryable: res.failure.retryable }),
+  });
 }
