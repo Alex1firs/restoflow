@@ -87,6 +87,12 @@ export type SourceMenuItem = {
   category?: string;
   available?: boolean;
   image?: string;
+  /**
+   * Which sales channels this dish belongs to: "both" (default), "pos_only" or
+   * "hidden". A restaurant uses it to keep staff meals and wholesale lines on
+   * its menu without offering them to customers.
+   */
+  channel?: string;
 };
 
 // ── Projected discovery documents ─────────────────────────────────────────────

@@ -41,6 +41,11 @@ export function computeVisibility(r: SourceRestaurant, nowMs: number): boolean {
  * or ordered from. Staging has exactly one such restaurant, and it is the case
  * this gate exists to keep out.
  */
+/** Channels a customer may be shown. Unset means "both", the permissive default. */
+export function isCustomerChannel(channel: string | undefined): boolean {
+  return channel !== "pos_only" && channel !== "hidden";
+}
+
 export function computeMarketplaceVisibility(r: SourceRestaurant, nowMs: number): boolean {
   return computeVisibility(r, nowMs) && r.marketplaceEnabled === true;
 }
@@ -203,7 +208,15 @@ export function projectDish(
     // Derived, never passed in: a dish cannot be more visible than its
     // restaurant, and the marketplace gate must not be something a caller can
     // forget to apply.
-    marketplaceVisible: restaurantVisible && snapshot.marketplaceEnabled,
+    //
+    // `channel` is part of that gate. A staff meal or a wholesale line lives on
+    // the restaurant's menu with channel "pos_only" or "hidden", and the
+    // customer menu has always excluded those. Once search reads this index,
+    // omitting the check here would let such a dish pull its restaurant into
+    // results and print its name as the reason — a dish the customer is not
+    // allowed to see, named to them.
+    marketplaceVisible:
+      restaurantVisible && snapshot.marketplaceEnabled && isCustomerChannel(item.channel),
     updatedAt: nowMs,
     signalsComputedAt: null,
     schemaVersion: SCHEMA_VERSION,

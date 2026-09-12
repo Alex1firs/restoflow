@@ -22,56 +22,6 @@ const test = (name: string, fn: () => void) => {
   try { fn(); passed++; console.log("  ✓ " + name); }
   catch (e) { console.error("  ✗ " + name + "\n    " + (e as Error).message); process.exitCode = 1; }
 };
-// ── Index maintenance ────────────────────────────────────────────────────────
-
-test("[23] every menu write nudges the index", () => {
-  // Menu edits are written to Firestore straight from the admin client, so
-  // nothing server-side observes them. A write path that forgets this call is
-  // a dish that stays invisible until the nightly reconcile.
-  const { readFileSync } = require("node:fs") as typeof import("node:fs");
-  const { join } = require("node:path") as typeof import("node:path");
-  const root = join(__dirname, "..", "..", "..");
-  const client = readFileSync(join(root, "app/admin/[slug]/menu/AdminMenuClient.tsx"), "utf8");
-
-  const writes = (client.match(/await (addDoc|updateDoc|deleteDoc)\(/g) ?? []).length;
-  const nudges = (client.match(/void refreshDiscovery\(\)/g) ?? []).length;
-  assert.ok(writes > 0, "guard: expected menu writes in the admin client");
-  assert.equal(nudges, writes, `${writes} menu writes but ${nudges} index refreshes`);
-  assert.match(client, /\/api\/admin\/discovery\/reindex/);
-});
-
-test("[24] the reindex endpoint takes its slug from the session, not the caller", () => {
-  const { readFileSync } = require("node:fs") as typeof import("node:fs");
-  const { join } = require("node:path") as typeof import("node:path");
-  const route = readFileSync(join(__dirname, "..", "..", "..", "app/api/admin/discovery/reindex/route.ts"), "utf8");
-  assert.match(route, /user\.restaurantSlug/);
-  assert.ok(!/req\.json\(\)/.test(route),
-    "accepting a caller-supplied slug would let anyone ask the server to read another restaurant's menu");
-});
-
-test("[25] a scheduled reconcile exists as the backstop", () => {
-  const { readFileSync } = require("node:fs") as typeof import("node:fs");
-  const { join } = require("node:path") as typeof import("node:path");
-  const root = join(__dirname, "..", "..", "..");
-  const vercel = JSON.parse(readFileSync(join(root, "vercel.json"), "utf8")) as { crons?: { path: string }[] };
-  assert.ok((vercel.crons ?? []).some((c) => c.path === "/api/cron/discovery"),
-    "no scheduled reconcile — popularity would never be recomputed");
-  const cron = readFileSync(join(root, "app/api/cron/discovery/route.ts"), "utf8");
-  assert.match(cron, /CRON_SECRET/);
-  assert.match(cron, /recomputePopularity/);
-});
-
-test("[26] no CLI script hardcodes which environment it writes to", () => {
-  const { readFileSync } = require("node:fs") as typeof import("node:fs");
-  const { join } = require("node:path") as typeof import("node:path");
-  const root = join(__dirname, "..", "..", "..");
-  for (const f of ["scripts/discovery-backfill.ts", "scripts/discovery-popularity.ts", "scripts/discovery-geocode.ts"]) {
-    const src = readFileSync(join(root, f), "utf8");
-    assert.ok(!/config\(\{ path: "\.env\.local" \}\)/.test(src),
-      `${f} hardcodes .env.local — a "staging" run could read production`);
-  }
-});
-
 console.log("\nmarketplace/discovery-integration\n");
 
 const NOW = Date.UTC(2026, 8, 12, 12, 0, 0);
@@ -285,6 +235,92 @@ test("[22] ETA needs a distance and admits when it has none", () => {
   const r = rest();
   assert.equal(etaMinsFor(r, null), 40, "falls back to the slow end of prep, not a guess at travel");
   assert.ok(etaMinsFor(r, 5)! > 20, "travel time is added to prep");
+});
+
+
+// ── Index maintenance ────────────────────────────────────────────────────────
+
+test("[23] every menu write nudges the index", () => {
+  // Menu edits are written to Firestore straight from the admin client, so
+  // nothing server-side observes them. A write path that forgets this call is
+  // a dish that stays invisible until the nightly reconcile.
+  const { readFileSync } = require("node:fs") as typeof import("node:fs");
+  const { join } = require("node:path") as typeof import("node:path");
+  const root = join(__dirname, "..", "..", "..");
+  const client = readFileSync(join(root, "app/admin/[slug]/menu/AdminMenuClient.tsx"), "utf8");
+
+  const writes = (client.match(/await (addDoc|updateDoc|deleteDoc)\(/g) ?? []).length;
+  const nudges = (client.match(/void refreshDiscovery\(\)/g) ?? []).length;
+  assert.ok(writes > 0, "guard: expected menu writes in the admin client");
+  assert.equal(nudges, writes, `${writes} menu writes but ${nudges} index refreshes`);
+  assert.match(client, /\/api\/admin\/discovery\/reindex/);
+});
+
+test("[24] the reindex endpoint takes its slug from the session, not the caller", () => {
+  const { readFileSync } = require("node:fs") as typeof import("node:fs");
+  const { join } = require("node:path") as typeof import("node:path");
+  const route = readFileSync(join(__dirname, "..", "..", "..", "app/api/admin/discovery/reindex/route.ts"), "utf8");
+  assert.match(route, /user\.restaurantSlug/);
+  assert.ok(!/req\.json\(\)/.test(route),
+    "accepting a caller-supplied slug would let anyone ask the server to read another restaurant's menu");
+});
+
+test("[25] a scheduled reconcile exists as the backstop", () => {
+  const { readFileSync } = require("node:fs") as typeof import("node:fs");
+  const { join } = require("node:path") as typeof import("node:path");
+  const root = join(__dirname, "..", "..", "..");
+  const vercel = JSON.parse(readFileSync(join(root, "vercel.json"), "utf8")) as { crons?: { path: string }[] };
+  assert.ok((vercel.crons ?? []).some((c) => c.path === "/api/cron/discovery"),
+    "no scheduled reconcile — popularity would never be recomputed");
+  const cron = readFileSync(join(root, "app/api/cron/discovery/route.ts"), "utf8");
+  assert.match(cron, /CRON_SECRET/);
+  assert.match(cron, /recomputePopularity/);
+});
+
+test("[26] no CLI script hardcodes which environment it writes to", () => {
+  const { readFileSync } = require("node:fs") as typeof import("node:fs");
+  const { join } = require("node:path") as typeof import("node:path");
+  const root = join(__dirname, "..", "..", "..");
+  for (const f of ["scripts/discovery-backfill.ts", "scripts/discovery-popularity.ts", "scripts/discovery-geocode.ts"]) {
+    const src = readFileSync(join(root, f), "utf8");
+    assert.ok(!/config\(\{ path: "\.env\.local" \}\)/.test(src),
+      `${f} hardcodes .env.local — a "staging" run could read production`);
+  }
+});
+
+test("[27] a POS-only or hidden dish never reaches the marketplace index", () => {
+  // Found on staging before device QA: the customer MENU correctly excluded a
+  // dish called "Staff Meal", but search matched on it and printed its name as
+  // the reason the restaurant appeared. The menu gate was never the only gate
+  // that mattered once search read the index.
+  const snap = restaurantSnapshotOf(source());
+  for (const channel of ["pos_only", "hidden"]) {
+    const d = projectDish(
+      { id: "d1", restaurantId: "r1", name: "Staff Meal", price: 100, channel },
+      snap, true, NOW, false, null
+    );
+    assert.equal(d.marketplaceVisible, false, `channel "${channel}" must not be marketplace-visible`);
+  }
+  for (const channel of ["both", undefined]) {
+    const d = projectDish(
+      { id: "d2", restaurantId: "r1", name: "Jollof", price: 100, channel },
+      snap, true, NOW, false, null
+    );
+    assert.equal(d.marketplaceVisible, true, `channel "${channel}" must stay visible`);
+  }
+});
+
+test("[28] search cannot name a dish the customer may not see", () => {
+  const r = rest();
+  const snap = restaurantSnapshotOf(source());
+  const hidden = { ...projectDish({ id: "h", restaurantId: "r1", name: "Staff Meal", price: 100, channel: "hidden" }, snap, true, NOW, false, null) };
+  // The store only ever hands search marketplace-visible dishes; this asserts
+  // the filter that makes that true, from the search's own side.
+  const visibleOnly = [hidden].filter((d) => d.marketplaceVisible);
+  const res = searchMarketplaceRestaurants({
+    q: "staff", at: LAGOS, nowMs: NOW, restaurants: [r], dishes: visibleOnly,
+  });
+  assert.deepEqual(res.restaurants, [], "a hidden dish must not pull its restaurant into results");
 });
 
 console.log(`\n${passed} checks passed\n`);

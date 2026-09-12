@@ -152,6 +152,7 @@ export function createFirestoreStore(db: Firestore): DiscoveryStore {
           category: x.category as string | undefined,
           available: x.available !== false,
           image: x.image as string | undefined,
+          channel: ((x.marketplace ?? {}) as Record<string, unknown>).channel as string | undefined,
         };
         return item;
       });
