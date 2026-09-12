@@ -73,10 +73,11 @@ The things that decide whether any of the above stays working.
 
 | Milestone | Scope |
 |---|---|
-| **6.1 Notification delivery** | Actually deliver what the outbox enqueues, to customer and restaurant. |
+| **6.1 Notification delivery** | ✅ **Done 2026-09-12.** Both send ports implemented on the existing Termii/Telegram channels, inline drain at every enqueue site plus a backstop cron, tracking links carry their token. Transport is SMS; real device push is 6.5. |
 | **6.2 Scheduled jobs** | Discovery indexing, geocoding, popularity, sweeps — on a schedule, not by hand. |
 | **6.3 Environment integrity** | Staging/production isolation, automated deploys, required environment variables present. |
 | **6.4 Observability** | Knowing a subsystem has stopped working before a customer tells you. |
+| **6.5 Device push** | Replace the SMS transport behind `sendCustomerPush` with real push in the customer app. The port exists; only the transport changes. |
 
 ---
 

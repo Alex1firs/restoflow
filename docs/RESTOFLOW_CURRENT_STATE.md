@@ -1,7 +1,7 @@
 # RestoFlow Current State
 
-Living status of every capability. **Last reconciled: 2026-09-12**, by reading
-the code and querying staging — not from prior reports.
+Living status of every capability. **Last reconciled: 2026-09-12** (WS6.1), by
+reading the code and querying staging — not from prior reports.
 
 Legend: ✅ COMPLETE · 🟡 PARTIAL · ⬜ NOT STARTED · 🔄 SUPERSEDED · 🚫 BLOCKED
 
@@ -69,6 +69,7 @@ customer app) · `pack_delivery` (Dispatcher).
 | Handover codes | ✅ | Pickup code to restaurant, receiving code to customer; each stored where only its audience can read it | — | — |
 | Rider board security | ✅ | `/deliveries/active` requires an approved rider; anonymous → 401; 9 authorization tests | — | — |
 | Tracking & timestamps | ✅ | `pickedUpAt` / `deliveredAt` real and ordered on hardware runs | — | — |
+| "Food is on the way" message | ✅ | Was wired to `PICKED_UP`, which no live delivery reaches — the rider app's pickup maps to `EN_ROUTE_TO_CUSTOMER`. That state now notifies; a test holds the push list and the tracking copy's `notify` flag in agreement | — | — |
 | Smart dispatch timing | 🔄 | `computeConfirmAt()` exists and is stored as `deliveryConfirmAt`, but release is now immediate at acceptance; the confirm sweep is a safety net | Re-enable timed release once prep history exists | Depends on WS2 prep history |
 | Delivery exceptions | 🟡 | States exist in the contract (`REASSIGNING`, `DELIVERY_FAILED`, `CUSTOMER_UNREACHABLE`); customer-facing stories unproven | Exercise and design the customer copy | — |
 
@@ -76,9 +77,9 @@ customer app) · `pack_delivery` (Dispatcher).
 
 | Capability | Status | Evidence | Remaining | Next action |
 |---|---|---|---|---|
-| Marketplace notification delivery | 🚫 | 6 entries enqueued per order; `drainOutbox` is called **only in tests**; no adapter, no cron | Ports implemented + scheduled drain | **WS6.1** |
-| Storefront SMS notifications | 🚫 | Wired into 4 live routes, but `lib/customer-notifications.ts:70` builds `/track/{id}` with no `?t=`, and `app/track/[orderId]/page.tsx:19` 404s without it | Append the token | **WS6.1 — one line** |
-| Customer push notifications | ⬜ | No `expo-notifications` in the customer app | Device registration + delivery | — |
+| Marketplace notification delivery | ✅ | `outbox-adapters.ts` implements both ports on Termii/Telegram; `deliver-now.ts` drains inline at all 3 enqueue sites; `/api/cron/outbox` is the backstop (401 anonymous). Staging: 12 claimed/12 retried, replay claimed 0 | — | — |
+| Storefront SMS notifications | ✅ | Link now carries `?t=`, and is dropped rather than sent broken when there is no token. Staging: bare link **404**, tokenised link **200** | — | — |
+| Customer push notifications | 🟡 | Delivered as SMS through the `sendCustomerPush` port. No `expo-notifications` in the customer app, so foreground/background/terminated and tap-to-deep-link are **unexercised** | Device registration + real push transport | **WS6.5** |
 | Discovery engine | 🟡 | `lib/discovery/*` complete: geo, taxonomy, ranking, popularity, indexer; `/discover` live (HTTP 200) | Index is empty | **WS6.2** |
 | Discovery scheduled jobs | 🚫 | `scripts/discovery-{backfill,geocode,popularity}.ts` are manual CLI only; crons are `ai-brief` and `marketplace` only | Promote to cron routes | **WS6.2** |
 | Discovery index population | 🚫 | `/api/discovery/categories` → `{"facets":[],"total":0}` on staging | First real backfill | Blocked by scheduled jobs |
@@ -93,8 +94,19 @@ customer app) · `pack_delivery` (Dispatcher).
 
 ## The pattern worth naming
 
-Three finished, tested subsystems are each **one wiring job** from being useful:
-the notification outbox has no drain, the discovery index has no scheduled job,
-and settlement has no payout adapter. Plus one live customer-facing bug — every
-SMS tracking link 404s. None of this is missing architecture; it is missing
-connection.
+Three finished, tested subsystems were each **one wiring job** from being
+useful. WS6.1 did the first: the outbox now drains and its links open. Two
+remain — the discovery index has no scheduled job, and settlement has no payout
+adapter. None of this is missing architecture; it is missing connection.
+
+WS6.1 also found the sharper version of the same pattern. The outbox was not
+merely undrained; the "your food is on the way" message was wired to a delivery
+state the live pipeline never produces. Something can be built, tested, wired
+and still send nothing, because the one fact nobody checked was whether the
+state it keys on ever actually occurs. Staging said it plainly: 65 queued
+notifications, seven distinct events, not one pickup among them.
+
+**Known gaps carried out of WS6.1**, both environmental rather than structural:
+the Termii staging account returns `402 Insufficient funds`, so messages retry
+rather than arrive; and the synthetic QA customer's number is not a real
+handset, so no physical-device notification test has been performed.
