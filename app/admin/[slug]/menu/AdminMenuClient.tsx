@@ -38,6 +38,23 @@ function newImageId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+
+/**
+ * Tell the server to refresh discovery for this restaurant.
+ *
+ * Menu edits are written straight to Firestore from here, so nothing
+ * server-side sees them. Without this nudge a new dish stays invisible in the
+ * customer app until the nightly reconcile. Fire-and-forget: a failed refresh
+ * must never fail the save the restaurant just made.
+ */
+async function refreshDiscovery() {
+  try {
+    await fetch("/api/admin/discovery/reindex", { method: "POST" });
+  } catch {
+    // The scheduled reconcile will pick it up.
+  }
+}
+
 export default function AdminMenuClient({ restaurant, aiEnabled = false }: Props) {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -151,8 +168,10 @@ export default function AdminMenuClient({ restaurant, aiEnabled = false }: Props
 
       if (editingItem) {
         await updateDoc(doc(db, "menu_items", editingItem.id), itemData);
+        void refreshDiscovery();
       } else {
         await addDoc(collection(db, "menu_items"), itemData);
+        void refreshDiscovery();
       }
       resetForm();
     } catch (err) {
@@ -165,6 +184,7 @@ export default function AdminMenuClient({ restaurant, aiEnabled = false }: Props
     if (!window.confirm("Are you sure you want to delete this item?")) return;
     try {
       await deleteDoc(doc(db, "menu_items", id));
+      void refreshDiscovery();
     } catch (err) {
       console.error("Delete failed:", err);
       alert("Failed to delete item.");
@@ -174,6 +194,7 @@ export default function AdminMenuClient({ restaurant, aiEnabled = false }: Props
   const toggleAvailability = async (item: MenuItem) => {
     try {
       await updateDoc(doc(db, "menu_items", item.id), { available: !item.available });
+      void refreshDiscovery();
     } catch (err) {
       console.error("Toggle failed:", err);
     }

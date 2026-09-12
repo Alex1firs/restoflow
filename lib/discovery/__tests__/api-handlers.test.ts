@@ -26,6 +26,8 @@ function makeStore(dishes: DiscoveryDish[], restaurants: DiscoveryRestaurant[]):
   return {
     getVisibleDiscoveryDishes: async () => dishes.filter((d) => d.visible),
     getVisibleDiscoveryRestaurants: async () => restaurants.filter((r) => r.visible),
+    getMarketplaceRestaurants: async () => restaurants.filter((r) => r.marketplaceVisible),
+    getMarketplaceDishes: async () => dishes.filter((d) => d.marketplaceVisible),
     getDiscoveryDishById: async (id: string) => dishes.find((d) => d.dishId === id) ?? null,
   } as unknown as DiscoveryStore;
 }
@@ -39,6 +41,8 @@ function snap(slug: string, geoStatus: GeoStatus, coords: { lat: number; lng: nu
     slug, name: `R ${slug}`, description: "", logo: `${slug}.png`, coverImage: "c.png",
     fulfillment: { delivery: true, pickup: true, dineIn: false },
     deliveryFee: null, feeDynamic: true, payments: ["Cash"], pickupAddress: null, location, geoStatus, state: null, city: null,
+    marketplaceEnabled: true, deliveryRadiusKm: null, prepTimeMins: null,
+    minOrderMinor: null, cuisines: [], promoLabel: null,
   };
 }
 
@@ -50,6 +54,7 @@ function dish(id: string, restSlug: string, over: Partial<DiscoveryDish> = {}, g
     taxonomyTags: over.taxonomyTags ?? [], taxonomyVersion: 1,
     popularityScore: over.popularityScore ?? 0.5, popularityRaw: over.popularityRaw ?? 0, popularityOrders: over.popularityOrders ?? 0,
     promo: over.promo ?? null, restaurantSnapshot: snap(restSlug, geo.status ?? "none", geo.coords ?? null),
+    marketplaceVisible: over.marketplaceVisible ?? over.visible ?? true,
     visible: over.visible ?? true, updatedAt: over.updatedAt ?? NOW, signalsComputedAt: null, schemaVersion: 1,
   };
 }
@@ -61,7 +66,9 @@ function restaurant(slug: string, over: Partial<DiscoveryRestaurant> & { open?: 
     serviceAreas: over.serviceAreas ?? [], openingHours: { _open: over.open ?? true }, geoConfirmedAt: geo.status === "confirmed" ? NOW : null,
     promo: over.promo ?? null, taxonomyTags: over.taxonomyTags ?? [], taxonomyVersion: 1,
     popularityScore: over.popularityScore ?? 0.5, popularityRaw: over.popularityRaw ?? 0, popularityOrders: over.popularityOrders ?? 0,
-    visible: over.visible ?? true, updatedAt: over.updatedAt ?? NOW, signalsComputedAt: null, schemaVersion: 1,
+    visible: over.visible ?? true, marketplaceVisible: over.visible ?? true,
+    marketplacePublishedAt: null,
+    updatedAt: over.updatedAt ?? NOW, signalsComputedAt: null, schemaVersion: 1,
   };
 }
 

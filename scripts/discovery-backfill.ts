@@ -8,7 +8,10 @@
 // not fatal). Uses the Admin SDK (bypasses the deny-all discovery rules).
 
 import * as dotenv from "dotenv";
-dotenv.config({ path: ".env.local" });
+// Which environment this runs against must be a choice, not a constant. The
+// hardcoded `.env.local` meant this script silently pointed at whatever was in
+// one file, which is how a "staging" backfill ends up reading production.
+dotenv.config({ path: process.env.ENV_FILE ?? ".env.local" });
 
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";

@@ -63,6 +63,19 @@ export type SourceRestaurant = {
   geoConfirmedAtMs?: number | null;    // resolved from Firestore Timestamp by the adapter
   geoConfidence?: GeoConfidence | null; // provider precision (audit) — NOT projected to discovery
   geoQuery?: string | null;            // address string that produced the current pin (staleness check)
+
+  // ── Marketplace (the consumer app) ──────────────────────────────────────────
+  // A RestoFlow SaaS tenant and a marketplace restaurant are NOT the same thing.
+  // These come from the `marketplace` map on the restaurant doc and decide
+  // whether a restaurant may appear in the consumer app at all.
+  marketplaceEnabled?: boolean;
+  marketplaceCuisines?: string[];
+  deliveryRadiusKm?: number | null;      // how far it will actually deliver
+  prepTimeMins?: { min: number; max: number } | null;
+  minOrderMinor?: number | null;
+  marketplacePromoLabel?: string | null;
+  /** Genuine marketplace publication time. Absent today — see New on RestoFlow. */
+  marketplacePublishedAtMs?: number | null;
 };
 
 export type SourceMenuItem = {
@@ -97,6 +110,17 @@ export type RestaurantSnapshot = {
   geoStatus: GeoStatus;         // trust state so a dish card knows if its distance is reliable (2.4)
   state: string | null;         // structured location (G1) — owner-supplied, nullable
   city: string | null;          // structured location (G1) — owner-supplied, nullable
+
+  // ── Marketplace facts, denormalized so a card is one read ───────────────────
+  // NOTE: no price of any kind lives here. The marketplace customer price is
+  // computed by `priceLine` at request time and is never indexed, because an
+  // indexed price is a price that goes stale the moment markup config changes.
+  marketplaceEnabled: boolean;
+  deliveryRadiusKm: number | null;   // null = no radius configured, not "unlimited proven"
+  prepTimeMins: { min: number; max: number } | null;
+  minOrderMinor: number | null;
+  cuisines: string[];
+  promoLabel: string | null;
 };
 
 export type DiscoveryRestaurant = RestaurantSnapshot & {
@@ -110,6 +134,18 @@ export type DiscoveryRestaurant = RestaurantSnapshot & {
   popularityRaw: number;        // debug: weighted order count (0 until computed)
   popularityOrders: number;     // debug: # qualifying orders (0 until computed)
   visible: boolean;             // status==live && subscription not expired (computed)
+  /**
+   * `visible` AND opted into the marketplace.
+   *
+   * Kept separate rather than folded into `visible`, because two different
+   * products read this index: the storefront discovery page wants every live
+   * tenant, and the consumer marketplace must see only restaurants a customer
+   * can actually order from. Collapsing them would either hide half the web
+   * page or leak internal restaurants into the app.
+   */
+  marketplaceVisible: boolean;
+  /** Genuine publication timestamp, or null. Never inferred from createdAt. */
+  marketplacePublishedAt: number | null;
   updatedAt: number;
   signalsComputedAt: number | null; // null until popularity computed (2.3)
   schemaVersion: number;
@@ -134,6 +170,8 @@ export type DiscoveryDish = {
   promo: StructuredPromo | null;
   restaurantSnapshot: RestaurantSnapshot;
   visible: boolean;             // mirrors restaurant visibility (availability is `available`)
+  /** Restaurant is visible AND marketplace-enabled. The consumer app filters on this. */
+  marketplaceVisible: boolean;
   updatedAt: number;
   signalsComputedAt: number | null;
   schemaVersion: number;

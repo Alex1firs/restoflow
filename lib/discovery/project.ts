@@ -32,6 +32,19 @@ export function computeVisibility(r: SourceRestaurant, nowMs: number): boolean {
   return !isExpired(r, nowMs);
 }
 
+/**
+ * Whether this restaurant may appear in the CONSUMER MARKETPLACE.
+ *
+ * Being a live RestoFlow tenant is not enough and never was. `marketplaceEnabled`
+ * is an explicit opt-in a restaurant makes, and a restaurant that has not made
+ * it has no public existence in the app — it cannot be listed, found by search,
+ * or ordered from. Staging has exactly one such restaurant, and it is the case
+ * this gate exists to keep out.
+ */
+export function computeMarketplaceVisibility(r: SourceRestaurant, nowMs: number): boolean {
+  return computeVisibility(r, nowMs) && r.marketplaceEnabled === true;
+}
+
 function isExpired(r: SourceRestaurant, nowMs: number): boolean {
   if (typeof r.subscriptionEndDateMs === "number") {
     return r.subscriptionEndDateMs + GRACE_DAYS * DAY_MS < nowMs;
@@ -123,6 +136,12 @@ export function restaurantSnapshotOf(r: SourceRestaurant): RestaurantSnapshot {
     geoStatus: geoStatusOf(r),
     state: str(r.state).trim() || null,
     city: str(r.city).trim() || null,
+    marketplaceEnabled: r.marketplaceEnabled === true,
+    deliveryRadiusKm: typeof r.deliveryRadiusKm === "number" ? r.deliveryRadiusKm : null,
+    prepTimeMins: r.prepTimeMins ?? null,
+    minOrderMinor: typeof r.minOrderMinor === "number" ? r.minOrderMinor : null,
+    cuisines: Array.isArray(r.marketplaceCuisines) ? r.marketplaceCuisines.map(String).filter(Boolean) : [],
+    promoLabel: str(r.marketplacePromoLabel).trim() || null,
   };
 }
 
@@ -144,6 +163,8 @@ export function projectRestaurant(r: SourceRestaurant, nowMs: number, taxonomyTa
     popularityRaw: 0,
     popularityOrders: 0,
     visible: computeVisibility(r, nowMs),
+    marketplaceVisible: computeMarketplaceVisibility(r, nowMs),
+    marketplacePublishedAt: typeof r.marketplacePublishedAtMs === "number" ? r.marketplacePublishedAtMs : null,
     updatedAt: nowMs,
     signalsComputedAt: null,
     schemaVersion: SCHEMA_VERSION,
@@ -179,6 +200,10 @@ export function projectDish(
     promo: promo ?? null,
     restaurantSnapshot: snapshot,
     visible: restaurantVisible,
+    // Derived, never passed in: a dish cannot be more visible than its
+    // restaurant, and the marketplace gate must not be something a caller can
+    // forget to apply.
+    marketplaceVisible: restaurantVisible && snapshot.marketplaceEnabled,
     updatedAt: nowMs,
     signalsComputedAt: null,
     schemaVersion: SCHEMA_VERSION,

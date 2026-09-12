@@ -12,6 +12,10 @@
     {
       "path": "/api/cron/outbox",
       "schedule": "20 3 * * *"
+    },
+    {
+      "path": "/api/cron/discovery",
+      "schedule": "40 3 * * *"
     }
   ]
 }

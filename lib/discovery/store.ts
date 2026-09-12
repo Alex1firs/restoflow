@@ -43,6 +43,11 @@ export interface DiscoveryStore {
   /** Visible discovery restaurants (read-only) — feeds /near and /search orchestration. */
   getVisibleDiscoveryRestaurants(): Promise<DiscoveryRestaurant[]>;
 
+  /** Only restaurants a customer may order from. The consumer marketplace reads this and nothing else. */
+  getMarketplaceRestaurants(): Promise<DiscoveryRestaurant[]>;
+  /** Dishes belonging to marketplace-visible restaurants. */
+  getMarketplaceDishes(): Promise<DiscoveryDish[]>;
+
   // ── Ranking read surface (2.5b) — READ-ONLY over discovery collections. ──
   /** Visible discovery dishes — feeds /search, /collections, /categories, related. */
   getVisibleDiscoveryDishes(): Promise<DiscoveryDish[]>;

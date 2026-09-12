@@ -20,6 +20,8 @@ class Fake implements DiscoveryStore {
   async applyRestaurantGeo(u: GeoUpdate[]) { this.applied.push(u); }
   // unused surface
   async getVisibleDiscoveryRestaurants() { return []; }
+  async getMarketplaceRestaurants() { return []; }
+  async getMarketplaceDishes() { return []; }
   async getVisibleDiscoveryDishes() { return []; }
   async getDiscoveryDishById() { return null; }
   async listRestaurantSlugs() { return []; }

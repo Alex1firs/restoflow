@@ -31,6 +31,26 @@ export function checkIsOpen(openingHours?: OpeningHours | null): boolean {
   return cur >= fH * 60 + fM && cur < tH * 60 + tM;
 }
 
+/**
+ * The marketplace's opening state, which admits that it may not know.
+ *
+ * `checkIsOpen` treats absent hours as open. That is a defensible default for a
+ * storefront the owner is sending people to directly, and it is the wrong
+ * default for a marketplace: it labels a restaurant "Open" on the strength of
+ * nothing, and a customer who orders on that badge finds out at the door.
+ *
+ * So this returns "unknown" rather than guessing, and callers are expected to
+ * show no badge at all. Deliberately a separate function — `checkIsOpen` keeps
+ * its lenient behaviour for the storefront, which has a different bargain with
+ * its customers.
+ */
+export type OpenState = "open" | "closed" | "unknown";
+
+export function openStateOf(openingHours?: OpeningHours | null): OpenState {
+  if (!openingHours || Object.keys(openingHours).length === 0) return "unknown";
+  return checkIsOpen(openingHours) ? "open" : "closed";
+}
+
 export function todayHours(openingHours?: OpeningHours | null): DayHours | null {
   if (!openingHours) return null;
   const lagosNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Lagos" }));

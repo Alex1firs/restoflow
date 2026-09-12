@@ -8,7 +8,7 @@
 // Admin SDK (bypasses the deny-all discovery rules).
 
 import * as dotenv from "dotenv";
-dotenv.config({ path: ".env.local" });
+dotenv.config({ path: process.env.ENV_FILE ?? ".env.local" });
 
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";

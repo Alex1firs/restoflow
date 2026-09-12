@@ -30,6 +30,8 @@ function snap(slug: string, geoStatus: GeoStatus, coords: { lat: number; lng: nu
     fulfillment: { delivery: true, pickup: true, dineIn: false },
     deliveryFee: null, feeDynamic: true, payments: ["Cash"], pickupAddress: null,
     location, geoStatus, state: null, city: null,
+    marketplaceEnabled: true, deliveryRadiusKm: null, prepTimeMins: null,
+    minOrderMinor: null, cuisines: [], promoLabel: null,
   };
 }
 
@@ -44,7 +46,8 @@ function dish(id: string, restSlug: string, over: DishOver = {}, geo: { status?:
     popularityScore: over.popularityScore ?? 0.5, popularityRaw: over.popularityRaw ?? 0, popularityOrders: over.popularityOrders ?? 0,
     promo: over.promo ?? null,
     restaurantSnapshot: snap(restSlug, geo.status ?? "none", geo.coords ?? null),
-    visible: over.visible ?? true, updatedAt: over.updatedAt ?? NOW, signalsComputedAt: null, schemaVersion: 1,
+    visible: over.visible ?? true, marketplaceVisible: over.visible ?? true,
+    updatedAt: over.updatedAt ?? NOW, signalsComputedAt: null, schemaVersion: 1,
   };
 }
 
@@ -57,7 +60,9 @@ function rest(slug: string, over: RestOver = {}, geo: { status?: GeoStatus; coor
     promo: over.promo ?? null, taxonomyTags: over.taxonomyTags ?? [], taxonomyVersion: 1,
     popularityScore: over.popularityScore ?? 0.5, popularityRaw: over.popularityRaw ?? 0, popularityOrders: over.popularityOrders ?? 0,
     name: over.name ?? slug,
-    visible: over.visible ?? true, updatedAt: over.updatedAt ?? NOW, signalsComputedAt: null, schemaVersion: 1,
+    visible: over.visible ?? true, marketplaceVisible: over.visible ?? true,
+    marketplacePublishedAt: null,
+    updatedAt: over.updatedAt ?? NOW, signalsComputedAt: null, schemaVersion: 1,
   };
 }
 

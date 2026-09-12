@@ -85,6 +85,34 @@ function normalizeRestaurant(slug: string, d: Doc): SourceRestaurant {
     geoConfirmedAtMs: toMillis(d.geoConfirmedAt),
     geoConfidence: (d.geoConfidence as SourceRestaurant["geoConfidence"]) ?? null,
     geoQuery: (d.geoQuery as string) ?? null,
+    ...marketplaceFieldsOf(d),
+  };
+}
+
+/**
+ * The `marketplace` map on a restaurant doc, normalized.
+ *
+ * Read defensively: one staging restaurant stores `marketplace` as an array,
+ * and a spread of that would silently produce garbage fields rather than an
+ * error. Absent values stay null — a restaurant with no configured radius is
+ * not a restaurant that delivers everywhere, it is one we know nothing about.
+ */
+function marketplaceFieldsOf(d: Doc): Partial<SourceRestaurant> {
+  const m = (!Array.isArray(d.marketplace) && typeof d.marketplace === "object" && d.marketplace !== null
+    ? d.marketplace
+    : {}) as Doc;
+  const prep = m.prepTimeMins as { min?: unknown; max?: unknown } | undefined;
+  return {
+    marketplaceEnabled: m.marketplaceEnabled === true,
+    marketplaceCuisines: Array.isArray(m.cuisines) ? m.cuisines.map(String) : [],
+    deliveryRadiusKm: typeof m.deliveryRadiusKm === "number" ? m.deliveryRadiusKm : null,
+    prepTimeMins:
+      prep && typeof prep.min === "number" && typeof prep.max === "number"
+        ? { min: prep.min, max: prep.max }
+        : null,
+    minOrderMinor: typeof m.minOrderMinor === "number" ? m.minOrderMinor : null,
+    marketplacePromoLabel: typeof m.promoLabel === "string" ? m.promoLabel : null,
+    marketplacePublishedAtMs: toMillis(m.publishedAt),
   };
 }
 
@@ -248,6 +276,16 @@ export function createFirestoreStore(db: Firestore): DiscoveryStore {
     async getVisibleDiscoveryRestaurants() {
       const snap = await db.collection(RESTAURANTS).where("visible", "==", true).get();
       return snap.docs.map((d) => d.data() as DiscoveryRestaurant);
+    },
+
+    async getMarketplaceRestaurants() {
+      const snap = await db.collection(RESTAURANTS).where("marketplaceVisible", "==", true).get();
+      return snap.docs.map((d) => d.data() as DiscoveryRestaurant);
+    },
+
+    async getMarketplaceDishes() {
+      const snap = await db.collection(DISHES).where("marketplaceVisible", "==", true).get();
+      return snap.docs.map((d) => d.data() as DiscoveryDish);
     },
 
     async getVisibleDiscoveryDishes() {

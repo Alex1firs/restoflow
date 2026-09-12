@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { reindexNow } from "@/lib/discovery/reindex";
 import { getAdminAuth, getAdminDb } from "@/lib/firebase-admin";
 import { cookies } from "next/headers";
 import { FieldValue } from "firebase-admin/firestore";
@@ -93,5 +94,8 @@ export async function PATCH(
     updatedAt: FieldValue.serverTimestamp(),
   });
 
+  // Opening hours, marketplace opt-in and status all change what a customer
+  // should see, so refresh the index rather than waiting for the reconcile.
+  await reindexNow(db, slug);
   return NextResponse.json({ success: true, score: checklist.score });
 }

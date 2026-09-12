@@ -18,10 +18,13 @@ function rest(slug: string, geoStatus: GeoStatus, coords: { lat: number; lng: nu
     fulfillment: { delivery: true, pickup: true, dineIn: false },
     deliveryFee: null, feeDynamic: true, payments: ["Cash"], pickupAddress: null,
     location, geoStatus, state: null, city: null,
+    marketplaceEnabled: true, deliveryRadiusKm: null, prepTimeMins: null,
+    minOrderMinor: null, cuisines: [], promoLabel: null,
     serviceAreas: [], openingHours: null, geoConfirmedAt: geoStatus === "confirmed" ? 1 : null,
     promo: null, taxonomyTags: [], taxonomyVersion: 1,
     popularityScore: 0.5, popularityRaw: 0, popularityOrders: 0,
-    visible: true, updatedAt: 0, signalsComputedAt: null, schemaVersion: 1,
+    visible: true, marketplaceVisible: true, marketplacePublishedAt: null,
+    updatedAt: 0, signalsComputedAt: null, schemaVersion: 1,
   };
 }
 

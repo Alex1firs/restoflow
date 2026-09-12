@@ -43,6 +43,8 @@ class Fake implements DiscoveryStore {
   async getRestaurantsForGeocode() { return []; }
   async applyRestaurantGeo() {}
   async getVisibleDiscoveryRestaurants() { return []; }
+  async getMarketplaceRestaurants() { return []; }
+  async getMarketplaceDishes() { return []; }
   async getVisibleDiscoveryDishes() { return []; }
   async getDiscoveryDishById() { return null; }
 }

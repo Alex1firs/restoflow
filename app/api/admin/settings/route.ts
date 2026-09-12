@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { getAdminDb } from "@/lib/firebase-admin";
+import { reindexNow } from "@/lib/discovery/reindex";
 import type { HeroSettings } from "@/lib/hero-settings";
 
 export async function PUT(req: NextRequest) {
@@ -141,5 +142,8 @@ export async function PUT(req: NextRequest) {
       ...(heroSettings && typeof heroSettings === "object" ? { heroSettings } : {}),
     });
 
+  // Opening hours, marketplace opt-in and status all change what a customer
+  // should see, so refresh the index rather than waiting for the reconcile.
+  await reindexNow(getAdminDb(), user.restaurantSlug);
   return NextResponse.json({ success: true });
 }

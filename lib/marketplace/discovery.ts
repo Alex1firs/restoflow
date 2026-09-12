@@ -9,10 +9,11 @@
  * annotation, and a test asserts that.
  */
 import type { Firestore } from "firebase-admin/firestore";
-import { checkIsOpen, nextOpenTime, type OpeningHours } from "@/lib/restaurant-utils";
+import { checkIsOpen, nextOpenTime, openStateOf, type OpenState, type OpeningHours } from "@/lib/restaurant-utils";
 import { haversineKm } from "./geo";
 import { readMarketplaceSettings, pricingConfigFor, isOrderable, type MarketplaceSettings } from "./config";
 import { priceLine, type LineInput, type PricingConfig } from "./pricing";
+import { deliverabilityOf, type Deliverability } from "./deliverability";
 
 /**
  * Marketplace discovery.
@@ -41,9 +42,20 @@ export type PublicRestaurant = {
   deliveryFeeMinor: number | null;
   feeDynamic: boolean;
   isOpen: boolean;
+  /**
+   * The honest three-state version.
+   *
+   * A restaurant with no configured hours is "unknown", never "open". The old
+   * behaviour inherited `checkIsOpen`'s leniency and put an Open badge on every
+   * restaurant that had never entered its hours — a claim made on the strength
+   * of nothing, which the customer discovers at the door.
+   */
+  openState: OpenState;
   opensAt: string | null;
   promoLabel: string | null;
   minOrderMinor: number | null;
+  /** Whether this restaurant will deliver to the coordinates in the request. */
+  deliverable: Deliverability;
 };
 
 export type PublicMenuItem = {
@@ -145,7 +157,8 @@ export function toPublicRestaurant(
     : null;
 
   const hours = (data.openingHours ?? null) as OpeningHours | null;
-  const open = isOrderable(settings, args.nowMs).ok && checkIsOpen(hours);
+  const openState = openStateOf(hours);
+  const open = isOrderable(settings, args.nowMs).ok && openState === "open";
   const next = nextOpenTime(hours, new Date(args.nowMs));
 
   return {
@@ -167,9 +180,14 @@ export function toPublicRestaurant(
     // than showing a number that will change.
     feeDynamic: true,
     isOpen: open,
-    opensAt: open ? null : next.kind === "opens" ? `Opens ${next.label}` : "Closed",
+    openState,
+    // No reopening time is claimed when the hours themselves are unknown.
+    opensAt: openState === "unknown" || open
+      ? null
+      : next.kind === "opens" ? `Opens ${next.label}` : "Closed",
     promoLabel: ((data.marketplace ?? {}) as { promoLabel?: unknown }).promoLabel as string ?? null,
     minOrderMinor: settings.minOrderMinor,
+    deliverable: deliverabilityOf({ radiusKm: settings.deliveryRadiusKm, distanceKm }),
   };
 }
 

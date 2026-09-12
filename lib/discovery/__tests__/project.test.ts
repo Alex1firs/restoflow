@@ -170,16 +170,32 @@ test("projected RESTAURANT contains ONLY allowlisted keys (no PII can leak)", ()
   // Hand the projector a fat source object with sensitive junk.
   const dirty = { ...baseR, phone: "0803...", ownerEmail: "a@b.com", paystackSubaccountCode: "ACCT_x", subscriptionEndDateMs: NOW + DAY } as SourceRestaurant;
   const d = projectRestaurant(dirty, NOW);
-  const allowed = ["slug","name","description","logo","coverImage","fulfillment","deliveryFee","feeDynamic","payments","pickupAddress","location","geoStatus","state","city","geoConfirmedAt","serviceAreas","openingHours","promo","taxonomyTags","taxonomyVersion","popularityScore","popularityRaw","popularityOrders","visible","updatedAt","signalsComputedAt","schemaVersion"].sort();
+  const allowed = ["slug","name","description","logo","coverImage","fulfillment","deliveryFee","feeDynamic","payments","pickupAddress","location","geoStatus","state","city","geoConfirmedAt","serviceAreas","openingHours","promo","taxonomyTags","taxonomyVersion","popularityScore","popularityRaw","popularityOrders","visible","updatedAt","signalsComputedAt","schemaVersion","marketplaceEnabled","deliveryRadiusKm","prepTimeMins","minOrderMinor","cuisines","promoLabel","marketplaceVisible","marketplacePublishedAt"].sort();
   assert.deepEqual(Object.keys(d).sort(), allowed);
   const blob = JSON.stringify(d);
   for (const secret of ["0803", "a@b.com", "ACCT_x", "paystack"]) assert.ok(!blob.includes(secret), `must not contain ${secret}`);
 });
 
+test("the index never carries a MARKETPLACE price", () => {
+  // `price` here is the restaurant's own menu price, which the storefront
+  // surfaces render. The customer marketplace price is the restaurant's price
+  // plus markup, and indexing it would put a stale number in front of a
+  // customer the moment pricing config changed — so it is computed per request
+  // and must never appear in a discovery document under any name.
+  const snap = restaurantSnapshotOf(baseR);
+  const d = projectDish({ ...item, restaurantId: "kapitol" }, snap, true, NOW, false, null);
+  for (const k of Object.keys(d)) {
+    assert.ok(!/marketplacePrice|priceMinor|customerPrice/i.test(k), `indexed a marketplace price: ${k}`);
+  }
+  for (const k of Object.keys(d.restaurantSnapshot)) {
+    assert.ok(!/price/i.test(k), `restaurant snapshot carries a price: ${k}`);
+  }
+});
+
 test("projected DISH contains ONLY allowlisted keys", () => {
   const snap = restaurantSnapshotOf(baseR);
   const d = projectDish({ ...item, restaurantId: "kapitol" }, snap, true, NOW, false, null);
-  const allowed = ["dishId","restaurantSlug","name","description","price","priceHidden","image","available","rawCategory","categoryKey","taxonomyTags","taxonomyVersion","popularityScore","popularityRaw","popularityOrders","promo","restaurantSnapshot","visible","updatedAt","signalsComputedAt","schemaVersion"].sort();
+  const allowed = ["dishId","restaurantSlug","name","description","price","priceHidden","image","available","rawCategory","categoryKey","taxonomyTags","taxonomyVersion","popularityScore","popularityRaw","popularityOrders","promo","restaurantSnapshot","visible","marketplaceVisible","updatedAt","signalsComputedAt","schemaVersion"].sort();
   assert.deepEqual(Object.keys(d).sort(), allowed);
 });
 
