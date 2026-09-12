@@ -1,6 +1,6 @@
 # RestoFlow Current State
 
-Living status of every capability. **Last reconciled: 2026-09-12** (WS6.1), by
+Living status of every capability. **Last reconciled: 2026-09-12** (WS6.1, WS6.2), by
 reading the code and querying staging — not from prior reports.
 
 Legend: ✅ COMPLETE · 🟡 PARTIAL · ⬜ NOT STARTED · 🔄 SUPERSEDED · 🚫 BLOCKED
@@ -25,8 +25,13 @@ customer app) · `pack_delivery` (Dispatcher).
 | One-restaurant cart | ✅ | `src/state/cart.ts` returns `kind:"conflict"`; prompt wired at `app/restaurant/[slug].tsx:333` | — | — |
 | Checkout & payment | ✅ | `app/checkout.tsx` → `/api/mobile/v1/orders` → Paystack; server-authoritative totals | — | — |
 | Post-payment tracking | ✅ | `app/order/[id].tsx`; six stages; map/ETA gated by stage; verified on hardware | — | — |
-| Discovery ranking reaching the app | 🟡 | App feed uses `lib/marketplace/discovery.ts` → `menu_items` directly, **not** `lib/discovery/*` | Converge the two paths | **Decide** which discovery path is canonical |
-| Reorder / Order Again | ⬜ | Order history exists; no reorder action | Reorder from a past order | — |
+| Discovery ranking reaching the app | ✅ | `/feed` and `/search` read `discovery_restaurants` / `discovery_dishes`; `lib/marketplace/search.ts` **deleted** rather than maintained alongside. Parity asserted before retirement | — | — |
+| Order Again (discovery) | ✅ | Feed section from genuine `orders` history; empty and hidden without it, and never resurrects an out-of-range restaurant | Re-adding a past basket in one tap | — |
+| Restaurant deliverability | ✅ | `deliveryRadiusKm` is enforced. Was configured (5 km / 15 km on staging) and read by nothing — the platform offered every restaurant to everyone | — | — |
+| Zero-coverage address | ✅ | Approved empty state on Home and Search with "Change address"; proven from Abuja against Lagos restaurants | — | — |
+| Opening state honesty | ✅ | Missing hours are **unknown**, never Open — and never Closed either. `checkIsOpen` keeps its lenient behaviour for the storefront | Hours should become required marketplace information | — |
+| Local Favourites | ⬜ | Deliberately hidden. Needs long-term local repeat ordering — a different signal from Popular Around You, not a second view of it | A distinguishing signal | — |
+| New on RestoFlow | ⬜ | Deliberately hidden. No restaurant has a marketplace publication timestamp, and `createdAt` is absent on 3/3 | A genuine publication date | — |
 | Ratings & reviews | ⬜ | `rating` is a named ranking signal pinned at 0 — reserved slot, no data source | Order-verified reviews | — |
 | Report a problem / support | ⬜ | No support route after delivery | Problem reporting | — |
 | Order chat | ⬜ | `canMessageCourier: false` returned honestly; Dispatcher has `integration/chat.js` unmounted | Partner endpoint + app UI | — |
@@ -80,11 +85,11 @@ customer app) · `pack_delivery` (Dispatcher).
 | Marketplace notification delivery | 🟡 | **Code complete, staging verified, physical SMS acceptance blocked.** `outbox-adapters.ts` implements both ports on Termii/Telegram; `deliver-now.ts` drains inline at all 3 enqueue sites; `/api/cron/outbox` is the backstop (401 anonymous). Staging: 12 claimed/12 retried, replay claimed 0 | **No message has been received on a real handset.** Termii staging credit; a real test phone number on the staging QA customer | Unblock externally — **do not fake either, and do not use production credentials** |
 | Storefront SMS notifications | ✅ | Link now carries `?t=`, and is dropped rather than sent broken when there is no token. Staging: bare link **404**, tokenised link **200** | — | — |
 | Native push notifications | ⬜ | **Not implemented.** The customer app has no push dependencies — `expo-notifications` is absent. The `sendCustomerPush` port delivers by **SMS**; the name describes the message, not the transport | Device registration, a real push transport, and only then foreground / background / terminated and tap-to-deep-link behaviour — **none of which exists or has been exercised today** | **WS6.5** |
-| Discovery engine | 🟡 | `lib/discovery/*` complete: geo, taxonomy, ranking, popularity, indexer; `/discover` live (HTTP 200) | Index is empty | **WS6.2** |
-| Discovery scheduled jobs | 🚫 | `scripts/discovery-{backfill,geocode,popularity}.ts` are manual CLI only; crons are `ai-brief` and `marketplace` only | Promote to cron routes | **WS6.2** |
-| Discovery index population | 🚫 | `/api/discovery/categories` → `{"facets":[],"total":0}` on staging | First real backfill | Blocked by scheduled jobs |
+| Discovery engine | ✅ | Marketplace-aware: `marketplaceVisible` is a second, stricter gate beside `visible`, so a live SaaS tenant that never opted in cannot reach customers (`stg-internal-only` confirmed absent) | — | — |
+| Discovery scheduled jobs | ✅ | `/api/cron/discovery` daily (reconcile + popularity, CRON_SECRET-gated) **plus** write-time reindex on menu and settings writes. No CLI run required | — | — |
+| Discovery index population | ✅ | Staging: 3 restaurants, 8 dishes indexed; 7 marketplace-visible. A menu edit is reflected without a backfill command (proven) | — | — |
 | Geolocation coverage | 🟡 | Geocoding and geohash built; backfill script exists | Coverage across real restaurants unmeasured | — |
-| Computed popularity | 🟡 | Computed from `orders`; ranking explicitly refuses owner-typed vanity fields | Refresh job unscheduled | — |
+| Computed popularity | ✅ | Genuine values on staging: 14 orders → `stg-trishas-kitchen` 1.000 vs cold-start 0.500. Popular Around You requires `popularityOrders > 0`, so the neutral score cannot pose as a ranking | — | — |
 | Staging/production isolation | ✅ | Separate Firebase projects, separate bundle ids, fail-loud guards, 8 isolation tests | — | — |
 | Dispatcher deploy automation | 🟡 | `scp` + `pm2 restart`; host git remote is a local path | Real pipeline | **WS6.3** |
 | `SENDGRID_API_KEY` on staging | 🚫 | Unset; no account can self-verify email | Provision a sandbox key | **WS6.3** |
@@ -105,6 +110,17 @@ state the live pipeline never produces. Something can be built, tested, wired
 and still send nothing, because the one fact nobody checked was whether the
 state it keys on ever actually occurs. Staging said it plainly: 65 queued
 notifications, seven distinct events, not one pickup among them.
+
+**WS6.2 delivered the second wiring job**, and found the same shape of defect
+underneath it. The index was not merely empty: it modelled the wrong
+relationship (a live SaaS tenant, not a marketplace restaurant), carried the
+wrong price (the restaurant's own, not the customer's), and sat beside a
+configured delivery radius that nothing read. Three finished subsystems, none
+of them connected to the thing they described.
+
+Settlement's payout adapter is the one that remains.
+
+---
 
 **WS6.1 is not closed.** It is code complete and verified on staging, but the
 physical SMS acceptance test has never run, so no notification this platform

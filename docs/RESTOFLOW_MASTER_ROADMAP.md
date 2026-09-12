@@ -74,9 +74,11 @@ The things that decide whether any of the above stays working.
 | Milestone | Scope |
 |---|---|
 | **6.1 Notification delivery** | 🟡 **CODE COMPLETE / STAGING VERIFIED / PHYSICAL SMS ACCEPTANCE BLOCKED** (2026-09-12). Both send ports implemented on the existing Termii/Telegram channels, inline drain at every enqueue site plus a backstop cron, tracking links carry their token. **Not closed:** no message has been received on a real handset. Two external blockers, neither to be faked or worked around with production credentials — the Termii staging account needs credit, and the staging QA customer needs a real test phone number. Transport is SMS; native push is 6.5 and is **not** implemented. |
-| **6.2 Scheduled jobs** | Discovery indexing, geocoding, popularity, sweeps — on a schedule, not by hand. |
+| **6.2 Customer discovery integration** | ✅ **Done 2026-09-12.** The customer app reads the discovery engine: `/feed` and `/search` converged onto it, the duplicate ranking path deleted, marketplace opt-in enforced as a hard gate, delivery radius enforced, opening state made honest, prices kept out of the index. Maintained by write-time reindex plus a daily reconcile. |
+| **6.2b Remaining scheduled jobs** | Geocoding on a schedule; sweeps. Geocoding needs a Google Geocoding API key, unset on staging — not on the critical path while restaurants carry usable pins. |
 | **6.3 Environment integrity** | Staging/production isolation, automated deploys, required environment variables present. |
 | **6.4 Observability** | Knowing a subsystem has stopped working before a customer tells you. |
+| **6.6 Discovery signals** | Ratings (no genuine source today), Local Favourites' long-term local signal, and a marketplace publication timestamp for New on RestoFlow. All three sections stay hidden until the data is real. |
 | **6.5 Device push** | Replace the SMS transport behind `sendCustomerPush` with real push in the customer app. The port exists; only the transport changes. |
 
 ---
