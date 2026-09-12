@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { readFlags } from "@/lib/marketplace/config";
+import { deliverQueuedNow } from "@/lib/marketplace/deliver-now";
 import { FirestoreMarketplaceStore } from "@/lib/marketplace/store";
 import { transitionRestaurant, type RestaurantState } from "@/lib/marketplace/order";
 import {
@@ -120,6 +121,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ord
       }) as unknown as Record<string, unknown>,
       nowMs,
     }).catch(() => {});
+    // Nudge the queue so "preparing" reaches the customer now rather than on
+    // the nightly cron. Cannot throw.
+    await deliverQueuedNow(db, orderId);
   }
 
   return NextResponse.json({ ok: true, from: result.from, to: result.to });

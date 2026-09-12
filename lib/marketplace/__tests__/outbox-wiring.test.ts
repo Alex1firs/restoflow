@@ -48,15 +48,22 @@ test("[2] notifications go out immediately, not on the next sweep", () => {
   // customer tomorrow morning that their order was received. Immediacy comes
   // from draining inline right after the messages are queued; the cron is the
   // backstop that catches retries and anything the inline pass missed.
-  const ANNOUNCE = read("lib/marketplace/announce.ts");
-  assert.match(ANNOUNCE, /await deliverQueuedNow\(db, orderId\)/, "nothing sends the queued messages promptly");
+  // Every place that enqueues must also nudge, or that event waits a day.
+  for (const site of [
+    "lib/marketplace/announce.ts",
+    "app/api/admin/marketplace/orders/[orderId]/route.ts",
+    "app/api/webhooks/dispatcher/route.ts",
+  ]) {
+    assert.match(read(site), /await deliverQueuedNow\(db, orderId\)/,
+      `${site} enqueues without sending — that event would wait for the cron`);
+  }
   assert.ok((VERCEL.crons ?? []).some((c) => c.path === "/api/cron/outbox"),
     "no backstop cron declared for retries");
 });
 
 test("[2b] the inline drain can never break the payment path", () => {
-  const ANNOUNCE = read("lib/marketplace/announce.ts");
-  const fn = ANNOUNCE.slice(ANNOUNCE.indexOf("async function deliverQueuedNow"));
+  const HELPER = read("lib/marketplace/deliver-now.ts");
+  const fn = HELPER.slice(HELPER.indexOf("export async function deliverQueuedNow"));
   assert.match(fn.slice(0, fn.indexOf("\n}")), /catch \(err\)/, "must swallow its own failures");
 });
 

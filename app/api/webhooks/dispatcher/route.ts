@@ -6,6 +6,7 @@ import { validateEvent, HEADERS, type DeliveryEvent } from "@/lib/delivery/contr
 import { FirestoreDeliveryStore } from "@/lib/delivery/firestore-store";
 import { ingestEvent } from "@/lib/delivery/ingest";
 import { FirestoreMarketplaceStore } from "@/lib/marketplace/store";
+import { deliverQueuedNow } from "@/lib/marketplace/deliver-now";
 import { customerEventForDeliveryState, customerMessage } from "@/lib/marketplace/notifications";
 
 export const runtime = "nodejs";
@@ -110,6 +111,10 @@ export async function POST(req: NextRequest) {
           }) as unknown as Record<string, unknown>,
           nowMs: Date.now(),
         });
+
+        // Same nudge as the other enqueue sites: courier assigned, picked up
+        // and delivered are the messages a customer is actually waiting on.
+        await deliverQueuedNow(db, orderId);
       },
     });
 
