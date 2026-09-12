@@ -66,7 +66,7 @@ function restaurant(slug: string, over: Partial<DiscoveryRestaurant> & { open?: 
   return {
     ...s,
     serviceAreas: over.serviceAreas ?? [], openingHours: { _open: over.open ?? true }, geoConfirmedAt: geo.status === "confirmed" ? NOW : null,
-    promo: over.promo ?? null, taxonomyTags: over.taxonomyTags ?? [], taxonomyVersion: 1,
+    promo: over.promo ?? null, taxonomyTags: over.taxonomyTags ?? [], marketplaceTaxonomyTags: [], taxonomyVersion: 1,
     popularityScore: over.popularityScore ?? 0.5, popularityRaw: over.popularityRaw ?? 0, popularityOrders: over.popularityOrders ?? 0,
     visible: over.visible ?? true, marketplaceVisible: over.visible ?? true,
     marketplacePublishedAt: null,

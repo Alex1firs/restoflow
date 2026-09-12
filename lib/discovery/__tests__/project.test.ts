@@ -170,7 +170,7 @@ test("projected RESTAURANT contains ONLY allowlisted keys (no PII can leak)", ()
   // Hand the projector a fat source object with sensitive junk.
   const dirty = { ...baseR, phone: "0803...", ownerEmail: "a@b.com", paystackSubaccountCode: "ACCT_x", subscriptionEndDateMs: NOW + DAY } as SourceRestaurant;
   const d = projectRestaurant(dirty, NOW);
-  const allowed = ["slug","name","description","logo","coverImage","fulfillment","deliveryFee","feeDynamic","payments","pickupAddress","location","geoStatus","state","city","geoConfirmedAt","serviceAreas","openingHours","promo","taxonomyTags","taxonomyVersion","popularityScore","popularityRaw","popularityOrders","visible","updatedAt","signalsComputedAt","schemaVersion","marketplaceEnabled","deliveryRadiusKm","prepTimeMins","minOrderMinor","cuisines","promoLabel","marketplaceVisible","marketplacePublishedAt"].sort();
+  const allowed = ["slug","name","description","logo","coverImage","fulfillment","deliveryFee","feeDynamic","payments","pickupAddress","location","geoStatus","state","city","geoConfirmedAt","serviceAreas","openingHours","promo","taxonomyTags","taxonomyVersion","popularityScore","popularityRaw","popularityOrders","visible","updatedAt","signalsComputedAt","schemaVersion","marketplaceEnabled","deliveryRadiusKm","prepTimeMins","minOrderMinor","cuisines","promoLabel","marketplaceVisible","marketplacePublishedAt","marketplaceTaxonomyTags"].sort();
   assert.deepEqual(Object.keys(d).sort(), allowed);
   const blob = JSON.stringify(d);
   for (const secret of ["0803", "a@b.com", "ACCT_x", "paystack"]) assert.ok(!blob.includes(secret), `must not contain ${secret}`);

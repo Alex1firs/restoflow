@@ -57,7 +57,7 @@ function rest(slug: string, over: RestOver = {}, geo: { status?: GeoStatus; coor
   return {
     ...s,
     serviceAreas: [], openingHours: null, geoConfirmedAt: null,
-    promo: over.promo ?? null, taxonomyTags: over.taxonomyTags ?? [], taxonomyVersion: 1,
+    promo: over.promo ?? null, taxonomyTags: over.taxonomyTags ?? [], marketplaceTaxonomyTags: [], taxonomyVersion: 1,
     popularityScore: over.popularityScore ?? 0.5, popularityRaw: over.popularityRaw ?? 0, popularityOrders: over.popularityOrders ?? 0,
     name: over.name ?? slug,
     visible: over.visible ?? true, marketplaceVisible: over.visible ?? true,

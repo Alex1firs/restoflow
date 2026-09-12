@@ -61,9 +61,13 @@ export async function reindexRestaurant(
     const dishes = items.map((it) =>
       projectDish(it, snapshot, visible, nowMs, !!source.hidePrices, source.promo ?? null),
     );
-    // Restaurant-level taxonomy = union of its dishes' tags (2.2).
+    // Restaurant-level taxonomy = union of its dishes' tags (2.2). The
+    // marketplace union is narrower on purpose — see marketplaceTaxonomyTags.
     const taxonomyTags = [...new Set(dishes.flatMap((d) => d.taxonomyTags))];
-    const restaurantDoc = projectRestaurant(source, nowMs, taxonomyTags);
+    const marketplaceTaxonomyTags = [
+      ...new Set(dishes.filter((d) => d.marketplaceVisible).flatMap((d) => d.taxonomyTags)),
+    ];
+    const restaurantDoc = projectRestaurant(source, nowMs, taxonomyTags, marketplaceTaxonomyTags);
 
     // Popularity is computed by a different job on a different cadence, and a
     // projection has no way to derive it — so writing the fresh document would

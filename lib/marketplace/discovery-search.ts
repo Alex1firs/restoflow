@@ -50,7 +50,9 @@ export function searchMarketplaceRestaurants(args: {
   }
 
   const hits = args.restaurants.filter(
-    (r) => dishesBySlug.has(r.slug) || matches(`${r.name} ${r.cuisines.join(" ")} ${r.taxonomyTags.join(" ")}`, ts)
+    (r) =>
+      dishesBySlug.has(r.slug) ||
+      matches(`${r.name} ${r.cuisines.join(" ")} ${r.marketplaceTaxonomyTags.join(" ")}`, ts)
   );
 
   const openNowBySlug = Object.fromEntries(

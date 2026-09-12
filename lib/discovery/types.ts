@@ -135,6 +135,15 @@ export type DiscoveryRestaurant = RestaurantSnapshot & {
   geoConfirmedAt: number | null; // ms; set only when a super-admin confirms the pin (2.4)
   promo: StructuredPromo | null;
   taxonomyTags: string[];       // union of dish tags (2.2)
+  /**
+   * Union over MARKETPLACE-VISIBLE dishes only.
+   *
+   * `taxonomyTags` includes tags contributed by pos_only and hidden dishes, so
+   * a staff meal shapes what the restaurant matches. Harmless on the storefront,
+   * which shows the whole menu; not harmless in the consumer app, where it lets
+   * a dish the customer may not see decide that a restaurant answers a search.
+   */
+  marketplaceTaxonomyTags: string[];
   taxonomyVersion: number;      // which taxonomy version tagged this doc
   popularityScore: number;      // NEUTRAL_POPULARITY until computed (2.3)
   popularityRaw: number;        // debug: weighted order count (0 until computed)

@@ -323,4 +323,15 @@ test("[28] search cannot name a dish the customer may not see", () => {
   assert.deepEqual(res.restaurants, [], "a hidden dish must not pull its restaurant into results");
 });
 
+test("[29] a hidden dish does not lend its taxonomy tag to customer search", () => {
+  // The same leak one level up. Restaurant-level taxonomyTags is the union of
+  // its dishes' tags — including the hidden ones — so "Staff Meal" put a tag
+  // called "internal" on the restaurant and searching it returned a hit.
+  const r = { ...rest(), taxonomyTags: ["rice-jollof", "internal"], marketplaceTaxonomyTags: ["rice-jollof"] };
+  const hit = searchMarketplaceRestaurants({ q: "internal", at: LAGOS, nowMs: NOW, restaurants: [r], dishes: [] });
+  assert.deepEqual(hit.restaurants, [], "a hidden dish's tag must not answer a search");
+  const ok = searchMarketplaceRestaurants({ q: "jollof", at: LAGOS, nowMs: NOW, restaurants: [r], dishes: [] });
+  assert.equal(ok.restaurants.length, 1, "a visible dish's tag still matches");
+});
+
 console.log(`\n${passed} checks passed\n`);

@@ -154,7 +154,12 @@ export function restaurantSnapshotOf(r: SourceRestaurant): RestaurantSnapshot {
  * Full discovery_restaurants document. `taxonomyTags` is the union of its dishes'
  * tags — supplied by the indexer, which has projected the dishes (defaults to []).
  */
-export function projectRestaurant(r: SourceRestaurant, nowMs: number, taxonomyTags: string[] = []): DiscoveryRestaurant {
+export function projectRestaurant(
+  r: SourceRestaurant,
+  nowMs: number,
+  taxonomyTags: string[] = [],
+  marketplaceTaxonomyTags: string[] = [],
+): DiscoveryRestaurant {
   const snap = restaurantSnapshotOf(r);
   return {
     ...snap,
@@ -163,6 +168,7 @@ export function projectRestaurant(r: SourceRestaurant, nowMs: number, taxonomyTa
     geoConfirmedAt: geoStatusOf(r) === "confirmed" && typeof r.geoConfirmedAtMs === "number" ? r.geoConfirmedAtMs : null,
     promo: r.promo ?? null,
     taxonomyTags,
+    marketplaceTaxonomyTags,
     taxonomyVersion: TAXONOMY_VERSION,
     popularityScore: NEUTRAL_POPULARITY,
     popularityRaw: 0,

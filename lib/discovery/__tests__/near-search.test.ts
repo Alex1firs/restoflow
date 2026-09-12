@@ -21,7 +21,7 @@ function rest(slug: string, geoStatus: GeoStatus, coords: { lat: number; lng: nu
     marketplaceEnabled: true, deliveryRadiusKm: null, prepTimeMins: null,
     minOrderMinor: null, cuisines: [], promoLabel: null,
     serviceAreas: [], openingHours: null, geoConfirmedAt: geoStatus === "confirmed" ? 1 : null,
-    promo: null, taxonomyTags: [], taxonomyVersion: 1,
+    promo: null, taxonomyTags: [], marketplaceTaxonomyTags: [], taxonomyVersion: 1,
     popularityScore: 0.5, popularityRaw: 0, popularityOrders: 0,
     visible: true, marketplaceVisible: true, marketplacePublishedAt: null,
     updatedAt: 0, signalsComputedAt: null, schemaVersion: 1,
