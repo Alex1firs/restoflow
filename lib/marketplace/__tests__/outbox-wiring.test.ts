@@ -43,11 +43,21 @@ test("[1] something actually calls the drain", () => {
   assert.match(CRON, /drainOutbox\(/, "the dedicated cron must drain the outbox");
 });
 
-test("[2] the drain runs often enough to be a notification", () => {
-  const outbox = (VERCEL.crons ?? []).find((c) => c.path === "/api/cron/outbox");
-  assert.ok(outbox, "no /api/cron/outbox schedule declared");
-  // A daily sweep would tell a customer their food arrived tomorrow.
-  assert.notEqual(outbox!.schedule.split(" ")[0], "0", "minute field must not be fixed — messages need minutes");
+test("[2] notifications go out immediately, not on the next sweep", () => {
+  // The hosting plan allows only daily crons, so the cron alone would tell a
+  // customer tomorrow morning that their order was received. Immediacy comes
+  // from draining inline right after the messages are queued; the cron is the
+  // backstop that catches retries and anything the inline pass missed.
+  const ANNOUNCE = read("lib/marketplace/announce.ts");
+  assert.match(ANNOUNCE, /await deliverQueuedNow\(db, orderId\)/, "nothing sends the queued messages promptly");
+  assert.ok((VERCEL.crons ?? []).some((c) => c.path === "/api/cron/outbox"),
+    "no backstop cron declared for retries");
+});
+
+test("[2b] the inline drain can never break the payment path", () => {
+  const ANNOUNCE = read("lib/marketplace/announce.ts");
+  const fn = ANNOUNCE.slice(ANNOUNCE.indexOf("async function deliverQueuedNow"));
+  assert.match(fn.slice(0, fn.indexOf("\n}")), /catch \(err\)/, "must swallow its own failures");
 });
 
 test("[3] the drain endpoint is not a public send button", () => {

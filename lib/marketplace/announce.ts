@@ -24,6 +24,47 @@ import { customerMessage, restaurantMessage } from "./notifications";
  * Never throws: the order is paid and real, and a notification problem belongs
  * to the outbox worker, not to the caller that happened to settle the payment.
  */
+/**
+ * Send what was just queued, without letting it touch the caller.
+ *
+ * The queue exists so a slow provider can never fail an order write, and that
+ * still holds: this runs after the order is committed, and it swallows
+ * everything. What it buys is immediacy — the hosting plan allows only a daily
+ * cron, and "your order was received" arriving tomorrow morning is not a
+ * notification. The cron remains the guaranteed backstop for anything this
+ * best-effort pass does not get to, including retries with backoff.
+ */
+async function deliverQueuedNow(db: Firestore, orderId: string): Promise<void> {
+  try {
+    const { drainOutbox } = await import("./outbox");
+    const { sendCustomerPush, sendRestaurantAlert } = await import("./outbox-adapters");
+    const { FirestoreMarketplaceStore } = await import("./store");
+    const store = new FirestoreMarketplaceStore(db);
+    const run = await drainOutbox({
+      claimDue: (now, limit) => store.claimDueNotifications(now, limit),
+      markSending: (entry, now) => store.markSending(entry, now),
+      markSent: (entry, now) => store.markNotificationSent(entry, now),
+      scheduleRetry: (entry, next, error) => store.scheduleNotificationRetry(entry, next, error),
+      markDead: (entry, error, now) => store.markNotificationDead(entry, error, now),
+      invalidateToken: (token, now) => store.invalidateDeviceToken(token, now),
+      sendCustomerPush,
+      sendRestaurantAlert,
+      log: (event, fields) =>
+        console.log(JSON.stringify({ scope: "marketplace_outbox", event, ...fields })),
+    }, Date.now());
+    console.log(JSON.stringify({
+      scope: "marketplace_announce", event: "delivered_inline", orderId, ...run,
+    }));
+  } catch (err) {
+    // The messages are already queued and the cron will find them. Nothing here
+    // is allowed to reach the payment path.
+    console.error(JSON.stringify({
+      scope: "marketplace_announce", event: "inline_delivery_failed", orderId,
+      error: err instanceof Error ? err.message : String(err),
+    }));
+  }
+}
+
 export async function announceOrderCreated(db: Firestore, orderId: string): Promise<void> {
   try {
     const snap = await db.collection("orders").doc(orderId).get();
@@ -67,6 +108,10 @@ export async function announceOrderCreated(db: Firestore, orderId: string): Prom
       orderId, error: err instanceof Error ? err.message : String(err),
     }));
   }
+
+  // Outside the try: whatever was queued above should go out now rather than
+  // waiting for the next cron. Cannot throw, by construction.
+  await deliverQueuedNow(db, orderId);
 }
 
 function summarise(items: unknown): string {

@@ -11,7 +11,7 @@
     },
     {
       "path": "/api/cron/outbox",
-      "schedule": "* * * * *"
+      "schedule": "20 3 * * *"
     }
   ]
 }
