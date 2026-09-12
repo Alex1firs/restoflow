@@ -4,6 +4,7 @@ import type { PaymentIntent, PaymentStore, ProviderVerification } from "./paymen
 import { buildMarketplaceOrder, makeOrderCode, legacyStatusFor, type RestaurantState } from "./order";
 import { entriesForPayment, type LedgerEntry } from "./ledger";
 import { checkInvariants } from "./pricing";
+import type { OutboxEntry } from "./outbox";
 
 /**
  * Firestore adapter for the marketplace commerce layer.
@@ -274,6 +275,86 @@ export class FirestoreMarketplaceStore implements PaymentStore {
       if (isAlreadyExists(err)) return false; // already queued or sent
       throw err;
     }
+  }
+
+  // ── Outbox drain ──────────────────────────────────────────────────────────
+  //
+  // Enqueueing was always here; draining was not, so every message this system
+  // ever produced sat in Firestore unread. These are the ports `drainOutbox`
+  // needs, and nothing more.
+
+  /**
+   * Queued entries whose backoff has elapsed.
+   *
+   * `nextAttemptAt` is absent on a first attempt, so the query cannot filter on
+   * it without silently skipping every new entry. It filters on state and
+   * discards the not-yet-due in memory — a batch is 50 rows.
+   */
+  async claimDueNotifications(nowMs: number, limit: number): Promise<OutboxEntry[]> {
+    const snap = await this.db.collection(OUTBOX)
+      .where("state", "in", ["queued", "failed"])
+      .limit(limit * 2)
+      .get();
+    return snap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as Omit<OutboxEntry, "id">) }))
+      .filter((e) => (e.nextAttemptAt ?? 0) <= nowMs)
+      .slice(0, limit);
+  }
+
+  /**
+   * Compare-and-set into `sending`, so two overlapping drains cannot both send
+   * the same message. The loser gets `false` and skips.
+   */
+  async markSending(entry: OutboxEntry, nowMs: number): Promise<boolean> {
+    const ref = this.db.collection(OUTBOX).doc(entry.id);
+    try {
+      return await this.db.runTransaction(async (tx) => {
+        const fresh = await tx.get(ref);
+        const state = fresh.data()?.state as string | undefined;
+        if (state !== "queued" && state !== "failed") return false;
+        tx.update(ref, { state: "sending", attempts: (fresh.data()?.attempts ?? 0) + 1, sendingAt: nowMs });
+        return true;
+      });
+    } catch {
+      return false;
+    }
+  }
+
+  async markNotificationSent(entry: OutboxEntry, nowMs: number): Promise<void> {
+    await this.db.collection(OUTBOX).doc(entry.id).update({
+      state: "sent", sentAt: nowMs, lastError: null, nextAttemptAt: null,
+    });
+  }
+
+  async scheduleNotificationRetry(entry: OutboxEntry, nextAttemptAt: number, error: string): Promise<void> {
+    await this.db.collection(OUTBOX).doc(entry.id).update({
+      state: "failed", nextAttemptAt, lastError: error.slice(0, 500),
+    });
+  }
+
+  /** Out of attempts, or undeliverable as it stands. Left for a human. */
+  async markNotificationDead(entry: OutboxEntry, error: string, nowMs: number): Promise<void> {
+    await this.db.collection(OUTBOX).doc(entry.id).update({
+      state: "dead", deadAt: nowMs, lastError: error.slice(0, 500), nextAttemptAt: null,
+    });
+  }
+
+  /**
+   * A token the provider rejected.
+   *
+   * There are no device tokens yet — the customer app has no push registration,
+   * so messages go out over SMS and this outcome cannot currently occur. The
+   * port exists because the drain requires it; it records rather than pretends,
+   * and there is deliberately no token store invented ahead of the feature that
+   * would fill it. When device push lands, this is where pruning belongs.
+   */
+  async invalidateDeviceToken(token: string, nowMs: number): Promise<void> {
+    console.warn(JSON.stringify({
+      scope: "marketplace_outbox",
+      event: "token_invalid_but_no_token_store",
+      tokenSuffix: token.slice(-6),
+      at: nowMs,
+    }));
   }
 
   async ledgerFor(orderId: string): Promise<LedgerEntry[]> {

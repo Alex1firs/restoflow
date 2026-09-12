@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/marketplace",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/outbox",
+      "schedule": "* * * * *"
     }
   ]
 }

@@ -5,6 +5,8 @@ import { DispatcherClient } from "@/lib/delivery/dispatcher-client";
 import { FirestoreDeliveryStore } from "@/lib/delivery/firestore-store";
 import { STALE_AFTER_MS } from "@/lib/delivery/projection";
 import { FirestoreMarketplaceStore } from "./store";
+import { drainOutbox, type OutboxPorts, type OutboxRun } from "./outbox";
+import { sendCustomerPush, sendRestaurantAlert } from "./outbox-adapters";
 import {
   confirmSweep, reconcileSweep, intentSweep, BATCH_SIZE,
   type ConfirmPorts, type ReconcilePorts, type IntentPorts, type DueOrder, type WorkerResult,
@@ -29,6 +31,8 @@ export type SweepRun = {
   intents: WorkerResult;
   /** Orders the restaurant accepted that never got a courier requested. */
   handoffs: WorkerResult;
+  /** Queued customer and restaurant messages actually delivered. */
+  notifications: OutboxRun;
   durationMs: number;
 };
 
@@ -107,6 +111,27 @@ function intentPorts(db: ReturnType<typeof getAdminDb>, nowMs: number): IntentPo
   };
 }
 
+/**
+ * The outbox drain's ports.
+ *
+ * Kept beside the other sweeps because it runs on the same schedule and for the
+ * same reason: something enqueued work and nothing was finishing it. Messages
+ * were being written and never sent.
+ */
+function outboxPorts(store: FirestoreMarketplaceStore): OutboxPorts {
+  return {
+    claimDue: (now, limit) => store.claimDueNotifications(now, limit),
+    markSending: (entry, now) => store.markSending(entry, now),
+    markSent: (entry, now) => store.markNotificationSent(entry, now),
+    scheduleRetry: (entry, next, error) => store.scheduleNotificationRetry(entry, next, error),
+    markDead: (entry, error, now) => store.markNotificationDead(entry, error, now),
+    invalidateToken: (token, now) => store.invalidateDeviceToken(token, now),
+    sendCustomerPush,
+    sendRestaurantAlert,
+    log,
+  };
+}
+
 export async function runMarketplaceSweeps(nowMs: number): Promise<SweepRun> {
   const started = Date.now();
   const cfg = readDeliveryConfig();
@@ -123,7 +148,12 @@ export async function runMarketplaceSweeps(nowMs: number): Promise<SweepRun> {
     // Money is still reconciled: a charged customer gets their order even with
     // the delivery integration switched off.
     const intents = await intentSweep(intentPorts(db, nowMs), nowMs);
-    return { confirm: empty, reconcile: empty, intents, handoffs: empty, durationMs: Date.now() - started };
+    // Notifications are not logistics. A customer who paid is owed their
+    // messages whether or not the delivery integration is switched on.
+    const notifications = await drainOutbox(
+      outboxPorts(new FirestoreMarketplaceStore(db)), nowMs
+    );
+    return { confirm: empty, reconcile: empty, intents, handoffs: empty, notifications, durationMs: Date.now() - started };
   }
 
   const deliveryStore = new FirestoreDeliveryStore(db);
@@ -187,8 +217,9 @@ export async function runMarketplaceSweeps(nowMs: number): Promise<SweepRun> {
   // Last, and independent of the two above: it repairs money, not logistics.
   const intents = await intentSweep(intentPorts(db, nowMs), nowMs);
   const handoffs = await handoffSweep(db, marketplaceStore, nowMs);
+  const notifications = await drainOutbox(outboxPorts(marketplaceStore), nowMs);
 
-  return { confirm, reconcile, intents, handoffs, durationMs: Date.now() - started };
+  return { confirm, reconcile, intents, handoffs, notifications, durationMs: Date.now() - started };
 }
 
 export { BATCH_SIZE };

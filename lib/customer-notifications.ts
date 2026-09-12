@@ -1,3 +1,5 @@
+import { getAdminDb } from "./firebase-admin";
+
 export type CustomerEventType =
   | "created"
   | "paid"
@@ -24,9 +26,13 @@ function totalFmt(total: number) {
 }
 
 function buildSMS(event: CustomerEventType, data: CustomerOrderData, trackingLink: string): string {
+  // A link is only worth sending if it opens. When the order has no tracking
+  // token there is nothing to link to, so the line is dropped rather than
+  // sending a URL that lands on a 404.
+  const trackLine = trackingLink ? `\n\nTrack: ${trackingLink}` : "";
   switch (event) {
     case "created":
-      return `Hi ${data.customerName}! Your order from ${data.restaurantName} has been received.\n\nItems: ${data.itemsSummary}\nTotal: ${totalFmt(data.total)}\n\nTrack: ${trackingLink}`;
+      return `Hi ${data.customerName}! Your order from ${data.restaurantName} has been received.\n\nItems: ${data.itemsSummary}\nTotal: ${totalFmt(data.total)}${trackLine}`;
     case "paid":
       return `Payment of ${totalFmt(data.total)} confirmed! ${data.restaurantName} is now preparing your order.`;
     case "preparing":
@@ -39,6 +45,29 @@ function buildSMS(event: CustomerEventType, data: CustomerOrderData, trackingLin
       return `Your order has been delivered. Thank you for ordering from ${data.restaurantName}!`;
     case "cancelled":
       return `Unfortunately your order from ${data.restaurantName} could not be completed. If you were charged, a refund will be processed.`;
+  }
+}
+
+/**
+ * The order's tracking URL, complete with the token the page requires.
+ *
+ * Returns "" when the order has no token — an older order, or one written by a
+ * path that never issued one. The caller drops the link rather than sending a
+ * dead one.
+ */
+async function buildTrackingLink(appUrl: string, orderId: string): Promise<string> {
+  if (!appUrl) return "";
+  try {
+    const snap = await getAdminDb().collection("orders").doc(orderId).get();
+    const token = snap.data()?.trackingToken as string | undefined;
+    if (!token) {
+      console.warn(`[customer-notifications] order ${orderId} has no trackingToken; link omitted`);
+      return "";
+    }
+    return `${appUrl}/track/${orderId}?t=${encodeURIComponent(token)}`;
+  } catch (err) {
+    console.error("[customer-notifications] could not read trackingToken:", err);
+    return "";
   }
 }
 
@@ -66,8 +95,12 @@ export async function sendCustomerNotification(
 ): Promise<void> {
   if (!data.customerPhone || data.customerPhone.length < 10) return;
 
+  // The tracking page refuses any request without `?t=`, so a link built
+  // without one 404s for every customer who taps it. The token is read here
+  // rather than passed in, so no caller can forget it — four routes send these
+  // and all four were sending broken links.
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
-  const trackingLink = `${appUrl}/track/${data.orderId}`;
+  const trackingLink = await buildTrackingLink(appUrl, data.orderId);
 
   try {
     // Send direct SMS notification via Termii
