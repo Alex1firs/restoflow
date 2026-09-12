@@ -103,6 +103,8 @@ export async function GET(request: NextRequest) {
   let restaurantLogo = "";
   let startUrl = "/";
   let scope = "/";
+  // Staff installs keep the dashboard/POS shortcuts; customer installs do not.
+  let isStaffPortal = false;
 
   const db = getAdminDb();
 
@@ -133,8 +135,28 @@ export async function GET(request: NextRequest) {
         startUrl = "/"; // Custom domains open directly at the root
         scope = "/";
       }
+    } else if (referer && new URL(referer).pathname.startsWith("/admin/")) {
+      // 2. Staff flow (e.g. /admin/stg-trishas-kitchen/orders).
+      //
+      // Installing from the portal used to hand back the generic manifest, so
+      // the icon on a manager's home screen opened the customer storefront at
+      // "/" instead of their own orders board — the one screen they installed
+      // it for. Scope is pinned to their restaurant so the installed app cannot
+      // wander into another one.
+      const slug = new URL(referer).pathname.split("/")[2];
+      if (slug) {
+        const snap = await db.collection("restaurants").doc(slug).get();
+        if (snap.exists) {
+          const d = snap.data()!;
+          isStaffPortal = true;
+          restaurantName = (d.name as string) ?? "";
+          restaurantLogo = (d.logo as string) ?? "";
+          startUrl = `/admin/${slug}/orders`;
+          scope = `/admin/${slug}/`;
+        }
+      }
     } else if (referer) {
-      // 2. Sub-path flow (e.g. restoflow.org/r/grills-capitol)
+      // 3. Sub-path flow (e.g. restoflow.org/r/grills-capitol)
       // Check if referrer path is /r/[slug]
       const url = new URL(referer);
       const pathname = url.pathname;
@@ -179,11 +201,14 @@ export async function GET(request: NextRequest) {
       ...DEFAULT_MANIFEST,
       name: restaurantName,
       short_name: restaurantName,
-      description: `Order online from ${restaurantName}.`,
+      description: isStaffPortal
+        ? `Orders, kitchen and POS for ${restaurantName}.`
+        : `Order online from ${restaurantName}.`,
       start_url: startUrl,
       scope: scope,
       icons: customIcons,
-      shortcuts: [] // Remove admin shortcuts for customers
+      // A customer has no use for a POS shortcut; a manager does.
+      shortcuts: isStaffPortal ? DEFAULT_MANIFEST.shortcuts : [],
     };
 
     return NextResponse.json(customManifest, {
