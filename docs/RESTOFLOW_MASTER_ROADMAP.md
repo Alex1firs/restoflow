@@ -73,7 +73,7 @@ The things that decide whether any of the above stays working.
 
 | Milestone | Scope |
 |---|---|
-| **6.1 Notification delivery** | ✅ **Done 2026-09-12.** Both send ports implemented on the existing Termii/Telegram channels, inline drain at every enqueue site plus a backstop cron, tracking links carry their token. Transport is SMS; real device push is 6.5. |
+| **6.1 Notification delivery** | 🟡 **CODE COMPLETE / STAGING VERIFIED / PHYSICAL SMS ACCEPTANCE BLOCKED** (2026-09-12). Both send ports implemented on the existing Termii/Telegram channels, inline drain at every enqueue site plus a backstop cron, tracking links carry their token. **Not closed:** no message has been received on a real handset. Two external blockers, neither to be faked or worked around with production credentials — the Termii staging account needs credit, and the staging QA customer needs a real test phone number. Transport is SMS; native push is 6.5 and is **not** implemented. |
 | **6.2 Scheduled jobs** | Discovery indexing, geocoding, popularity, sweeps — on a schedule, not by hand. |
 | **6.3 Environment integrity** | Staging/production isolation, automated deploys, required environment variables present. |
 | **6.4 Observability** | Knowing a subsystem has stopped working before a customer tells you. |

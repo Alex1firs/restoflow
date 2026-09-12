@@ -77,9 +77,9 @@ customer app) · `pack_delivery` (Dispatcher).
 
 | Capability | Status | Evidence | Remaining | Next action |
 |---|---|---|---|---|
-| Marketplace notification delivery | ✅ | `outbox-adapters.ts` implements both ports on Termii/Telegram; `deliver-now.ts` drains inline at all 3 enqueue sites; `/api/cron/outbox` is the backstop (401 anonymous). Staging: 12 claimed/12 retried, replay claimed 0 | — | — |
+| Marketplace notification delivery | 🟡 | **Code complete, staging verified, physical SMS acceptance blocked.** `outbox-adapters.ts` implements both ports on Termii/Telegram; `deliver-now.ts` drains inline at all 3 enqueue sites; `/api/cron/outbox` is the backstop (401 anonymous). Staging: 12 claimed/12 retried, replay claimed 0 | **No message has been received on a real handset.** Termii staging credit; a real test phone number on the staging QA customer | Unblock externally — **do not fake either, and do not use production credentials** |
 | Storefront SMS notifications | ✅ | Link now carries `?t=`, and is dropped rather than sent broken when there is no token. Staging: bare link **404**, tokenised link **200** | — | — |
-| Customer push notifications | 🟡 | Delivered as SMS through the `sendCustomerPush` port. No `expo-notifications` in the customer app, so foreground/background/terminated and tap-to-deep-link are **unexercised** | Device registration + real push transport | **WS6.5** |
+| Native push notifications | ⬜ | **Not implemented.** The customer app has no push dependencies — `expo-notifications` is absent. The `sendCustomerPush` port delivers by **SMS**; the name describes the message, not the transport | Device registration, a real push transport, and only then foreground / background / terminated and tap-to-deep-link behaviour — **none of which exists or has been exercised today** | **WS6.5** |
 | Discovery engine | 🟡 | `lib/discovery/*` complete: geo, taxonomy, ranking, popularity, indexer; `/discover` live (HTTP 200) | Index is empty | **WS6.2** |
 | Discovery scheduled jobs | 🚫 | `scripts/discovery-{backfill,geocode,popularity}.ts` are manual CLI only; crons are `ai-brief` and `marketplace` only | Promote to cron routes | **WS6.2** |
 | Discovery index population | 🚫 | `/api/discovery/categories` → `{"facets":[],"total":0}` on staging | First real backfill | Blocked by scheduled jobs |
@@ -106,7 +106,16 @@ and still send nothing, because the one fact nobody checked was whether the
 state it keys on ever actually occurs. Staging said it plainly: 65 queued
 notifications, seven distinct events, not one pickup among them.
 
-**Known gaps carried out of WS6.1**, both environmental rather than structural:
-the Termii staging account returns `402 Insufficient funds`, so messages retry
-rather than arrive; and the synthetic QA customer's number is not a real
-handset, so no physical-device notification test has been performed.
+**WS6.1 is not closed.** It is code complete and verified on staging, but the
+physical SMS acceptance test has never run, so no notification this platform
+produces has yet been read by a person on a phone. Two external blockers, and
+neither may be faked or substituted with production credentials:
+
+1. The Termii staging account returns `402 Insufficient funds` — it needs credit.
+2. The staging QA customer's `+2348111111111` is not a real handset — it needs a
+   real test phone number.
+
+Separately and not to be conflated with the above: **native push is not
+implemented.** Today's customer transport is SMS. Foreground, background and
+terminated behaviour, and tap-to-deep-link, do not exist yet and have not been
+tested — they arrive with WS6.5.
