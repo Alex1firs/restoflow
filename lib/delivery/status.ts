@@ -173,7 +173,11 @@ export function toCustomerFacing(
       return { ...base, headline: "Your food has been picked up", detail: `${who} is on the way.`, notify: true, showMap: true, showContact: true };
 
     case "EN_ROUTE_TO_CUSTOMER":
-      return { ...base, headline: "Your order is on the way", showMap: true, showContact: true };
+      // Worth an interruption, because this is the state the rider app actually
+      // produces when the food leaves the restaurant. PICKED_UP is in the
+      // vocabulary but no live snapshot ever maps to it, so if this one stays
+      // quiet the customer is never told their food is on its way at all.
+      return { ...base, headline: "Your order is on the way", showMap: true, showContact: true, notify: true };
 
     case "ARRIVING":
       return { ...base, headline: `${who} is arriving soon`, detail: "Please be available to receive your order.", notify: true, showMap: true, showContact: true };

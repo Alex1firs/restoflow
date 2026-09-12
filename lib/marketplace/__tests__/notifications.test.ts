@@ -3,6 +3,7 @@
 
 import assert from "node:assert/strict";
 import { DELIVERY_STATES, type DeliveryState } from "../../delivery/contract";
+import { toCustomerFacing } from "../../delivery/status";
 import {
   NOTIFICATION_OWNER, dispatcherMustStaySilent, customerMessage, restaurantMessage,
   shouldPushForDelivery, customerEventForRestaurantState, customerEventForDeliveryState,
@@ -165,12 +166,41 @@ test("delivery notifications fire for news, not for every transition", () => {
 test("routine state changes do NOT push", () => {
   // These change the tracking screen and nothing else. A push per transition
   // is how a customer turns notifications off before their food arrives.
+  //
+  // EN_ROUTE_TO_CUSTOMER used to be in this list, on the assumption that
+  // PICKED_UP carried the "food has left" message. It does not: no live rider
+  // snapshot maps to PICKED_UP — `in_progress` with a `pickedUpAt` becomes
+  // EN_ROUTE_TO_CUSTOMER — so that message was never sent to anybody.
   for (const s of [
     "REQUESTED", "SEARCHING_FOR_DRIVER", "DRIVER_TO_PICKUP",
-    "ARRIVED_AT_PICKUP", "WAITING_FOR_ORDER", "EN_ROUTE_TO_CUSTOMER",
+    "ARRIVED_AT_PICKUP", "WAITING_FOR_ORDER",
     "REASSIGNING", "DRIVER_CANCELLED", "RESTAURANT_DELAY", "CUSTOMER_UNREACHABLE",
   ] as const) {
     assert.equal(customerEventForDeliveryState(s), null, `${s} must not push`);
+  }
+});
+
+test("the state a real pickup produces tells the customer their food is coming", () => {
+  // The regression that hid for this system's whole life. Guarded on the state
+  // the rider app actually emits, not on the one the vocabulary suggests.
+  assert.equal(customerEventForDeliveryState("EN_ROUTE_TO_CUSTOMER"), "on_the_way");
+  assert.ok(shouldPushForDelivery("EN_ROUTE_TO_CUSTOMER"));
+  const msg = customerMessage({
+    event: "on_the_way", orderId: "o1", orderCode: "ABC123", restaurantName: "Trisha's Kitchen",
+  });
+  assert.match(msg.title, /on the way/i);
+});
+
+test("the push list and the tracking copy state the same decision", () => {
+  // `notify` on the copy is documented as "whether this warrants a push", and
+  // CUSTOMER_PUSH_STATES is the list that actually decides. Two spellings of
+  // one decision drift; that drift is exactly what silenced the pickup message.
+  // Scoped to states that have a message at all — an exception state may be
+  // notify-worthy on the tracking screen without having customer copy yet.
+  for (const s of DELIVERY_STATES) {
+    if (customerEventForDeliveryState(s) === null) continue;
+    assert.equal(toCustomerFacing(s).notify, true,
+      `${s} sends a notification but its tracking copy says notify:false`);
   }
 });
 

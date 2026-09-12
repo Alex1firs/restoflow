@@ -131,9 +131,16 @@ function deliveryStateFor(event: CustomerEvent): DeliveryState {
  *
  * Deliberately short. A notification for every internal transition trains a
  * customer to swipe them all away, including the one that mattered.
+ *
+ * This list and the `notify` flag on the copy in `toCustomerFacing` are two
+ * statements of the same decision, and they had drifted: PICKED_UP was listed
+ * here, but the rider app reports a pickup as EN_ROUTE_TO_CUSTOMER, which was
+ * not — so the one message a hungry customer is actually waiting for was the
+ * one message this system never sent. A test now holds the two in agreement.
  */
 export const CUSTOMER_PUSH_STATES: readonly DeliveryState[] = [
-  "DRIVER_ASSIGNED", "PICKED_UP", "ARRIVING", "DELIVERED", "DELIVERY_FAILED", "CANCELLED",
+  "DRIVER_ASSIGNED", "PICKED_UP", "EN_ROUTE_TO_CUSTOMER", "ARRIVING", "DELIVERED",
+  "DELIVERY_FAILED", "CANCELLED",
 ] as const;
 
 export function shouldPushForDelivery(state: DeliveryState): boolean {
@@ -200,6 +207,7 @@ export function customerEventForDeliveryState(state: DeliveryState): CustomerEve
   switch (state) {
     case "DRIVER_ASSIGNED": return "courier_assigned";
     case "PICKED_UP": return "picked_up";
+    case "EN_ROUTE_TO_CUSTOMER": return "on_the_way";
     case "ARRIVING": return "arriving";
     case "DELIVERED": return "delivered";
     case "DELIVERY_FAILED": return "delivery_issue";
