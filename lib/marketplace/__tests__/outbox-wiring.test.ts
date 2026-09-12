@@ -121,4 +121,12 @@ test("[11] the customer is never told about Dispatcher", () => {
     "adapters must not mention Dispatcher outside the header comment");
 });
 
+test("[12] an empty SMS balance retries rather than binning the message", () => {
+  const fn = ADAPTERS.slice(ADAPTERS.indexOf("function outcomeForHttp"));
+  const head = fn.slice(0, fn.indexOf("\n}"));
+  assert.match(head, /status === 402 \|\| status === 429/, "402/429 must be transient");
+  const idx = head.indexOf("402 || status === 429");
+  assert.match(head.slice(idx, idx + 200), /transient/, "a top-up-able failure must not dead-letter");
+});
+
 console.log(`\n${passed} checks passed\n`);

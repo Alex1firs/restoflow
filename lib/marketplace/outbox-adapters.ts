@@ -29,7 +29,14 @@ const TERMII_URL = "https://api.ng.termii.com/api/sms/send";
 
 /** Transport failures worth trying again, as opposed to a bad message. */
 function outcomeForHttp(status: number, body: string): SendOutcome {
-  // 4xx is the message or the address; asking again changes nothing.
+  // Two 4xx codes are about the account, not the message, and both come right
+  // once somebody acts: 402 is an empty SMS balance, 429 is a rate limit.
+  // Dead-lettering those throws away messages that would have sent after a
+  // top-up — which is precisely what happened to a backlog of 38 on staging.
+  if (status === 402 || status === 429) {
+    return { status: "transient", reason: `provider ${status}: ${body.slice(0, 160)}` };
+  }
+  // Any other 4xx is the message or the address; asking again changes nothing.
   if (status >= 400 && status < 500) {
     return { status: "permanent", reason: `provider ${status}: ${body.slice(0, 160)}` };
   }
