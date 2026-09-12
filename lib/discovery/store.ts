@@ -53,4 +53,8 @@ export interface DiscoveryStore {
   getVisibleDiscoveryDishes(): Promise<DiscoveryDish[]>;
   /** A single discovery dish by id (dish detail), or null if absent. */
   getDiscoveryDishById(dishId: string): Promise<DiscoveryDish | null>;
+
+  /** Existing index docs, so a reindex can carry forward what it does not compute. */
+  getDiscoveryRestaurant(slug: string): Promise<DiscoveryRestaurant | null>;
+  getDiscoveryDishesForRestaurant(slug: string): Promise<DiscoveryDish[]>;
 }

@@ -22,6 +22,26 @@ export type ReindexResult = {
  * expired / suspended) are still indexed but flagged `visible=false`, so a later
  * status change is a cheap field update and the public APIs simply filter.
  */
+/**
+ * Keep the popularity a previous run computed.
+ *
+ * Deliberately field-by-field rather than a spread of the whole prior document:
+ * everything else in the projection is derived from source data and MUST be
+ * replaced, so carrying anything more would resurrect stale names and prices.
+ */
+function carryPopularity<T extends {
+  popularityScore: number; popularityRaw: number; popularityOrders: number; signalsComputedAt: number | null;
+}>(fresh: T, prior: T | null): T {
+  if (!prior || prior.signalsComputedAt == null) return fresh;
+  return {
+    ...fresh,
+    popularityScore: prior.popularityScore,
+    popularityRaw: prior.popularityRaw,
+    popularityOrders: prior.popularityOrders,
+    signalsComputedAt: prior.signalsComputedAt,
+  };
+}
+
 export async function reindexRestaurant(
   store: DiscoveryStore,
   slug: string,
@@ -45,8 +65,20 @@ export async function reindexRestaurant(
     const taxonomyTags = [...new Set(dishes.flatMap((d) => d.taxonomyTags))];
     const restaurantDoc = projectRestaurant(source, nowMs, taxonomyTags);
 
-    await store.upsertRestaurant(restaurantDoc);
-    if (dishes.length) await store.upsertDishes(dishes);
+    // Popularity is computed by a different job on a different cadence, and a
+    // projection has no way to derive it — so writing the fresh document would
+    // reset every score to the cold-start neutral. That is not a cosmetic loss:
+    // it drops the restaurant out of Popular Around You until the next nightly
+    // pass, as a consequence of someone editing one dish.
+    const [priorRestaurant, priorDishes] = await Promise.all([
+      store.getDiscoveryRestaurant(slug),
+      store.getDiscoveryDishesForRestaurant(slug),
+    ]);
+    const priorBySlug = new Map(priorDishes.map((d) => [d.dishId, d]));
+
+    await store.upsertRestaurant(carryPopularity(restaurantDoc, priorRestaurant));
+    const merged = dishes.map((d) => carryPopularity(d, priorBySlug.get(d.dishId) ?? null));
+    if (merged.length) await store.upsertDishes(merged);
     await store.deleteDishesNotIn(slug, dishes.map((d) => d.dishId));
 
     return { slug, ok: true, visible: restaurantDoc.visible, dishCount: dishes.length };

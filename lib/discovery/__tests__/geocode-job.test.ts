@@ -22,6 +22,8 @@ class Fake implements DiscoveryStore {
   async getVisibleDiscoveryRestaurants() { return []; }
   async getMarketplaceRestaurants() { return []; }
   async getMarketplaceDishes() { return []; }
+  async getDiscoveryRestaurant() { return null; }
+  async getDiscoveryDishesForRestaurant() { return []; }
   async getVisibleDiscoveryDishes() { return []; }
   async getDiscoveryDishById() { return null; }
   async listRestaurantSlugs() { return []; }

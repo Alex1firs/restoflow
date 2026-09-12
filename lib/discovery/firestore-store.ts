@@ -294,6 +294,16 @@ export function createFirestoreStore(db: Firestore): DiscoveryStore {
       return snap.docs.map((d) => d.data() as DiscoveryDish);
     },
 
+    async getDiscoveryRestaurant(slug: string) {
+      const doc = await db.collection(RESTAURANTS).doc(slug).get();
+      return doc.exists ? (doc.data() as DiscoveryRestaurant) : null;
+    },
+
+    async getDiscoveryDishesForRestaurant(slug: string) {
+      const snap = await db.collection(DISHES).where("restaurantSlug", "==", slug).get();
+      return snap.docs.map((d) => d.data() as DiscoveryDish);
+    },
+
     async getDiscoveryDishById(dishId: string) {
       const doc = await db.collection(DISHES).doc(dishId).get();
       if (!doc.exists) return null;

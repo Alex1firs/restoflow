@@ -28,6 +28,8 @@ function makeStore(dishes: DiscoveryDish[], restaurants: DiscoveryRestaurant[]):
     getVisibleDiscoveryRestaurants: async () => restaurants.filter((r) => r.visible),
     getMarketplaceRestaurants: async () => restaurants.filter((r) => r.marketplaceVisible),
     getMarketplaceDishes: async () => dishes.filter((d) => d.marketplaceVisible),
+    getDiscoveryRestaurant: async (slug: string) => restaurants.find((r) => r.slug === slug) ?? null,
+    getDiscoveryDishesForRestaurant: async (slug: string) => dishes.filter((d) => d.restaurantSlug === slug),
     getDiscoveryDishById: async (id: string) => dishes.find((d) => d.dishId === id) ?? null,
   } as unknown as DiscoveryStore;
 }

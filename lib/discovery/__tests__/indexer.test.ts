@@ -41,6 +41,8 @@ class FakeStore implements DiscoveryStore {
   async getVisibleDiscoveryRestaurants() { return [...this.discR.values()]; }
   async getMarketplaceRestaurants() { return [...this.discR.values()].filter((r) => r.marketplaceVisible); }
   async getMarketplaceDishes() { return [...this.discD.values()].filter((d) => d.marketplaceVisible); }
+  async getDiscoveryRestaurant(slug: string) { return this.discR.get(slug) ?? null; }
+  async getDiscoveryDishesForRestaurant(slug: string) { return [...this.discD.values()].filter((d) => d.restaurantSlug === slug); }
   async getVisibleDiscoveryDishes() { return [...this.discD.values()]; }
   async getDiscoveryDishById(id: string) { return this.discD.get(id) ?? null; }
 
@@ -142,6 +144,41 @@ console.log("discovery/indexer");
     assert.equal(sum.total, 1);
     assert.equal(s.discR.has("k"), true);
     assert.equal(s.discR.has("t"), false);
+  });
+
+  await test("a reindex keeps the popularity a previous run computed", async () => {
+    // Found preparing device QA: backfill writes the whole document, so every
+    // menu edit reset the score to the cold-start neutral and dropped the
+    // restaurant out of Popular Around You until the next nightly pass.
+    const s = new FakeStore();
+    s.srcR.set("k", live("k"));
+    s.srcItems.set("k", [item("a", "k")]);
+    await reindexRestaurant(s, "k", NOW);
+
+    // A popularity run lands.
+    const scored = { ...s.discR.get("k")!, popularityScore: 0.93, popularityRaw: 41, popularityOrders: 12, signalsComputedAt: NOW };
+    s.discR.set("k", scored);
+    const dish = s.dishesFor("k")[0];
+    s.discD.set(dish.dishId, { ...dish, popularityScore: 0.8, popularityRaw: 9, popularityOrders: 4, signalsComputedAt: NOW });
+
+    // The restaurant edits a dish name — nothing to do with popularity.
+    s.srcItems.set("k", [{ ...item("a", "k"), name: "Renamed" }]);
+    await reindexRestaurant(s, "k", NOW + 1000);
+
+    assert.equal(s.discR.get("k")?.popularityScore, 0.93, "restaurant score must survive a reindex");
+    assert.equal(s.discR.get("k")?.popularityOrders, 12);
+    const after = s.dishesFor("k")[0];
+    assert.equal(after.popularityScore, 0.8, "dish score must survive a reindex");
+    assert.equal(after.name, "Renamed", "but the edit itself must still apply");
+  });
+
+  await test("an unscored index is not treated as having popularity to keep", async () => {
+    const s = new FakeStore();
+    s.srcR.set("k", live("k"));
+    s.srcItems.set("k", [item("a", "k")]);
+    await reindexRestaurant(s, "k", NOW);
+    await reindexRestaurant(s, "k", NOW + 1);
+    assert.equal(s.discR.get("k")?.signalsComputedAt, null);
   });
 
   console.log(`\n${passed} checks passed`);
