@@ -1,0 +1,99 @@
+# RestoFlow Master Roadmap
+
+Workstreams and milestones for the whole platform. Read
+[`RESTOFLOW_PRODUCT_CHARTER.md`](./RESTOFLOW_PRODUCT_CHARTER.md) first for the
+product definition, and
+[`RESTOFLOW_CURRENT_STATE.md`](./RESTOFLOW_CURRENT_STATE.md) for where each item
+actually stands today.
+
+Workstreams are **not** phases. They run in parallel and at different speeds. A
+milestone belongs to exactly one workstream, so "which phase are we in" stops
+being a meaningful question.
+
+---
+
+## WS1 · Customer Marketplace
+
+The consumer app and everything a customer touches.
+
+| Milestone | Scope |
+|---|---|
+| **1.1 Core ordering loop** | Address → discovery → storefront → cart → checkout → payment. The V1 magic path. |
+| **1.2 Live order story** | The six post-payment stages as one continuous narrative, map and ETA appearing only when useful. |
+| **1.3 Discovery quality** | Ranking that actually reaches the customer app: distance, open state, delivery availability, prep time, ETA, popularity. |
+| **1.4 Return behaviour** | Order Again, reorder, favourites, recent orders. |
+| **1.5 After delivery** | Rate food, rate delivery, report a problem, support route. |
+| **1.6 Order communication** | Order-scoped customer ↔ courier chat, then masked calling. |
+
+## WS2 · Restaurant Commerce
+
+What a restaurant using the full product sees.
+
+| Milestone | Scope |
+|---|---|
+| **2.1 Marketplace order handling** | Receive, accept, reject, preparing, ready — inside the normal RestoFlow workflow. |
+| **2.2 Menu & modifiers** | Categories, sizes, proteins, extras, instructions, availability. |
+| **2.3 Kitchen & prep signals** | Prep-time accuracy and historical performance, which WS5 needs for smart dispatch. |
+| **2.4 Merchant mobile** | The portal usable on a phone in a kitchen. |
+
+## WS3 · Partner Models & RestoFlow Connect
+
+The three relationships beyond a full RestoFlow restaurant.
+
+| Milestone | Scope |
+|---|---|
+| **3.1 Marketplace Partner** | Simplified merchant interface for restaurants without the POS: information, menu, prices, hours, location, prep. |
+| **3.2 RestoFlow Connect** | Request-a-courier without originating the food order — pickup, drop-off, package, ready now/later. Logistics revenue on orders RestoFlow did not take. |
+| **3.3 Partner API** | Programmatic marketplace and delivery requests for enterprise systems, with keys, quotas and idempotency. |
+
+## WS4 · Payments, Payable & Settlement
+
+Money in, money owed, money out.
+
+| Milestone | Scope |
+|---|---|
+| **4.1 Customer payments** | Intent, webhook, reconciliation, idempotency. |
+| **4.2 Ledger & payable** | Append-only, balanced, per-order: restaurant payable, delivery payable, platform revenue, processor cost. |
+| **4.3 Payout execution** | Connect the settlement state machine to a provider, human gate intact. |
+| **4.4 Statements & reconciliation** | What a restaurant and a courier partner can each see and trust. |
+
+## WS5 · Dispatcher Logistics
+
+The engine underneath, which must stay invisible to customers.
+
+| Milestone | Scope |
+|---|---|
+| **5.1 Delivery integration** | Quote, acceptance-gated handoff, rider board, handover codes, tracking. |
+| **5.2 Smart dispatch timing** | Start the rider search from prep time, rider travel and restaurant history rather than immediately on acceptance. |
+| **5.3 Delivery exceptions** | Reassignment, courier cancellation, unreachable customer, failed delivery — as customer-safe stories. |
+
+## WS6 · Platform Operations
+
+The things that decide whether any of the above stays working.
+
+| Milestone | Scope |
+|---|---|
+| **6.1 Notification delivery** | Actually deliver what the outbox enqueues, to customer and restaurant. |
+| **6.2 Scheduled jobs** | Discovery indexing, geocoding, popularity, sweeps — on a schedule, not by hand. |
+| **6.3 Environment integrity** | Staging/production isolation, automated deploys, required environment variables present. |
+| **6.4 Observability** | Knowing a subsystem has stopped working before a customer tells you. |
+
+---
+
+## Deferred until the core is excellent
+
+Loyalty · wallet · subscriptions · scheduled ordering · group ordering ·
+promotions · AI food discovery · advanced recommendations.
+
+These do not enter a milestone without separate approval.
+
+---
+
+## Sequencing principles
+
+1. **Wire what is already built before building more.** Several subsystems are
+   complete and tested but not connected to anything.
+2. **A customer-visible failure outranks a missing feature.**
+3. **Decide before duplicating.** Where two implementations of one capability
+   exist, converge rather than maintaining both.
+4. **Dispatcher is never the product.** It is WS5 of six workstreams.
