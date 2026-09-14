@@ -520,6 +520,7 @@ export async function refundConnectDelivery(args: {
     reason: args.reason,
     status: "pending",
     providerReference: null,
+    providerStatus: null,
     requestedAtMs: nowMs,
     settledAtMs: null,
     lastError: null,
@@ -543,14 +544,19 @@ export async function refundConnectDelivery(args: {
     return { ok: false, reason: "refund_failed", detail: res.reason };
   }
 
+  // Accepted is not settled. Paystack returns `pending` and settles later, so
+  // our status follows the provider rather than declaring victory on a 200.
+  const settled = res.providerStatus === "processed" || res.providerStatus === "success"
+    || res.providerStatus === "already_refunded";
   const current = (await store.getInternal(d.id))!;
   await store.update(d.id, {
-    state: "refunded",
+    state: settled ? "refunded" : "refund_pending",
     refund: {
       ...current.refund!,
-      status: "succeeded",
+      status: settled ? "succeeded" : "pending",
       providerReference: res.providerReference,
-      settledAtMs: nowMs,
+      providerStatus: res.providerStatus,
+      settledAtMs: settled ? nowMs : null,
     },
   });
 

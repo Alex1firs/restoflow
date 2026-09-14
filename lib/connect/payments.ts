@@ -109,7 +109,21 @@ export async function initializeConnectPayment(args: {
 }
 
 export type RefundResult =
-  | { ok: true; providerReference: string | null; alreadyRefunded: boolean }
+  | {
+      ok: true;
+      providerReference: string | null;
+      alreadyRefunded: boolean;
+      /**
+       * What the provider says about the refund, verbatim.
+       *
+       * Paystack ACCEPTS a refund immediately and SETTLES it later — the
+       * refund is `pending` for a while and the transaction reads
+       * `reversal-pending`. Recording our own "succeeded" at the moment of
+       * acceptance would mean our books claim money is back with the customer
+       * while the provider still has it.
+       */
+      providerStatus: string | null;
+    }
   | { ok: false; reason: string };
 
 /**
@@ -155,12 +169,17 @@ export async function refundConnectPayment(args: {
   };
 
   if (res.ok && body.status) {
-    return { ok: true, providerReference: body.data?.id != null ? String(body.data.id) : null, alreadyRefunded: false };
+    return {
+      ok: true,
+      providerReference: body.data?.id != null ? String(body.data.id) : null,
+      alreadyRefunded: false,
+      providerStatus: body.data?.status ?? null,
+    };
   }
 
   const message = String(body.message ?? "");
   if (/already.*refund|has been refunded|duplicate/i.test(message)) {
-    return { ok: true, providerReference: null, alreadyRefunded: true };
+    return { ok: true, providerReference: null, alreadyRefunded: true, providerStatus: "already_refunded" };
   }
 
   return { ok: false, reason: `paystack ${res.status}: ${message.slice(0, 160)}` };

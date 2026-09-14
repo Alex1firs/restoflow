@@ -463,4 +463,18 @@ test("[51] refunds are a super-admin act, not a partner or customer one", () => 
     "neither the partner nor a link-holder may move money");
 });
 
+test("[52] accepted is not settled", () => {
+  // Paystack accepts a refund immediately and settles it later — the refund
+  // reads `pending` and the transaction `reversal-pending`. Recording our own
+  // "succeeded" on the 200 would have our books claim the money is back with
+  // the customer while the provider still holds it.
+  const svc = read("lib/connect/service.ts");
+  assert.match(svc, /const settled = res\.providerStatus === "processed"/);
+  assert.match(svc, /state: settled \? "refunded" : "refund_pending"/);
+  assert.match(svc, /status: settled \? "succeeded" : "pending"/);
+  assert.match(svc, /settledAtMs: settled \? nowMs : null/);
+  const types = read("lib/connect/types.ts");
+  assert.match(types, /providerStatus: string \| null/, "the provider's own word must be kept");
+});
+
 console.log(`\n${passed} checks passed\n`);

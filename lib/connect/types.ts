@@ -60,8 +60,11 @@ export type ConnectRefund = {
   reference: string;
   amountMinor: number;
   reason: string;
+  /** Ours. `succeeded` means the provider has SETTLED, not merely accepted. */
   status: "pending" | "succeeded" | "failed";
   providerReference: string | null;
+  /** The provider's own word for it, kept so the two are never confused. */
+  providerStatus: string | null;
   requestedAtMs: number;
   settledAtMs: number | null;
   lastError: string | null;
