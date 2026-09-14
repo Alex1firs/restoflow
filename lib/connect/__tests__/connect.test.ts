@@ -444,4 +444,23 @@ test("[48] the same link becomes tracking once paid", () => {
   assert.match(page, /view\.tracking &&/);
 });
 
+test("[50] a held or refunded delivery never says 'finding you a courier'", () => {
+  // The single worst thing to show somebody whose money we are holding: both
+  // untrue and reassuring.
+  const g = read("lib/connect/guest.ts");
+  for (const st of ["payment_held_unfulfilled", "refund_pending", "refunded", "refund_failed"]) {
+    assert.ok(g.includes(st), `guest view must speak to ${st}`);
+  }
+  const page = read("app/d/[id]/page.tsx");
+  assert.match(page, /view\.paid && !view\.tracking && !view\.problem/,
+    "the 'finding a courier' message must be suppressed when there is a problem");
+});
+
+test("[51] refunds are a super-admin act, not a partner or customer one", () => {
+  const route = read("app/api/super-admin/connect/deliveries/[id]/refund/route.ts");
+  assert.match(route, /getSuperAdminUser/);
+  assert.ok(!/authoriseConnect|trackingToken/.test(route),
+    "neither the partner nor a link-holder may move money");
+});
+
 console.log(`\n${passed} checks passed\n`);

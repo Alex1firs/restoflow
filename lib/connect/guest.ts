@@ -25,6 +25,14 @@ export type GuestView = {
   amountMinor: number | null;
   paid: boolean;
   checkoutUrl: string | null;
+  /**
+   * What to tell the person when there is no courier and there will not be one.
+   *
+   * Without this a held or refunded delivery still read "we're finding you a
+   * courier", which is the single worst thing to show somebody whose money we
+   * are holding — it is both untrue and reassuring.
+   */
+  problem: { headline: string; detail: string } | null;
   /** Present only once the delivery is genuinely under way. */
   tracking: {
     headline: string;
@@ -54,6 +62,25 @@ export async function guestView(id: string, token: string): Promise<GuestView | 
 
   const paid = !!d.payment?.paidAtMs;
   let tracking: GuestView["tracking"] = null;
+
+  let problem: GuestView["problem"] = null;
+  if (d.state === "payment_held_unfulfilled") {
+    problem = {
+      headline: "We couldn't complete this delivery",
+      detail: "Your payment was received and is being returned. You don't need to do anything.",
+    };
+  } else if (d.state === "refund_pending") {
+    problem = { headline: "Refund on its way", detail: "We've started returning your payment." };
+  } else if (d.state === "refunded") {
+    problem = {
+      headline: "Refunded",
+      detail: "Your payment has been returned. It can take a few days to appear.",
+    };
+  } else if (d.state === "refund_failed") {
+    // Never "something went wrong" — somebody's money is involved and a person
+    // is already dealing with it.
+    problem = { headline: "Refund in progress", detail: "Our team is completing your refund." };
+  }
 
   if (d.delivery) {
     const copy = toCustomerFacing(d.delivery.state, {
@@ -86,6 +113,7 @@ export async function guestView(id: string, token: string): Promise<GuestView | 
     amountMinor: d.payment?.amountMinor ?? d.quote?.partnerPriceMinor ?? null,
     paid,
     checkoutUrl: paid ? null : d.payment?.authorizationUrl ?? null,
+    problem,
     tracking,
   };
 }

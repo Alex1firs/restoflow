@@ -88,7 +88,14 @@ export default async function ConnectGuestPage({
             </a>
           )}
 
-          {view.paid && !view.tracking && (
+          {view.problem && (
+            <div style={{ marginTop: 20, padding: 16, background: "#fef3c7", borderRadius: 12 }}>
+              <div style={{ fontWeight: 650, fontSize: 15 }}>{view.problem.headline}</div>
+              <div style={{ color: "#4b5563", fontSize: 14, marginTop: 4 }}>{view.problem.detail}</div>
+            </div>
+          )}
+
+          {view.paid && !view.tracking && !view.problem && (
             <p style={{ marginTop: 20, padding: 14, background: "#ecfdf5", borderRadius: 12, fontSize: 14 }}>
               Payment received. We&apos;re finding you a courier.
             </p>
