@@ -1,6 +1,6 @@
 # RestoFlow Current State
 
-Living status of every capability. **Last reconciled: 2026-09-12** (WS6.1, WS6.2), by
+Living status of every capability. **Last reconciled: 2026-09-14** (WS6.1, WS6.2), by
 reading the code and querying staging — not from prior reports.
 
 Legend: ✅ COMPLETE · 🟡 PARTIAL · ⬜ NOT STARTED · 🔄 SUPERSEDED · 🚫 BLOCKED
@@ -26,6 +26,7 @@ customer app) · `pack_delivery` (Dispatcher).
 | Checkout & payment | ✅ | `app/checkout.tsx` → `/api/mobile/v1/orders` → Paystack; server-authoritative totals | — | — |
 | Post-payment tracking | ✅ | `app/order/[id].tsx`; six stages; map/ETA gated by stage; verified on hardware | — | — |
 | Discovery ranking reaching the app | ✅ | `/feed` and `/search` read `discovery_restaurants` / `discovery_dishes`; `lib/marketplace/search.ts` **deleted** rather than maintained alongside. Parity asserted before retirement | — | — |
+| Discovery physical regression | ✅ | **PASSED on hardware 2026-09-14.** Discovery → cart → payment → restaurant acceptance → **exactly one** Dispatcher job (`-P1Tpjw6R1R66xa1VGeb`, order `B11sR5FdUR77nNOlO1ih`, `sequence: 1`). Rider completion **not repeated**: the QA rider's genuine GPS was 366.5 km from the synthetic Lekki pickup, and the run was not manufactured by moving the restaurant, faking GPS or widening the radius. That leg was already proven on hardware 2026-09-12 and discovery changed no rider code | — | — |
 | Order Again (discovery) | ✅ | Feed section from genuine `orders` history; empty and hidden without it, and never resurrects an out-of-range restaurant | Re-adding a past basket in one tap | — |
 | Restaurant deliverability | ✅ | `deliveryRadiusKm` is enforced. Was configured (5 km / 15 km on staging) and read by nothing — the platform offered every restaurant to everyone | — | — |
 | Zero-coverage address | ✅ | Approved empty state on Home and Search with "Change address"; proven from Abuja against Lagos restaurants | — | — |
@@ -73,6 +74,8 @@ customer app) · `pack_delivery` (Dispatcher).
 | Delivery integration | ✅ | Acceptance-gated handoff; 0 jobs before acceptance; released at acceptance; verified on physical devices | — | — |
 | Handover codes | ✅ | Pickup code to restaurant, receiving code to customer; each stored where only its audience can read it | — | — |
 | Rider board security | ✅ | `/deliveries/active` requires an approved rider; anonymous → 401; 9 authorization tests | — | — |
+| Rider job visibility radius | ✅ | **One source of truth (2026-09-14).** `systemSettings/deliveryRadius` governs; the server enforces it against `users/<uid>/liveLocation` from the verified token; `lat`/`lng`/`radiusKm` are no longer read from the query string. The app defers to `eligibilityEnforced` and its fallback reads the same setting, never a constant. Staging: 5 km → empty board, spoofed `radiusKm=1000` → ignored, admin 400 km → same job offered to the same real GPS | Deploy the same enforcement to the production delivery service | **WS6.3** |
+| Staging credential hygiene | ✅ | Two production service accounts (`pack-delivery-live`, `pack-delivery`) were sitting unused in the staging service directory; removed, and `staging-bootstrap.js` now refuses to start while any production credential is merely present. Deployed staging was already clean | Production keys still duplicated elsewhere in both trees — see below | — |
 | Tracking & timestamps | ✅ | `pickedUpAt` / `deliveredAt` real and ordered on hardware runs | — | — |
 | "Food is on the way" message | ✅ | Was wired to `PICKED_UP`, which no live delivery reaches — the rider app's pickup maps to `EN_ROUTE_TO_CUSTOMER`. That state now notifies; a test holds the push list and the tracking copy's `notify` flag in agreement | — | — |
 | Smart dispatch timing | 🔄 | `computeConfirmAt()` exists and is stored as `deliveryConfirmAt`, but release is now immediate at acceptance; the confirm sweep is a safety net | Re-enable timed release once prep history exists | Depends on WS2 prep history |
@@ -92,6 +95,7 @@ customer app) · `pack_delivery` (Dispatcher).
 | Computed popularity | ✅ | Genuine values on staging: 14 orders → `stg-trishas-kitchen` 1.000 vs cold-start 0.500. Popular Around You requires `popularityOrders > 0`, so the neutral score cannot pose as a ranking | — | — |
 | Staging/production isolation | ✅ | Separate Firebase projects, separate bundle ids, fail-loud guards, 8 isolation tests | — | — |
 | Dispatcher deploy automation | 🟡 | `scp` + `pm2 restart`; host git remote is a local path | Real pipeline | **WS6.3** |
+| Production key duplication | 🟡 | One `pack-delivery-live` service account (`b737ea86…`) is used by **both** `adminprod` and `paystackprod`, and copies sit in `admin-dashboard/` and `paystackwebhook/` under **both** the prod and staging trees on the droplet. It is also in git history (documented in `GIT_HISTORY_CLEANUP.md`) | Rotation touches two live services at once — **not** attempted | Owner decision |
 | `SENDGRID_API_KEY` on staging | 🚫 | Unset; no account can self-verify email | Provision a sandbox key | **WS6.3** |
 | Observability | ⬜ | Nothing alerts when a subsystem silently stops | — | — |
 
