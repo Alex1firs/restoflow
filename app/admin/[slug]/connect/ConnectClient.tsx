@@ -3,7 +3,16 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Truck, Copy, Check, Share2, MapPin, Loader2 } from "lucide-react";
+import dynamic from "next/dynamic";
 import type { MerchantDelivery } from "@/lib/connect/merchant-view";
+import type { Coords } from "./LocationPicker";
+
+// Leaflet touches `window` on import, so the picker is client-only and loaded
+// on demand — no other admin page pays for a map it never shows.
+const LocationPicker = dynamic(() => import("./LocationPicker"), {
+  ssr: false,
+  loading: () => <div className="h-56 sm:h-64 w-full bg-gray-100 rounded-xl animate-pulse" />,
+});
 
 /**
  * RestoFlow Connect — the operator's screen.
@@ -40,10 +49,12 @@ const STAGE_TONE: Record<string, string> = {
 const ACTIVE = new Set(["awaiting_payment", "paid", "finding_courier", "courier_assigned", "at_restaurant", "picked_up", "on_the_way"]);
 
 export default function ConnectClient({
-  slug, pickup,
+  slug, pickup, pickupCoords,
 }: {
   slug: string;
   pickup: { name: string; address: string };
+  /** The restaurant's own pin, so the map opens where its deliveries happen. */
+  pickupCoords: Coords | null;
 }) {
   const [rows, setRows] = useState<MerchantDelivery[] | null>(null);
   const [creating, setCreating] = useState(false);
@@ -92,6 +103,7 @@ export default function ConnectClient({
       {creating && (
         <NewDelivery
           pickup={pickup}
+          pickupCoords={pickupCoords}
           onClose={() => setCreating(false)}
           onCreated={() => { setCreating(false); void load(); }}
         />
@@ -154,16 +166,17 @@ function Section({ title, rows, slug }: { title: string; rows: MerchantDelivery[
 
 /** The form. Five things, in the order an operator already has them. */
 function NewDelivery({
-  pickup, onClose, onCreated,
+  pickup, pickupCoords, onClose, onCreated,
 }: {
   pickup: { name: string; address: string };
+  pickupCoords: Coords | null;
   onClose: () => void;
   onCreated: () => void;
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [coords, setCoords] = useState<Coords | null>(null);
   const [pkg, setPkg] = useState("1 food package");
   const [readyInMins, setReadyInMins] = useState(15);
   const [busy, setBusy] = useState(false);
@@ -229,7 +242,7 @@ function NewDelivery({
             className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:border-orange-400" />
         </Field>
 
-        <LocationConfirm coords={coords} onChange={setCoords} />
+        <LocationPicker value={coords} onChange={setCoords} initialCenter={pickupCoords} />
 
         <Field label="What's in the package">
           <input value={pkg} onChange={(e) => setPkg(e.target.value)}
@@ -261,74 +274,6 @@ function NewDelivery({
         {busy ? <><Loader2 className="w-4 h-4 animate-spin" /> Getting quote…</> : "Get delivery quote"}
       </button>
     </div>
-  );
-}
-
-/**
- * Confirm where the courier is actually going.
- *
- * The typed address is what a human reads; these coordinates are what the rider
- * is sent to, so they are captured explicitly rather than guessed from the text.
- * There is no embedded map here yet — RestoFlow has no map provider configured,
- * and adding one is a commercial decision rather than something to slip into a
- * form. Until then: the device's own location, or coordinates pasted from
- * whatever map the operator already uses.
- */
-function LocationConfirm({
-  coords, onChange,
-}: {
-  coords: { lat: number; lng: number } | null;
-  onChange: (c: { lat: number; lng: number } | null) => void;
-}) {
-  const [manual, setManual] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  const useDevice = () => {
-    setErr(null);
-    if (!navigator.geolocation) { setErr("This device can't share a location."); return; }
-    setBusy(true);
-    navigator.geolocation.getCurrentPosition(
-      (p) => { onChange({ lat: p.coords.latitude, lng: p.coords.longitude }); setBusy(false); },
-      () => { setErr("Couldn't read the location. Paste coordinates instead."); setBusy(false); },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  };
-
-  const applyManual = (v: string) => {
-    setManual(v);
-    const m = v.split(",").map((x) => Number(x.trim()));
-    if (m.length === 2 && m.every(Number.isFinite) && Math.abs(m[0]) <= 90 && Math.abs(m[1]) <= 180) {
-      onChange({ lat: m[0], lng: m[1] });
-      setErr(null);
-    } else {
-      onChange(null);
-    }
-  };
-
-  return (
-    <Field label="Confirm delivery location">
-      {coords ? (
-        <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-3 py-2.5">
-          <span className="flex items-center gap-2 text-sm font-bold text-green-800">
-            <MapPin className="w-4 h-4" /> Location confirmed
-          </span>
-          <button type="button" onClick={() => { onChange(null); setManual(""); }}
-            className="text-xs font-black text-green-700 hover:text-green-900">Change</button>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          <button type="button" onClick={useDevice} disabled={busy}
-            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-700 flex items-center justify-center gap-2">
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
-            Use this device&apos;s location
-          </button>
-          <input value={manual} onChange={(e) => applyManual(e.target.value)} placeholder="or paste coordinates: 6.5158, 3.3877"
-            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:border-orange-400" />
-        </div>
-      )}
-      {err && <p className="text-xs font-bold text-red-600 mt-1">{err}</p>}
-    </Field>
   );
 }
 

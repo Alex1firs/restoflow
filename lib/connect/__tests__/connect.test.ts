@@ -558,13 +558,54 @@ test("[59] the operator screens refresh themselves", () => {
   }
 });
 
-test("[60] the drop-off pin is captured explicitly, not guessed from the text", () => {
-  const src = read("app/admin/[slug]/connect/ConnectClient.tsx");
-  assert.match(src, /Confirm delivery location/);
-  assert.match(src, /navigator\.geolocation/, "the device can supply it");
-  assert.match(src, /!coords/, "a quote must be impossible without confirmed coordinates");
-  // No map provider was added — see the report.
-  assert.ok(!/googleapis\.com\/maps|mapbox|leaflet/i.test(src));
+test("[60] the drop-off pin is placed on a map, and a quote needs it", () => {
+  const form = read("app/admin/[slug]/connect/ConnectClient.tsx");
+  assert.match(form, /LocationPicker/);
+  assert.match(form, /!coords/, "a quote must be impossible without confirmed coordinates");
+});
+
+test("[61] ordinary staff never see latitude or longitude", () => {
+  // The coordinates are authoritative but nobody behind a counter thinks in
+  // decimal degrees. They are captured by tapping a map, never typed.
+  const form = read("app/admin/[slug]/connect/ConnectClient.tsx");
+  const picker = read("app/admin/[slug]/connect/LocationPicker.tsx");
+  assert.ok(!/paste coordinates|placeholder="[^"]*6\.5/i.test(form + picker),
+    "no coordinate entry field may appear in the merchant flow");
+  assert.ok(!/<input/.test(picker), "the picker takes no typed input at all");
+});
+
+test("[62] OpenStreetMap is attributed, as its licence requires", () => {
+  const picker = read("app/admin/[slug]/connect/LocationPicker.tsx");
+  assert.match(picker, /openstreetmap\.org\/copyright/);
+  assert.match(picker, /OpenStreetMap<\/a> contributors/);
+  assert.match(picker, /tile\.openstreetmap\.org/);
+});
+
+test("[63] no paid map provider crept in", () => {
+  const picker = read("app/admin/[slug]/connect/LocationPicker.tsx");
+  for (const p of ["googleapis.com/maps", "mapbox", "maps.google", "api_key", "apiKey"]) {
+    assert.ok(!picker.includes(p), `introduced ${p}`);
+  }
+});
+
+test("[64] Nominatim is not quietly used as a geocoder", () => {
+  // The public endpoint is not a production service; treating it as one works
+  // in testing and rate-limits in the evening rush. Address search needs a
+  // real provider, and that is a separate decision.
+  // The comments explain WHY it is avoided; what matters is the code.
+  const strip = (src: string) =>
+    src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const code = strip(read("app/admin/[slug]/connect/LocationPicker.tsx"))
+    + strip(read("app/admin/[slug]/connect/ConnectClient.tsx"));
+  for (const s2 of ["nominatim", "/search?q=", "geocode"]) {
+    assert.ok(!code.toLowerCase().includes(s2), `depends on ${s2}`);
+  }
+});
+
+test("[65] the map is loaded on demand, not by every admin page", () => {
+  const form = read("app/admin/[slug]/connect/ConnectClient.tsx");
+  assert.match(form, /dynamic\(\(\) => import\("\.\/LocationPicker"\)/);
+  assert.match(form, /ssr: false/, "Leaflet touches window on import");
 });
 
 console.log(`\n${passed} checks passed\n`);

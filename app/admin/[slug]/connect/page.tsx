@@ -38,6 +38,11 @@ export default async function ConnectPage({ params }: { params: Promise<{ slug: 
             name: String(data.name ?? slug),
             address: String(data.address ?? ""),
           }}
+          pickupCoords={
+            Number.isFinite(Number(data.latitude)) && Number.isFinite(Number(data.longitude))
+              ? { lat: Number(data.latitude), lng: Number(data.longitude) }
+              : null
+          }
         />
       </div>
     </div>
