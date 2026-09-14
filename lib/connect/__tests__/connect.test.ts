@@ -348,6 +348,18 @@ test("[38] a provider 'already refunded' is success, not an error to retry forev
   assert.match(dup, /alreadyRefunded: true/);
 });
 
+test("[38b] a refund must PROVE no job exists, not assume it", () => {
+  // Our record saying there is no job is not evidence — the create may have
+  // succeeded with the response lost. Refunding on that assumption pays a
+  // customer back for a courier already on the way.
+  const svc = read("lib/connect/service.ts");
+  const fn = svc.slice(svc.indexOf("export async function refundConnectDelivery"));
+  const head = fn.slice(0, fn.indexOf("claimRefund"));
+  assert.match(head, /getDelivery\(\{ externalOrderId: d\.id/, "must ask Dispatcher before refunding");
+  assert.match(head, /job_exists_after_all/, "a job found must cancel the refund");
+  assert.match(head, /reconciliation_unavailable/, "being unable to ask must not become a refund");
+});
+
 test("[39] a dispatched delivery can never be refunded by this path", () => {
   const svc = read("lib/connect/service.ts");
   const fn = svc.slice(svc.indexOf("export async function refundConnectDelivery"));

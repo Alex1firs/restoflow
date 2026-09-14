@@ -492,6 +492,27 @@ export async function refundConnectDelivery(args: {
   if (d.delivery?.deliveryJobId) return { ok: false, reason: "already_dispatched" };
   if (d.refund?.status === "succeeded") return { ok: true, alreadyRefunded: true };
 
+  // ── Prove it, do not assume it ──────────────────────────────────────────────
+  // Our record saying there is no job is not evidence: the create may have
+  // succeeded and the response lost. Refunding on that assumption pays the
+  // customer back for a courier who is already on the way. So Dispatcher is
+  // asked directly, and a job it holds cancels the refund and is adopted
+  // instead.
+  const rc = client();
+  if (!rc) return { ok: false, reason: "delivery_integration_disabled" };
+  const correlationId = d.correlationId ?? `cn-${randomUUID().slice(0, 13)}`;
+  const probe = await rc.getDelivery({ externalOrderId: d.id, correlationId });
+  if (probe.ok && probe.value.deliveryJobId) {
+    await attach(store, d, probe.value, nowMs);
+    return { ok: false, reason: "job_exists_after_all" };
+  }
+  if (!probe.ok && probe.failure.kind !== "server_rejected") {
+    // A rejection means Dispatcher answered and holds nothing for this id —
+    // that is the proof we need. Anything else (timeout, network, auth) means
+    // we could not ask, and holding is safe where refunding blind is not.
+    return { ok: false, reason: "reconciliation_unavailable", detail: probe.failure.kind };
+  }
+
   const claimed = await store.claimRefund(d.id, {
     id: `${d.id}__refund`,
     reference: d.payment.reference,
