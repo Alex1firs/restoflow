@@ -3,6 +3,7 @@ import { getAdminDb } from "@/lib/firebase-admin";
 import { authoriseConnect } from "@/lib/connect/http";
 import { quoteConnectDelivery } from "@/lib/connect/service";
 import { ConnectStore } from "@/lib/connect/store";
+import { merchantView } from "@/lib/connect/merchant-view";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export async function GET() {
   const auth = await authoriseConnect();
   if (!auth.ok) return auth.response;
   const rows = await new ConnectStore(getAdminDb()).list(auth.caller.restaurantId);
-  return NextResponse.json({ deliveries: rows.map(redact) });
+  return NextResponse.json({ deliveries: rows.map((d) => merchantView(d)) });
 }
 
 /** Price a delivery. Creates a `quoted` record; requests nothing. */
@@ -66,35 +67,5 @@ export async function POST(req: Request) {
   });
 
   if (!result.ok) return NextResponse.json({ error: result.reason, detail: result.detail }, { status: 422 });
-  return NextResponse.json({ delivery: redact(result.delivery) });
-}
-
-/**
- * What the partner is allowed to see.
- *
- * The Dispatcher cost and RestoFlow's margin are accounting facts, not quote
- * copy — a partner shown "your price is our cost plus our cut" is being invited
- * to negotiate with the wrong party. One number goes out: the amount payable.
- */
-function redact(d: import("@/lib/connect/types").ConnectDelivery) {
-  return {
-    id: d.id,
-    state: d.state,
-    dropoff: d.dropoff,
-    packageDescription: d.packageDescription,
-    readyAt: d.readyAt,
-    quote: d.quote
-      ? {
-          priceMinor: d.quote.partnerPriceMinor,
-          distanceKm: d.quote.distanceKm,
-          etaToPickupMins: d.quote.etaToPickupMins,
-          etaToDropoffMins: d.quote.etaToDropoffMins,
-          expiresAtMs: d.quote.expiresAtMs,
-        }
-      : null,
-    delivery: d.delivery
-      ? { state: d.delivery.state, pickupCode: d.delivery.pickupCode, driver: d.delivery.driver }
-      : null,
-    createdAtMs: d.createdAtMs,
-  };
+  return NextResponse.json({ delivery: merchantView(result.delivery) });
 }

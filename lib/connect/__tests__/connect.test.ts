@@ -239,12 +239,25 @@ test("[25] Connect records are server-only in the rules", () => {
 });
 
 test("[26] the partner is never shown the Dispatcher cost or the margin", () => {
-  const src = read("app/api/admin/connect/deliveries/route.ts");
-  const redact = src.slice(src.indexOf("function redact("));
+  // The merchant projection is the single place this is decided, for the list,
+  // the detail page and anything that comes later.
+  const view = read("lib/connect/merchant-view.ts");
+  const fn = view.slice(view.indexOf("export function merchantView"));
   for (const leak of ["dispatcherCostMinor", "marginMinor", "marginBps"]) {
-    assert.ok(!redact.includes(leak), `redacted projection leaks ${leak}`);
+    assert.ok(!fn.includes(leak), `merchant projection leaks ${leak}`);
   }
-  assert.match(redact, /priceMinor: d\.quote\.partnerPriceMinor/, "one number: what they pay");
+  assert.match(fn, /priceMinor: d\.payment\?\.amountMinor \?\? d\.quote\?\.partnerPriceMinor/,
+    "one number: what they pay");
+  // And the routes must not hand the raw record out around it.
+  for (const r of ["app/api/admin/connect/deliveries/route.ts", "app/api/admin/connect/deliveries/[id]/route.ts"]) {
+    assert.match(read(r), /merchantView\(/, `${r} must go through the projection`);
+  }
+});
+
+test("[26b] the receiving code is unreachable through the merchant projection", () => {
+  const view = read("lib/connect/merchant-view.ts");
+  assert.ok(!view.includes("receivingCode"), "a restaurant that can read it can hand it to the wrong rider");
+  assert.match(view, /PICKUP_CODE_FROM/, "the pickup code appears only once a rider is actually coming");
 });
 
 test("[27] the receiving code never reaches the partner", () => {
@@ -475,6 +488,83 @@ test("[52] accepted is not settled", () => {
   assert.match(svc, /settledAtMs: settled \? nowMs : null/);
   const types = read("lib/connect/types.ts");
   assert.match(types, /providerStatus: string \| null/, "the provider's own word must be kept");
+});
+
+// ── Merchant UI ─────────────────────────────────────────────────────────────
+
+test("[53] the Connect nav entry appears only for Connect restaurants", () => {
+  const nav = read("app/admin/[slug]/components/AdminNav.tsx");
+  assert.match(nav, /buildGroups\(slug: string, connectEnabled: boolean\)/);
+  assert.match(nav, /connectEnabled\s*\n?\s*\? \[\{/, "the item must be conditional, not always present");
+  assert.match(nav, /\/api\/admin\/connect\/status/);
+});
+
+test("[54] the Connect pages 404 for a restaurant without Connect", () => {
+  for (const p of ["app/admin/[slug]/connect/page.tsx", "app/admin/[slug]/connect/[id]/page.tsx"]) {
+    const src = read(p);
+    assert.match(src, /connectReadiness/, `${p} must check readiness`);
+    assert.match(src, /if \(!readiness\.ok\) return notFound\(\);/, `${p} must 404, not 403`);
+  }
+});
+
+test("[55] a merchant page cannot act on another restaurant's slug", () => {
+  for (const p of ["app/admin/[slug]/connect/page.tsx", "app/admin/[slug]/connect/[id]/page.tsx"]) {
+    const src = read(p);
+    assert.match(src, /user\.restaurantSlug !== slug/, `${p} must redirect a foreign slug`);
+  }
+});
+
+test("[56] the operator screens never speak Dispatcher", () => {
+  // "SEARCHING_FOR_DRIVER" means nothing behind a counter.
+  // Comments explain WHY the vocabulary is hidden; what matters is what renders.
+  const stripComments = (src: string) =>
+    src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  for (const p of [
+    "app/admin/[slug]/connect/ConnectClient.tsx",
+    "app/admin/[slug]/connect/[id]/ConnectDetailClient.tsx",
+  ]) {
+    const src = stripComments(read(p));
+    assert.ok(!/Dispatcher/i.test(src), `${p} exposes Dispatcher to the operator`);
+    assert.ok(!/SEARCHING_FOR_DRIVER|EN_ROUTE_TO_CUSTOMER/.test(src), `${p} leaks raw delivery states`);
+  }
+});
+
+test("[57] the merchant UI never renders the receiving code", () => {
+  for (const p of [
+    "app/admin/[slug]/connect/ConnectClient.tsx",
+    "app/admin/[slug]/connect/[id]/ConnectDetailClient.tsx",
+  ]) {
+    assert.ok(!read(p).includes("receivingCode"), `${p} must not show the customer's proof`);
+  }
+});
+
+test("[58] the UI does not claim RestoFlow sent the customer a message", () => {
+  // There is no WhatsApp integration. Saying otherwise is a lie the operator
+  // only discovers when the customer never receives anything.
+  const src = read("app/admin/[slug]/connect/ConnectClient.tsx");
+  assert.ok(!/sent (via|to|through) WhatsApp|We.?ve sent/i.test(src));
+  assert.match(src, /navigator\.share/, "sharing uses the device's own share sheet");
+  assert.match(src, /Waiting for customer payment/);
+});
+
+test("[59] the operator screens refresh themselves", () => {
+  for (const p of [
+    "app/admin/[slug]/connect/ConnectClient.tsx",
+    "app/admin/[slug]/connect/[id]/ConnectDetailClient.tsx",
+  ]) {
+    const src = read(p);
+    assert.match(src, /setInterval\(\(\) => void load\(\), 8000\)/, `${p} must poll`);
+    assert.ok(!/socket|EventSource|pusher/i.test(src), `${p} must not add a second realtime system`);
+  }
+});
+
+test("[60] the drop-off pin is captured explicitly, not guessed from the text", () => {
+  const src = read("app/admin/[slug]/connect/ConnectClient.tsx");
+  assert.match(src, /Confirm delivery location/);
+  assert.match(src, /navigator\.geolocation/, "the device can supply it");
+  assert.match(src, /!coords/, "a quote must be impossible without confirmed coordinates");
+  // No map provider was added — see the report.
+  assert.ok(!/googleapis\.com\/maps|mapbox|leaflet/i.test(src));
 });
 
 console.log(`\n${passed} checks passed\n`);

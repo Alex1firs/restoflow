@@ -31,6 +31,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
+  Truck,
 } from "lucide-react";
 
 type Role = "owner" | "manager" | "staff";
@@ -83,7 +84,13 @@ function DomainDot({ slug }: { slug: string }) {
   );
 }
 
-function buildGroups(slug: string): NavGroup[] {
+/**
+ * `connectEnabled` is asked for at runtime rather than baked in, because the
+ * nav is a client component and Connect is a per-restaurant capability. A
+ * restaurant without it never sees the entry — the same reasoning as the API
+ * answering 404: the feature does not announce itself.
+ */
+function buildGroups(slug: string, connectEnabled: boolean): NavGroup[] {
   return [
     {
       label: "Operations",
@@ -112,6 +119,14 @@ function buildGroups(slug: string): NavGroup[] {
           Icon: ClipboardList,
           roles: ["owner", "manager", "staff"],
         },
+        ...(connectEnabled
+          ? [{
+              name: "Connect",
+              href: `/admin/${slug}/connect`,
+              Icon: Truck,
+              roles: ["owner", "manager", "staff"] as Role[],
+            }]
+          : []),
         {
           name: "Kitchen",
           href: `/admin/${slug}/kitchen`,
@@ -350,7 +365,17 @@ export default function AdminNav({ slug, role = "owner" }: Props) {
     pathname === `/admin/${slug}/kitchen` ||
     pathname === `/admin/${slug}/pos`;
 
-  const groups = buildGroups(slug);
+  // Asked for once, the same way the domain dot asks. A restaurant without
+  // Connect simply never sees the entry.
+  const [connectEnabled, setConnectEnabled] = useState(false);
+  useEffect(() => {
+    fetch("/api/admin/connect/status")
+      .then((r) => r.json())
+      .then((d) => setConnectEnabled(d?.enabled === true))
+      .catch(() => {});
+  }, []);
+
+  const groups = buildGroups(slug, connectEnabled);
 
   const handleLogout = async () => {
     setDrawerOpen(false);
