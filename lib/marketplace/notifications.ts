@@ -41,8 +41,16 @@ export const NOTIFICATION_OWNER: Record<Audience, Owner> = {
  * True for every marketplace job. Dispatcher keeps every rider notification it
  * already sends — those are its audience and its job.
  */
+export const RESTOFLOW_PARTNERS = ["restoflow_marketplace", "restoflow_connect"] as const;
+
 export function dispatcherMustStaySilent(delivery: { partner?: string | null; isExternal?: boolean }): boolean {
-  return delivery.partner === "restoflow_marketplace";
+  // Connect belongs here for the same reason the marketplace does, and for one
+  // more: a Connect customer never heard of RestoFlow either. They ordered from
+  // the restaurant on WhatsApp. A message from a logistics company they have no
+  // relationship with is not a status update, it is a stranger with their
+  // address — so RestoFlow owns every word, exactly as it does for its own
+  // customers, and Dispatcher stays silent for both.
+  return RESTOFLOW_PARTNERS.includes(delivery.partner as (typeof RESTOFLOW_PARTNERS)[number]);
 }
 
 export type CustomerEvent =

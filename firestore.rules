@@ -184,6 +184,34 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ─── RestoFlow Connect (delivery-only partners) ──────────────────────────────
+    //
+    // Every Connect surface is server-mediated through /api/admin/connect/*,
+    // which takes the restaurant from the session and never from the request.
+    // Denying direct client access is not belt-and-braces here: these records
+    // carry a customer's name, phone and home address for a person who never
+    // agreed to anything with RestoFlow, and a rule that merely scoped reads by
+    // restaurantId would still hand the whole record to a compromised staff
+    // login. The API returns a redacted projection instead.
+    match /connect_deliveries/{deliveryId} {
+      allow read:  if false;
+      allow write: if false;
+    }
+
+    // The receiving code is the customer's proof of delivery. Nobody reads it
+    // but the server — not the partner, not staff. Same reasoning as
+    // order_handover, and the same deny-all.
+    match /connect_handover/{deliveryId} {
+      allow read:  if false;
+      allow write: if false;
+    }
+
+    // Money. Written by the server, reconciled by the server.
+    match /connect_ledger_entries/{entryId} {
+      allow read:  if false;
+      allow write: if false;
+    }
+
     // ─── Food Discovery Engine (discovery_dishes + discovery_restaurants) ─────────
     // Denormalized, read-only projection of the transactional core, built by the
     // server (Admin SDK, which bypasses these rules) via the discovery indexer /
