@@ -43,7 +43,7 @@ The three relationships beyond a full RestoFlow restaurant.
 | Milestone | Scope |
 |---|---|
 | **3.1 Marketplace Partner** | Simplified merchant interface for restaurants without the POS: information, menu, prices, hours, location, prep. |
-| **3.2 RestoFlow Connect** | Request-a-courier without originating the food order — pickup, drop-off, package, ready now/later. Logistics revenue on orders RestoFlow did not take. |
+| **3.2 RestoFlow Connect (delivery-only)** | 🟡 **Slices 1–2 done 2026-09-14, verified on staging.** Capability on the existing tenant, per-partner margin, own ledger, quote → dispatch through the proven Dispatcher client, jobs classified `restoflow_connect`. **Not started:** merchant UI, tracking, cancellation, prepaid enforcement, Enterprise API. |
 | **3.3 Partner API** | Programmatic marketplace and delivery requests for enterprise systems, with keys, quotas and idempotency. |
 
 ## WS4 · Payments, Payable & Settlement

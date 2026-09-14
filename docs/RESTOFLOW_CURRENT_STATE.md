@@ -53,7 +53,12 @@ customer app) · `pack_delivery` (Dispatcher).
 | Capability | Status | Evidence | Remaining | Next action |
 |---|---|---|---|---|
 | Marketplace Partner mode | ⬜ | No partner mode in `lib/marketplace/config.ts`; every marketplace restaurant is a full RestoFlow restaurant | Simplified merchant interface | — |
-| RestoFlow Connect (delivery-only) | ⬜ | No request-courier surface. `requestDeliveryForOrder` requires a paid marketplace order | Standalone courier request | — |
+| RestoFlow Connect — foundation (Slice 1) | ✅ | `connect` capability on the existing tenant (two switches: super-admin approval **and** a configured margin, no default); `connect_deliveries` / `connect_handover` / `connect_ledger_entries`, all deny-all in rules; session-derived tenant scoping; super-admin activation route; indexes deployed | — | — |
+| RestoFlow Connect — quote → dispatch (Slice 2) | ✅ | `lib/connect/service.ts` over the proven Dispatcher client/contract. Staging: cost ₦850 + 10% test margin = ₦935; Dispatcher sent ₦850 only; replay returned one job; expired quote → 409; ledger balanced; job stamped `restoflow_connect` | — | — |
+| Connect margin | ✅ | Per-partner basis points, no default. Staging uses 10% flagged `marginIsTest`; **production refuses a test-flagged margin**, so a verification value cannot become a commercial rate | Set real commercial rates before any production partner | Owner decision |
+| Connect prepaid billing | 🟡 | **No wallet was built.** Audit found no reusable balance/credit mechanism — settlement is outbound only. Obligations are recorded in the ledger (`partner_receivable`); nothing yet enforces a balance before dispatch | Smallest-safe prepaid design, reported for approval | **Next Connect slice** |
+| Connect merchant UI / tracking / cancellation | ⬜ | Deliberately not started — foundation only, pending approval | Slices 3–6 | Owner approval |
+| Dispatcher partner classification | ✅ | Was hardcoded to the marketplace; now derived from the authenticated client, and the webhook emitter resolves each job's callback from its own partner record. Records without a `partner` field remain marketplace, so existing behaviour is unchanged | Deploy to the production Dispatcher with the rest of 6.3a | **WS6.3** |
 | Partner / Enterprise API | ⬜ | No `app/api/partner` or versioned public API | Keys, quotas, idempotency | — |
 
 ## WS4 · Payments, Payable & Settlement
