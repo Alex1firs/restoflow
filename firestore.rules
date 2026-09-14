@@ -212,6 +212,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Payment reference → delivery. Written and read by the webhook only.
+    match /connect_payment_refs/{reference} {
+      allow read:  if false;
+      allow write: if false;
+    }
+
     // ─── Food Discovery Engine (discovery_dishes + discovery_restaurants) ─────────
     // Denormalized, read-only projection of the transactional core, built by the
     // server (Admin SDK, which bypasses these rules) via the discovery indexer /

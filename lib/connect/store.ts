@@ -1,6 +1,6 @@
 import "server-only";
 import type { Firestore } from "firebase-admin/firestore";
-import type { ConnectDelivery } from "./types";
+import type { ConnectDelivery, ConnectRefund } from "./types";
 import type { ConnectLedgerEntry } from "./ledger";
 
 /**
@@ -22,6 +22,7 @@ import type { ConnectLedgerEntry } from "./ledger";
 const DELIVERIES = "connect_deliveries";
 const HANDOVER = "connect_handover";
 const LEDGER = "connect_ledger_entries";
+const REFS = "connect_payment_refs";
 
 export class ConnectStore {
   constructor(private db: Firestore) {}
@@ -76,6 +77,53 @@ export class ConnectStore {
       const current = snap.data() as ConnectDelivery;
       if (current.delivery) return false;
       tx.update(ref, { ...patch, updatedAtMs: Date.now() });
+      return true;
+    });
+  }
+
+  /**
+   * Payment reference → Connect delivery.
+   *
+   * Its own document rather than a query, because the webhook arrives with
+   * nothing but a reference and must resolve it in one read, deterministically.
+   */
+  async mapReference(reference: string, deliveryId: string): Promise<void> {
+    await this.db.collection(REFS).doc(reference).set({ reference, deliveryId, createdAtMs: Date.now() });
+  }
+
+  async deliveryIdForReference(reference: string): Promise<string | null> {
+    const snap = await this.db.collection(REFS).doc(reference).get();
+    return snap.exists ? String(snap.data()?.deliveryId ?? "") || null : null;
+  }
+
+  /**
+   * Claim the payment, once.
+   *
+   * Compare-and-set on `payment.paidAtMs == null`. Two webhook deliveries of the
+   * same charge — which Paystack does send — must produce one dispatch and one
+   * set of ledger rows.
+   */
+  async markPaid(id: string, nowMs: number): Promise<boolean> {
+    const ref = this.db.collection(DELIVERIES).doc(id);
+    return this.db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return false;
+      const d = snap.data() as ConnectDelivery;
+      if (!d.payment || d.payment.paidAtMs) return false;
+      tx.update(ref, { state: "paid", "payment.paidAtMs": nowMs, updatedAtMs: nowMs });
+      return true;
+    });
+  }
+
+  /** Claim the single refund obligation. A second caller gets false, never a second refund. */
+  async claimRefund(id: string, refund: ConnectRefund): Promise<boolean> {
+    const ref = this.db.collection(DELIVERIES).doc(id);
+    return this.db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return false;
+      const d = snap.data() as ConnectDelivery;
+      if (d.refund) return false;
+      tx.update(ref, { refund, state: "refund_pending", updatedAtMs: Date.now() });
       return true;
     });
   }

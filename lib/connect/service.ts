@@ -7,8 +7,9 @@ import { DispatcherClient } from "@/lib/delivery/dispatcher-client";
 import { initialProjection } from "@/lib/delivery/projection";
 import { readConnectSettings, connectReadiness } from "./config";
 import { priceConnectDelivery } from "./pricing";
-import { connectEntries, connectBalance } from "./ledger";
+import { connectEntries, connectRefundEntries, connectBalance } from "./ledger";
 import { ConnectStore } from "./store";
+import { initializeConnectPayment, refundConnectPayment } from "./payments";
 import type { ConnectDelivery, ConnectPlace, ConnectQuote } from "./types";
 
 /**
@@ -121,6 +122,8 @@ export async function quoteConnectDelivery(args: {
   packageDescription: string;
   readyAt: string;
   nowMs?: number;
+  /** Re-quoting an existing delivery in place, rather than starting a new one. */
+  reuseDeliveryId?: string;
 }): Promise<QuoteOk | ConnectFailure> {
   const nowMs = args.nowMs ?? Date.now();
   const ctx = await partnerContext(args.db, args.restaurantId);
@@ -129,7 +132,7 @@ export async function quoteConnectDelivery(args: {
   const c = client();
   if (!c) return { ok: false, reason: "delivery_integration_disabled" };
 
-  const id = `cn_${randomBytes(9).toString("hex")}`;
+  const id = args.reuseDeliveryId ?? `cn_${randomBytes(9).toString("hex")}`;
   const correlationId = `cn-${randomUUID().slice(0, 13)}`;
 
   const res = await c.quote({
@@ -183,90 +186,270 @@ export async function quoteConnectDelivery(args: {
     packageDescription: args.packageDescription,
     readyAt: args.readyAt,
     quote,
+    payer: null,
+    payment: null,
+    refund: null,
     delivery: null,
-    trackingToken: null,
+    // Minted at QUOTE, not at dispatch: the pay link has to exist before the
+    // courier does, and it is the same token the customer later tracks with.
+    trackingToken: randomBytes(16).toString("hex"),
     createdAtMs: nowMs,
     updatedAtMs: nowMs,
     createdByUid: args.createdByUid,
     correlationId,
   };
 
-  await new ConnectStore(args.db).create(delivery);
+  const store = new ConnectStore(args.db);
+  if (args.reuseDeliveryId) {
+    // A refresh, not a new delivery: keep the token the pay link already uses.
+    await store.update(id, { quote, state: "quoted" });
+  } else {
+    await store.create(delivery);
+  }
   return { ok: true, delivery, quote };
 }
 
+/** Below this much remaining, re-quote rather than send somebody to a checkout that may die mid-payment. */
+export const QUOTE_MIN_REMAINING_MS = 2 * 60 * 1000;
+
+export type PayerChoice = "customer" | "restaurant";
+
 /**
- * Turn an accepted quote into a real Dispatcher job.
+ * Choose who pays, refresh the price if the quote is going stale, and open a
+ * Paystack checkout.
  *
- * Idempotent on the Connect delivery id, which is also the `externalOrderId`
- * Dispatcher dedupes on — so a double-tap, a retried request or a replayed
- * call all converge on one job rather than two couriers.
+ * ── Why the quote is refreshed BEFORE payment, never after ───────────────────
+ * A quote that expires between the pay link and the payment leaves money taken
+ * for a delivery that can no longer be priced — recoverable only by refunding
+ * somebody who did nothing wrong. So a quote with little life left is replaced
+ * here, and if the price moved the caller is told before anybody is charged.
+ *
+ * Once the intent exists the amount is frozen. A later re-quote cannot change
+ * what a payer has already been shown.
  */
-export async function requestConnectDelivery(args: {
+export async function preparePayment(args: {
   db: Firestore;
   restaurantId: string;
   deliveryId: string;
+  payer: PayerChoice;
+  payerEmail?: string;
   nowMs?: number;
-}): Promise<RequestOk | ConnectFailure> {
+}): Promise<
+  | { ok: true; delivery: ConnectDelivery; amountMinor: number; priceChanged: boolean; authorizationUrl: string }
+  | ConnectFailure
+> {
   const nowMs = args.nowMs ?? Date.now();
   const store = new ConnectStore(args.db);
-
   const existing = await store.get(args.restaurantId, args.deliveryId);
   if (!existing) return { ok: false, reason: "not_found" };
 
-  if (existing.delivery?.deliveryJobId) {
-    return { ok: true, delivery: existing, replayed: true };
-  }
-  if (existing.state !== "quoted") return { ok: false, reason: "not_quoted" };
+  // Already paid, or already dispatched: never open a second checkout.
+  if (existing.payment?.paidAtMs) return { ok: false, reason: "already_paid" };
+  if (existing.delivery) return { ok: false, reason: "already_dispatched" };
   if (!existing.quote) return { ok: false, reason: "no_quote" };
-
-  // An expired quote is refused outright. Requesting on a stale price means
-  // either the partner or RestoFlow eats a difference nobody agreed to.
-  if (existing.quote.expiresAtMs <= nowMs) return { ok: false, reason: "quote_expired" };
 
   const ctx = await partnerContext(args.db, args.restaurantId);
   if (!ctx.ok) return { ok: false, reason: ctx.reason };
 
+  let quote = existing.quote;
+  let priceChanged = false;
+
+  if (quote.expiresAtMs - nowMs < QUOTE_MIN_REMAINING_MS) {
+    const fresh = await quoteConnectDelivery({
+      db: args.db,
+      restaurantId: args.restaurantId,
+      createdByUid: existing.createdByUid,
+      dropoff: existing.dropoff,
+      packageDescription: existing.packageDescription,
+      readyAt: existing.readyAt,
+      nowMs,
+      reuseDeliveryId: existing.id,
+    });
+    if (!fresh.ok) return fresh;
+    priceChanged = fresh.quote.partnerPriceMinor !== quote.partnerPriceMinor;
+    quote = fresh.quote;
+  }
+
+  const reference = `cnpay_${existing.id}_${randomBytes(4).toString("hex")}`;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const init = await initializeConnectPayment({
+    reference,
+    // Server-computed, from the frozen quote. No client supplies an amount.
+    amountMinor: quote.partnerPriceMinor,
+    email: args.payerEmail?.trim() || "delivery@restoflow.app",
+    deliveryId: existing.id,
+    callbackUrl: `${appUrl}/d/${existing.id}?t=${existing.trackingToken ?? ""}`,
+  });
+  if (!init.ok) return { ok: false, reason: "payment_init_failed", detail: init.reason };
+
+  const payment = {
+    reference: init.reference,
+    payer: args.payer,
+    amountMinor: quote.partnerPriceMinor,
+    dispatcherCostMinor: quote.dispatcherCostMinor,
+    marginMinor: quote.marginMinor,
+    quoteId: quote.quoteId,
+    createdAtMs: nowMs,
+    authorizationUrl: init.authorizationUrl,
+    paidAtMs: null,
+  };
+
+  await store.update(existing.id, { state: "awaiting_payment", payer: args.payer, quote, payment });
+  await store.mapReference(init.reference, existing.id);
+
+  const fresh2 = await store.get(args.restaurantId, existing.id);
+  return {
+    ok: true,
+    delivery: fresh2 ?? existing,
+    amountMinor: quote.partnerPriceMinor,
+    priceChanged,
+    authorizationUrl: init.authorizationUrl,
+  };
+}
+
+/**
+ * A confirmed Paystack charge for a Connect delivery.
+ *
+ * Idempotent on the payment reference. A webhook replay finds the delivery
+ * already paid and returns without charging, dispatching or booking anything a
+ * second time.
+ */
+export async function onConnectPaymentConfirmed(args: {
+  db: Firestore;
+  reference: string;
+  amountMinor: number;
+  nowMs?: number;
+}): Promise<{ outcome: "dispatched" | "replayed" | "ignored" | "held"; deliveryId?: string; reason?: string }> {
+  const nowMs = args.nowMs ?? Date.now();
+  const store = new ConnectStore(args.db);
+
+  const deliveryId = await store.deliveryIdForReference(args.reference);
+  if (!deliveryId) return { outcome: "ignored", reason: "unknown_reference" };
+
+  const d = await store.getInternal(deliveryId);
+  if (!d || !d.payment) return { outcome: "ignored", reason: "no_intent" };
+
+  if (d.payment.paidAtMs) return { outcome: "replayed", deliveryId };
+
+  // Checked against the FROZEN snapshot, never recomputed. A re-quote between
+  // checkout and callback must not silently change what was owed.
+  if (args.amountMinor !== d.payment.amountMinor) {
+    console.error(JSON.stringify({
+      scope: "connect_payment", event: "amount_mismatch", deliveryId,
+      expected: d.payment.amountMinor, actual: args.amountMinor,
+    }));
+    return { outcome: "ignored", reason: "amount_mismatch" };
+  }
+
+  const claimed = await store.markPaid(deliveryId, nowMs);
+  if (!claimed) return { outcome: "replayed", deliveryId };
+
+  // Books first: the money is real whether or not a courier can be found.
+  const price = {
+    dispatcherCostMinor: d.payment.dispatcherCostMinor,
+    marginMinor: d.payment.marginMinor,
+    partnerPriceMinor: d.payment.amountMinor,
+    marginBps: d.quote?.marginBps ?? 0,
+  };
+  const entries = connectEntries({
+    deliveryId, restaurantId: d.restaurantId, price, payer: d.payment.payer, nowMs,
+  });
+  if (connectBalance(entries) !== 0) {
+    console.error(JSON.stringify({ scope: "connect_ledger", event: "unbalanced", deliveryId }));
+  } else {
+    await store.writeLedger(entries);
+  }
+
+  const dispatched = await dispatchPaidDelivery({ db: args.db, deliveryId, nowMs });
+  return dispatched.ok
+    ? { outcome: "dispatched", deliveryId }
+    : { outcome: "held", deliveryId, reason: dispatched.reason };
+}
+
+/**
+ * Hand a paid delivery to Dispatcher.
+ *
+ * ── Reconcile before retrying, always ────────────────────────────────────────
+ * A create that times out is not a create that failed. Asking again could put a
+ * second rider on the same job, so an ambiguous result is resolved by asking
+ * Dispatcher what it holds for this externalOrderId — the same machinery the
+ * marketplace sweeps use — before anything is retried or refunded.
+ */
+export async function dispatchPaidDelivery(args: {
+  db: Firestore;
+  deliveryId: string;
+  nowMs?: number;
+}): Promise<{ ok: true; replayed: boolean } | ConnectFailure> {
+  const nowMs = args.nowMs ?? Date.now();
+  const store = new ConnectStore(args.db);
+  const d = await store.getInternal(args.deliveryId);
+  if (!d) return { ok: false, reason: "not_found" };
+  if (d.delivery?.deliveryJobId) return { ok: true, replayed: true };
+  if (!d.payment?.paidAtMs) return { ok: false, reason: "not_paid" };
+  if (!d.quote) return { ok: false, reason: "no_quote" };
+
   const c = client();
   if (!c) return { ok: false, reason: "delivery_integration_disabled" };
 
+  const correlationId = d.correlationId ?? `cn-${randomUUID().slice(0, 13)}`;
+
   const req: CreateDeliveryRequest = {
     contractVersion: CONTRACT_VERSION,
-    correlationId: existing.correlationId ?? `cn-${randomUUID().slice(0, 13)}`,
-    externalOrderId: existing.id,
-    quoteId: existing.quote.quoteId,
+    correlationId,
+    externalOrderId: d.id,
+    quoteId: d.payment.quoteId,
     serviceType: "FOOD_STANDARD",
     pickup: {
-      name: existing.pickup.name,
-      address: existing.pickup.address,
-      location: existing.pickup.location,
-      contactPhone: existing.pickup.contactPhone,
-      ...(existing.pickup.instructions ? { instructions: existing.pickup.instructions } : {}),
+      name: d.pickup.name,
+      address: d.pickup.address,
+      location: d.pickup.location,
+      contactPhone: d.pickup.contactPhone,
+      ...(d.pickup.instructions ? { instructions: d.pickup.instructions } : {}),
     },
     dropoff: {
-      // First name only. The contract says so and the rider needs no more.
-      name: existing.dropoff.name.trim().split(/\s+/)[0] ?? "Customer",
-      address: existing.dropoff.address,
-      location: existing.dropoff.location,
-      contactPhone: existing.dropoff.contactPhone,
-      ...(existing.dropoff.instructions ? { instructions: existing.dropoff.instructions } : {}),
+      name: d.dropoff.name.trim().split(/\s+/)[0] ?? "Customer",
+      address: d.dropoff.address,
+      location: d.dropoff.location,
+      contactPhone: d.dropoff.contactPhone,
+      ...(d.dropoff.instructions ? { instructions: d.dropoff.instructions } : {}),
     },
-    readyAt: existing.readyAt,
-    // What Dispatcher charges US. RestoFlow's margin is not Dispatcher's
-    // business and must never inflate what the rider's side sees.
-    deliveryFeeMinor: existing.quote.dispatcherCostMinor,
-    // Prepaid: the partner owes RestoFlow, and the rider collects nothing.
+    readyAt: d.readyAt,
+    // What Dispatcher charges US. The margin is not Dispatcher's business and
+    // must never inflate what the rider's side sees.
+    deliveryFeeMinor: d.payment.dispatcherCostMinor,
+    // Prepaid: the customer already paid RestoFlow, so the rider collects nothing.
     paymentCollection: "NONE",
-    packageDescription: existing.packageDescription,
+    packageDescription: d.packageDescription,
   };
 
   const res = await c.createDelivery(req);
-  if (!res.ok) return { ok: false, reason: "create_failed", detail: res.failure.kind };
 
-  const v = res.value;
+  if (!res.ok) {
+    // Ambiguous — a timeout or a transport failure. Ask what Dispatcher holds
+    // before deciding anything.
+    const existing = await c.getDelivery({ externalOrderId: d.id, correlationId });
+    if (existing.ok && existing.value.deliveryJobId) {
+      await attach(store, d, existing.value, nowMs);
+      return { ok: true, replayed: true };
+    }
+    // Only now is it safe to call this a failure.
+    await store.update(d.id, { state: "payment_held_unfulfilled" });
+    return { ok: false, reason: "dispatch_failed", detail: res.failure.kind };
+  }
+
+  await attach(store, d, res.value, nowMs);
+  return { ok: true, replayed: res.value.replayed };
+}
+
+async function attach(
+  store: ConnectStore,
+  d: ConnectDelivery,
+  v: { deliveryJobId: string; state: import("@/lib/delivery/contract").DeliveryState; driver: import("@/lib/delivery/contract").DriverPublicProfile | null; etaToPickupMins: number | null; etaToDropoffMins: number | null; pickupCode: string | null; receivingCode: string | null },
+  nowMs: number
+): Promise<void> {
   const projection = initialProjection({
-    correlationId: req.correlationId,
-    quoteId: existing.quote.quoteId,
+    correlationId: d.correlationId ?? "",
+    quoteId: d.payment?.quoteId ?? null,
     nowMs,
   });
   projection.deliveryJobId = v.deliveryJobId;
@@ -276,49 +459,89 @@ export async function requestConnectDelivery(args: {
   projection.etaToDropoffMins = v.etaToDropoffMins;
   projection.pickupCode = v.pickupCode ?? null;
 
-  const attached = await store.attachDelivery(existing.id, {
-    state: "requested",
-    delivery: projection,
-    trackingToken: randomBytes(16).toString("hex"),
-  });
+  const attached = await store.attachDelivery(d.id, { state: "requested", delivery: projection });
+  if (!attached) return; // somebody else won; their job is the job
 
-  if (!attached) {
-    // Somebody else won the race. Their job is the job.
-    const fresh = await store.get(args.restaurantId, existing.id);
-    return fresh
-      ? { ok: true, delivery: fresh, replayed: true }
-      : { ok: false, reason: "attach_failed" };
-  }
-
-  // The receiving code is the customer's proof and is never stored on a record
-  // the partner can read.
-  await store.writeHandover(existing.id, {
+  await store.writeHandover(d.id, {
     pickupCode: v.pickupCode ?? null,
     receivingCode: v.receivingCode ?? null,
   });
+}
 
-  const entries = connectEntries({
-    deliveryId: existing.id,
-    restaurantId: existing.restaurantId,
-    price: {
-      dispatcherCostMinor: existing.quote.dispatcherCostMinor,
-      marginMinor: existing.quote.marginMinor,
-      partnerPriceMinor: existing.quote.partnerPriceMinor,
-      marginBps: existing.quote.marginBps,
-    },
-    nowMs,
+/**
+ * Refund a delivery that was paid for and can never be fulfilled.
+ *
+ * ── One refund, forever ──────────────────────────────────────────────────────
+ * The obligation is keyed on the payment reference and claimed with a
+ * compare-and-set, so a webhook replay, a retried worker and a manual
+ * reconciliation all converge on the same single refund. Paystack refusing a
+ * duplicate is treated as success for the same reason: it is the outcome we
+ * wanted, and calling it an error would make a retrying worker loop forever.
+ */
+export async function refundConnectDelivery(args: {
+  db: Firestore;
+  deliveryId: string;
+  reason: string;
+  nowMs?: number;
+}): Promise<{ ok: true; alreadyRefunded: boolean } | ConnectFailure> {
+  const nowMs = args.nowMs ?? Date.now();
+  const store = new ConnectStore(args.db);
+  const d = await store.getInternal(args.deliveryId);
+  if (!d) return { ok: false, reason: "not_found" };
+  if (!d.payment?.paidAtMs) return { ok: false, reason: "not_paid" };
+  if (d.delivery?.deliveryJobId) return { ok: false, reason: "already_dispatched" };
+  if (d.refund?.status === "succeeded") return { ok: true, alreadyRefunded: true };
+
+  const claimed = await store.claimRefund(d.id, {
+    id: `${d.id}__refund`,
+    reference: d.payment.reference,
+    amountMinor: d.payment.amountMinor,
+    reason: args.reason,
+    status: "pending",
+    providerReference: null,
+    requestedAtMs: nowMs,
+    settledAtMs: null,
+    lastError: null,
   });
-  if (connectBalance(entries) !== 0) {
-    // Refuse to write books that do not balance. Loudly, because a silent
-    // imbalance is discovered months later by somebody reconciling by hand.
-    console.error(JSON.stringify({
-      scope: "connect_ledger", event: "unbalanced", deliveryId: existing.id,
-      balance: connectBalance(entries),
-    }));
-  } else {
-    await store.writeLedger(entries);
+  if (!claimed) {
+    const fresh = await store.getInternal(d.id);
+    return { ok: true, alreadyRefunded: fresh?.refund?.status === "succeeded" };
   }
 
-  const fresh = await store.get(args.restaurantId, existing.id);
-  return { ok: true, delivery: fresh ?? existing, replayed: v.replayed };
+  const res = await refundConnectPayment({
+    reference: d.payment.reference,
+    amountMinor: d.payment.amountMinor,
+    reason: args.reason,
+  });
+
+  if (!res.ok) {
+    await store.update(d.id, {
+      state: "refund_failed",
+      refund: { ...d.refund!, ...(await store.getInternal(d.id))!.refund!, status: "failed", lastError: res.reason },
+    });
+    return { ok: false, reason: "refund_failed", detail: res.reason };
+  }
+
+  const current = (await store.getInternal(d.id))!;
+  await store.update(d.id, {
+    state: "refunded",
+    refund: {
+      ...current.refund!,
+      status: "succeeded",
+      providerReference: res.providerReference,
+      settledAtMs: nowMs,
+    },
+  });
+
+  const price = {
+    dispatcherCostMinor: d.payment.dispatcherCostMinor,
+    marginMinor: d.payment.marginMinor,
+    partnerPriceMinor: d.payment.amountMinor,
+    marginBps: d.quote?.marginBps ?? 0,
+  };
+  await store.writeLedger(
+    connectRefundEntries({ deliveryId: d.id, restaurantId: d.restaurantId, price, payer: d.payment.payer, nowMs })
+  );
+
+  return { ok: true, alreadyRefunded: res.alreadyRefunded };
 }

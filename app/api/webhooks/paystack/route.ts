@@ -110,6 +110,20 @@ export async function POST(req: NextRequest) {
         // the webhook behaves exactly as it did before.
         const { handleMarketplacePaymentWebhook } = await import("@/lib/marketplace/webhook");
         await handleMarketplacePaymentWebhook(event.data);
+      } else if (metadata?.paymentType === "connect_delivery") {
+        // A Connect delivery fee. Collected by the platform like a marketplace
+        // order — the restaurant is owed none of it — and the courier is
+        // requested from here rather than from an HTTP action, so a job is only
+        // ever commissioned against money that has actually landed.
+        const { onConnectPaymentConfirmed } = await import("@/lib/connect/service");
+        const { getAdminDb } = await import("@/lib/firebase-admin");
+        const d = event.data as PaystackPaymentData & { reference: string; amount?: number };
+        const outcome = await onConnectPaymentConfirmed({
+          db: getAdminDb(),
+          reference: d.reference,
+          amountMinor: Number(d.amount ?? 0),
+        });
+        console.log(JSON.stringify({ scope: "connect_payment", event: "webhook", ...outcome }));
       } else {
         await processSuccessfulPayment(event.data);
       }
