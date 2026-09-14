@@ -43,7 +43,7 @@ The three relationships beyond a full RestoFlow restaurant.
 | Milestone | Scope |
 |---|---|
 | **3.1 Marketplace Partner** | Simplified merchant interface for restaurants without the POS: information, menu, prices, hours, location, prep. |
-| **3.2 RestoFlow Connect (delivery-only)** | 🟡 **Slices 1–2 plus the payment gate done 2026-09-14.** Customer-paid or restaurant-paid per delivery, **no wallet**; dispatch behind the Paystack webhook; Paystack refund adapter; one guest token for pay → track. **Pending:** one real TEST checkout to prove the post-payment path end to end.** Capability on the existing tenant, per-partner margin, own ledger, quote → dispatch through the proven Dispatcher client, jobs classified `restoflow_connect`. **Not started:** merchant UI, tracking, cancellation, prepaid enforcement, Enterprise API. |
+| **3.2 RestoFlow Connect (delivery-only)** | 🟡 **Foundation, dispatch, payment gate and refunds done and verified on staging 2026-09-14.** Customer-paid or restaurant-paid per delivery, **no wallet**; dispatch behind the Paystack webhook; Paystack refund adapter; one guest token for pay → track. Customer-paid and restaurant-paid both proven with real Paystack TEST payments, including refund on definitive non-fulfilment. **Not started:** merchant Connect UI, cancellation, Enterprise invoice billing. Capability on the existing tenant, per-partner margin, own ledger, quote → dispatch through the proven Dispatcher client, jobs classified `restoflow_connect`. **Not started:** merchant UI, tracking, cancellation, prepaid enforcement, Enterprise API. |
 | **3.3 Partner API** | Programmatic marketplace and delivery requests for enterprise systems, with keys, quotas and idempotency. |
 
 ## WS4 · Payments, Payable & Settlement
